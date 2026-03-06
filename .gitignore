@@ -1,0 +1,13 @@
+# Wrangler / Cloudflare
+.wrangler/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Misc
+.DS_Store

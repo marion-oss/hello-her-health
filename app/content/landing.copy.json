@@ -1,0 +1,220 @@
+{
+  "meta": {
+    "productName": "Unison"
+  },
+  "hero": {
+    "headline": "AI teammates with shared memory for your company.",
+    "subheadline": "Unison is an AI-native workspace where AI co-workers remember your company context, turn decisions into tasks, and execute work. AI co-workers are shared across the team, so multiple humans can steer the same AI co-worker while staying in control.",
+    "primaryCta": { "label": "Request Access", "href": "#request-access" },
+    "secondaryCta": { "label": "Watch Demo", "href": "#demo" }
+  },
+  "problem": {
+    "title": "Your AI tools forget everything.",
+    "bullets": [
+      "Paste the same context into every tool, every time",
+      "GPT forgets what you decided yesterday",
+      "Copy outputs from one AI co-worker into another",
+      "No single place where AI knows your company"
+    ],
+    "closingLine": "Your AI tools don't talk to each other. Unison fixes that."
+  },
+  "solution": {
+    "title": "A workspace built for humans and AI co-workers",
+    "body": "Unison is where AI teammates live. AI co-workers work alongside your team inside the workflow, with shared context across conversations, docs, and tasks."
+  },
+  "coreBenefits": {
+    "title": "Why AI-native teams use Unison",
+    "items": [
+      {
+        "title": "AI co-workers that remember your company context",
+        "body": "AI co-workers operate with full workspace memory. They retain decisions, documents, conversations, and past work so you don't have to repeat yourself."
+      },
+      {
+        "title": "Centralized tools and knowledge",
+        "body": "Bring chat, docs, tasks, and AI execution into one workspace so context doesn't get lost between tools."
+      },
+      {
+        "title": "Shared AI teammates for the whole team",
+        "body": "AI co-workers belong to the workspace, not a single user. Multiple people can collaborate with and steer the same AI co-worker."
+      },
+      {
+        "title": "Create your own AI co-workers and share them internally",
+        "body": "Build specialized AI teammates for your workflows, then publish them to your workspace so everyone can use them."
+      }
+    ]
+  },
+  "workflow": {
+    "title": "From meeting to shipped work",
+    "intro": "Here's what Unison does for a typical product meeting:",
+    "steps": [
+      {
+        "title": "AI co-worker joins your meeting",
+        "body": "Unison's AI co-worker attends and captures the conversation with full company context."
+      },
+      {
+        "title": "Creates structured output",
+        "body": "It generates a meeting summary, decisions made, and action items."
+      },
+      {
+        "title": "Turns outcomes into tasks",
+        "body": "It creates tasks in the workspace: assigns owners, sets priorities, and links context."
+      },
+      {
+        "title": "AI co-workers execute deep work",
+        "body": "AI co-workers can start work like competitor research, drafting a spec, or analyzing feedback."
+      },
+      {
+        "title": "You approve before anything is shared",
+        "body": "AI co-workers draft outputs. Humans review and approve before sending or publishing."
+      }
+    ]
+  },
+  "capabilities": {
+    "title": "What AI teammates actually do",
+    "items": [
+      {
+        "title": "Never lose a decision again",
+        "body": "Every meeting becomes structured knowledge. AI co-workers capture the discussion, extract decisions, and generate clear follow-ups automatically."
+      },
+      {
+        "title": "Turn conversations into tasks",
+        "body": "Decisions instantly become tasks with owners, priorities, and context. No manual task creation. No forgotten action items."
+      },
+      {
+        "title": "Execute work in the background",
+        "body": "AI co-workers don't just summarize. They run research, draft specs, analyze feedback, and prepare reports using your company context."
+      },
+      {
+        "title": "Draft first, humans approve",
+        "body": "AI co-workers prepare outputs and suggestions. Humans review and approve before anything is shared or sent."
+      },
+      {
+        "title": "Keep the team informed automatically",
+        "body": "AI co-workers report progress, surface blockers, and update the team so everyone stays aligned without constant status meetings."
+      }
+    ]
+  },
+  "useCases": {
+    "title": "AI teammates in action",
+    "items": [
+      {
+        "title": "Product teams",
+        "bullets": [
+          "Meeting summaries automatically generated",
+          "Decisions extracted and documented",
+          "Tasks created and assigned",
+          "Specs drafted from conversations"
+        ]
+      },
+      {
+        "title": "AI-native founders",
+        "bullets": [
+          "Market research executed automatically",
+          "Competitive analysis generated",
+          "Product documentation drafted automatically",
+          "Customer insights summarized"
+        ]
+      },
+      {
+        "title": "Operations teams",
+        "bullets": [
+          "Reports generated from internal data",
+          "Process documentation created",
+          "Operational issues flagged",
+          "Action plans suggested"
+        ]
+      }
+    ]
+  },
+  "differentiation": {
+    "title": "Why Unison is different",
+    "points": [
+      {
+        "title": "AI teammates, not AI features",
+        "body": "Unison treats AI as a collaborator that operates inside the workflow, not a sidebar that generates text."
+      },
+      {
+        "title": "Shared memory and shared AI co-workers",
+        "body": "AI co-workers retain company context inside the workspace and can be used by multiple people on the team."
+      },
+      {
+        "title": "Real work with approvals",
+        "body": "AI co-workers do deep work and request approval when something is ready to share or send."
+      },
+      {
+        "title": "Create and share your own AI co-workers",
+        "body": "Build specialized AI co-workers for your team's workflows and make them available across the workspace."
+      }
+    ]
+  },
+  "controlSafety": {
+    "title": "Human control, always",
+    "bullets": [
+      "Review the AI co-worker's drafts",
+      "Adjust instructions",
+      "Approve before sharing or sending",
+      "Redirect execution"
+    ],
+    "closingLine": "AI co-workers operate transparently and default to human approval."
+  },
+  "faq": {
+    "title": "FAQ",
+    "items": [
+      {
+        "q": "Who is Unison for?",
+        "a": "Unison is for newly formed, AI-reliant teams (2-20 people) who want shared AI co-workers with persistent company context, centralized knowledge, and approvals by default."
+      },
+      {
+        "q": "Do AI co-workers send messages or updates automatically?",
+        "a": "No. AI co-workers draft outputs and ask for approval; humans review and approve before anything is shared."
+      },
+      {
+        "q": "How is Unison different from using AI inside tools like Notion or Slack?",
+        "a": "Most tools add AI as a feature that generates text. Unison makes AI a teammate with shared memory that participates in workflows, creates tasks, and executes work inside the workspace."
+      },
+      {
+        "q": "Can I create my own AI co-workers?",
+        "a": "Yes. You can create specialized AI co-workers for your workflows and share them with your team inside the workspace."
+      },
+      {
+        "q": "Can I watch a demo?",
+        "a": "Yes - use the Watch Demo link. If you want to try it with your team, request access."
+      }
+    ]
+  },
+  "finalCta": {
+    "title": "Join the beta",
+    "body": "We're running a limited beta with newly formed, AI-reliant teams exploring shared AI teammates. If your team is building with AI and wants AI co-workers with persistent company context, request access.",
+    "cta": { "label": "Request Access", "href": "#request-access" }
+  },
+  "requestAccess": {
+    "endpoint": "https://unison-landing-api.mcarvalho-de.workers.dev/api/request-access",
+    "fields": {
+      "email": {
+        "label": "Work email",
+        "placeholder": "you@company.com"
+      },
+      "name": {
+        "label": "Name (optional)",
+        "placeholder": "Your name"
+      },
+      "companyOrRole": {
+        "label": "Company / role (optional)",
+        "placeholder": "e.g. AI-native startup"
+      }
+    },
+    "submitLabel": "Request Access",
+    "submittingLabel": "Submitting...",
+    "successTitle": "Request received.",
+    "successBody": "You're on the list. We'll reach out soon with beta access details.",
+    "errorBody": "Something went wrong. Please try again."
+  },
+  "footer": {
+    "tagline": "AI-native workspace for shared AI teammates and human collaboration",
+    "columns": [
+      { "title": "Company", "links": ["About", "Blog", "Careers"] },
+      { "title": "Product", "links": ["Features", "AI co-workers", "Roadmap"] },
+      { "title": "Legal", "links": ["Privacy", "Terms"] }
+    ]
+  }
+}
