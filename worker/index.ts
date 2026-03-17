@@ -1,5 +1,7 @@
 type RequestAccessPayload = {
   email?: unknown;
+  name?:  unknown;
+  phone?: unknown;
 };
 
 interface Env {
@@ -53,10 +55,13 @@ export default {
     }
 
     const emailRaw = typeof payload.email === "string" ? payload.email : "";
-    const email = normalizeEmail(emailRaw);
+    const email    = normalizeEmail(emailRaw);
     if (!email || !isValidEmail(email)) {
       return jsonResponse({ ok: false, error: "Invalid email" }, { status: 400 });
     }
+
+    const name  = typeof payload.name  === "string" ? payload.name.trim()  || null : null;
+    const phone = typeof payload.phone === "string" ? payload.phone.trim() || null : null;
 
     try {
       const existing = await env.DB.prepare(
@@ -64,15 +69,23 @@ export default {
       ).bind(email).first();
 
       if (existing) {
+        // Update name/phone if provided on a repeat submission
+        if (name || phone) {
+          await env.DB.prepare(
+            "UPDATE waitlist SET name = COALESCE(?, name), phone = COALESCE(?, phone) WHERE email = ?",
+          ).bind(name, phone, email).run();
+        }
         return jsonResponse({ ok: true, status: "already_subscribed" });
       }
 
       const id = crypto.randomUUID();
       await env.DB.prepare(
-        "INSERT INTO waitlist (id, email, created_at, user_agent) VALUES (?, ?, ?, ?)",
+        "INSERT INTO waitlist (id, email, name, phone, created_at, user_agent) VALUES (?, ?, ?, ?, ?, ?)",
       ).bind(
         id,
         email,
+        name,
+        phone,
         new Date().toISOString(),
         request.headers.get("user-agent") ?? null,
       ).run();

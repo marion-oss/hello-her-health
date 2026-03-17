@@ -1,0 +1,421 @@
+# Siri-Style Voice Assistant Animation (Canvas Implementation)
+
+## Overview
+
+This document explains how to implement a **Siri-like voice assistant animation** using the HTML5 Canvas API.
+
+The animation represents the state of a voice assistant through a **reactive glowing orb** that smoothly morphs based on system state and audio input.
+
+Typical assistant states include:
+
+* Idle
+* Listening
+* Thinking
+* Speaking
+
+The animation reacts to these states by adjusting:
+
+* Orb size
+* Shape deformation
+* Glow intensity
+* Color
+* Rotation
+* Audio amplitude
+
+The goal is **not to simulate physics**, but to create the **illusion of a living, responsive interface**.
+
+---
+
+# Core Concept
+
+The animation is built from a **dynamic blob** rendered on Canvas.
+
+The blob consists of:
+
+* A center point
+* A base radius
+* Multiple points distributed around a circle
+* Deformation applied to each point
+* A smooth path connecting the points
+
+Each frame:
+
+1. The blob points are recalculated
+2. The shape is drawn
+3. Visual effects (glow, gradients) are applied
+4. State transitions are smoothed
+
+---
+
+# Rendering Pipeline
+
+Each animation frame follows this sequence:
+
+```
+requestAnimationFrame → update state → compute geometry → render shape → render glow
+```
+
+Steps:
+
+1. Clear the canvas
+2. Update animation parameters
+3. Generate blob points
+4. Draw the path
+5. Apply glow and color gradients
+
+---
+
+# Canvas Setup
+
+A high-DPI canvas ensures crisp rendering.
+
+```javascript
+const canvas = document.getElementById("orb")
+const ctx = canvas.getContext("2d")
+
+function resize() {
+  const dpr = window.devicePixelRatio || 1
+
+  canvas.width = window.innerWidth * dpr
+  canvas.height = window.innerHeight * dpr
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+}
+
+window.addEventListener("resize", resize)
+resize()
+```
+
+---
+
+# Orb Data Model
+
+The orb is controlled by a small set of parameters.
+
+```javascript
+const orb = {
+  x: canvas.width / 2,
+  y: canvas.height / 2,
+  baseRadius: 90,
+  points: 48,
+  noiseSpeed: 0.002,
+  hue: 220,
+  energy: 0,
+  audioLevel: 0
+}
+```
+
+### Parameter descriptions
+
+| Parameter  | Description                        |
+| ---------- | ---------------------------------- |
+| baseRadius | Default orb size                   |
+| points     | Number of vertices around the blob |
+| noiseSpeed | Speed of shape movement            |
+| hue        | Color of the orb                   |
+| energy     | Motion intensity                   |
+| audioLevel | Current microphone amplitude       |
+
+---
+
+# State System
+
+The animation changes based on the assistant state.
+
+## Idle
+
+Minimal movement.
+
+```
+small pulse
+slow breathing
+soft glow
+```
+
+## Listening
+
+Assistant is waiting for input.
+
+```
+slightly larger
+faster pulse
+more glow
+```
+
+## Thinking
+
+Assistant is processing.
+
+```
+subtle rotation
+fluid motion
+increased deformation
+```
+
+## Speaking
+
+Assistant is responding.
+
+```
+shape reacts to audio amplitude
+strong glow
+dynamic deformation
+```
+
+---
+
+# Blob Geometry
+
+The blob shape is generated from points distributed around a circle.
+
+Each point's radius is modified by noise and audio input.
+
+Basic formula:
+
+```
+radius = baseRadius + deformation
+```
+
+Angle per point:
+
+```
+angle = (i / totalPoints) * 2π
+```
+
+Coordinates:
+
+```
+x = centerX + cos(angle) * radius
+y = centerY + sin(angle) * radius
+```
+
+---
+
+# Noise-Based Deformation
+
+To avoid a static circle, each point is offset with a smooth pseudo-noise function.
+
+Example:
+
+```javascript
+function noise(angle, time) {
+  return (
+    Math.sin(angle * 2 + time) * 0.5 +
+    Math.sin(angle * 3 - time * 1.3) * 0.3 +
+    Math.sin(angle * 5 + time * 0.8) * 0.2
+  )
+}
+```
+
+This produces smooth organic motion.
+
+---
+
+# Audio Reactivity
+
+When the assistant is speaking, the animation reacts to microphone amplitude.
+
+Audio values should be **smoothed** to avoid jitter.
+
+Example smoothing:
+
+```javascript
+smoothedAudio += (audioLevel - smoothedAudio) * 0.15
+```
+
+Then influence deformation:
+
+```
+deformation = baseDeform + smoothedAudio * intensity
+```
+
+---
+
+# Drawing the Blob
+
+The points are connected using quadratic curves to create a smooth organic shape.
+
+Example:
+
+```javascript
+ctx.beginPath()
+
+for (let i = 0; i < points.length; i++) {
+  const p = points[i]
+  const next = points[(i + 1) % points.length]
+
+  const midX = (p.x + next.x) / 2
+  const midY = (p.y + next.y) / 2
+
+  if (i === 0) ctx.moveTo(midX, midY)
+
+  ctx.quadraticCurveTo(p.x, p.y, midX, midY)
+}
+
+ctx.closePath()
+ctx.fill()
+```
+
+---
+
+# Glow Effect
+
+A soft glow dramatically improves visual quality.
+
+```javascript
+ctx.shadowBlur = 40
+ctx.shadowColor = `hsla(${orb.hue}, 90%, 60%, 0.7)`
+```
+
+Use gradients for richer visuals.
+
+Example radial gradient:
+
+```javascript
+const gradient = ctx.createRadialGradient(
+  centerX,
+  centerY,
+  radius * 0.2,
+  centerX,
+  centerY,
+  radius * 1.3
+)
+
+gradient.addColorStop(0, "rgba(255,255,255,0.9)")
+gradient.addColorStop(1, "rgba(80,120,255,0.3)")
+```
+
+---
+
+# Animation Loop
+
+The entire animation runs inside `requestAnimationFrame`.
+
+```javascript
+function animate(time) {
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+  updateState(time)
+  updateGeometry(time)
+
+  drawBlob()
+
+  requestAnimationFrame(animate)
+}
+
+requestAnimationFrame(animate)
+```
+
+---
+
+# Performance Guidelines
+
+To keep the animation smooth:
+
+### Limit geometry complexity
+
+Recommended:
+
+```
+32–64 points
+```
+
+### Avoid layout recalculations
+
+Do not read DOM layout every frame.
+
+### Use smoothing
+
+Avoid raw microphone amplitude.
+
+### Use devicePixelRatio scaling
+
+Prevents blurry visuals.
+
+---
+
+# Recommended State Parameters
+
+| State     | Deformation | Glow   | Rotation   |
+| --------- | ----------- | ------ | ---------- |
+| Idle      | Low         | Soft   | None       |
+| Listening | Medium      | Medium | Slow       |
+| Thinking  | Medium      | High   | Continuous |
+| Speaking  | High        | Strong | Slight     |
+
+---
+
+# Optional Enhancements
+
+Possible improvements:
+
+### Gradient color cycling
+
+Orb slowly shifts hue.
+
+### Particle halo
+
+Tiny particles orbit the orb.
+
+### Waveform overlay
+
+Inner waveform reacts to audio.
+
+### Depth illusion
+
+Use multiple layered blobs.
+
+---
+
+# Summary
+
+A Siri-style animation does **not require complex physics or GPU simulation**.
+
+The core components are:
+
+1. Canvas rendering
+2. Smooth blob geometry
+3. Noise-based deformation
+4. Audio amplitude input
+5. State-based visual behavior
+6. RequestAnimationFrame loop
+
+With these elements, it is possible to create a **high-quality interactive assistant animation with minimal complexity**.
+
+---
+
+# Suggested Future Improvements
+
+For more advanced visuals consider:
+
+* WebGL shaders
+* metaball rendering
+* fluid simulations
+* GPU particle systems
+
+However, the Canvas approach described here is sufficient for **most production assistants and web applications**.
+
+
+Questions:
+
+Context & Placement
+Where exactly on the website should this animation appear? (e.g., hero section, a dedicated AI assistant widget/panel, floating button, full-screen overlay?)
+It will be used on top of website. For now, let's create a separate page on the website /animation. The goal is that in the near future we can use this as a homescreen.
+Is this animation purely decorative/demo on the landing page, or will it actually be connected to a live voice assistant (mic input, TTS output)? It will be an "experience" on the website, the animation will run for a period of time together with visual text so that we can show what is possible for the users.
+2. Tech Stack Integration
+The PRD uses vanilla JS Canvas. Your site appears to be a Next.js app — should this be implemented as a React component wrapping the Canvas, or do you prefer a different approach? You decide the best approach here.
+
+Do you have any preference for how state is managed? (e.g., a prop-driven component, Zustand, React context, or a simple internal hook?) You decide
+3. Audio Reactivity
+The PRD includes audio amplitude input for the Speaking state. For the website, will this animation actually react to real microphone/audio data, or should it simulate the states visually without real audio input (e.g., for demo purposes)? No audio for now. it will run together with text.
+
+4. States in Play
+The PRD defines 4 states: Idle, Listening, Thinking, Speaking. Which of these do you need for the initial implementation? All four, or a subset? Lets use Idle,Thinking, Speaking.
+Will the state be externally controlled (e.g., triggered by a parent component or UI button), or will the orb manage its own state transitions internally? We will control in code here.
+5. Visual Design Fit
+The PRD defaults to a blue/purple hue (hue: 220). Does this need to match your site's design system/brand colors? Let's start with: FF5F00,FF8C00, FFC300 and FFD400.
+Any size/scale constraints I should know about? (fixed size, responsive, full-bleed?)  nope.
+6. Performance & Constraints
+Are there any known mobile performance concerns on this site, or should mobile be treated as a first-class target for this animation? It should be responsive, yes.
+Any accessibility requirements — e.g., prefers-reduced-motion support? Nope
