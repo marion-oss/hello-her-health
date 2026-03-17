@@ -1,8 +1,10 @@
-import landingCopy from "../../content/landing.copy.json";
+import enCopy from "../../content/landing.copy.json";
+import deCopy from "../../content/landing.copy.de.json";
 
-export type LandingCopy = typeof landingCopy;
+export type LandingCopy = typeof enCopy;
 
 export function getLandingCopy(): LandingCopy {
-  return landingCopy;
+  return enCopy;
 }
 
+export { enCopy, deCopy };

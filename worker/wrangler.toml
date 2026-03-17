@@ -1,8 +1,8 @@
-name = "unison-landing-api"
+name = "takumiro-landing-api"
 main = "index.ts"
 compatibility_date = "2026-03-05"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "unison-waitlist"
-database_id = "a3325aa8-3cb0-435c-beb9-aa1cd4be3931"
+database_name = "takumiro-waitlist"
+database_id = "c8f0c7fb-85b6-47ed-82e3-3c84c619477b"

@@ -1,0 +1,7 @@
+[
+  { "id": "intro-1",       "state": "speaking", "text": "Guten Tag. Ich bin Takumiro.",                        "durationMs": 2600 },
+  { "id": "intro-2",       "state": "speaking", "text": "Dein digitaler Büroassistent.",                    "durationMs": 2400 },
+  { "id": "intro-3",       "state": "speaking", "text": "Du sprichst. Ich erledige. Du gibst frei.",        "durationMs": 2800 },
+  { "id": "main-idle",     "state": "idle",     "text": "Was soll ich heute für dich tun?",                 "durationMs": null, "buttons": "main" },
+  { "id": "task-speaking", "state": "speaking", "text": "",                                                  "durationMs": null }
+]

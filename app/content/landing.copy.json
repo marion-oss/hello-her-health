@@ -1,219 +1,228 @@
 {
   "meta": {
-    "productName": "Unison"
+    "productName": "Takumiro"
   },
   "hero": {
-    "headline": "AI teammates with shared memory for your company.",
-    "subheadline": "Unison is an AI-native workspace where AI co-workers remember your company context, turn decisions into tasks, and execute work. AI co-workers are shared across the team, so multiple humans can steer the same AI co-worker while staying in control.",
-    "primaryCta": { "label": "Request Access", "href": "#request-access" },
-    "secondaryCta": { "label": "Watch Demo", "href": "#demo" }
+    "headline": "Less office madness. More time for the craft.",
+    "subheadline": "Takumiro is your AI secretary. It monitors your emails, WhatsApp messages, and incoming calls — organises every customer request, chases missing details, and puts the right task in front of you at exactly the right moment. Nothing slips through. You always know what to do next.",
+    "primaryCta": { "label": "Become a Pilot Partner", "href": "#request-access" },
+    "secondaryCta": { "label": "See How It Works", "href": "#workflow" }
   },
   "problem": {
-    "title": "Your AI tools forget everything.",
+    "title": "Customer requests get buried in the daily grind.",
     "bullets": [
-      "Paste the same context into every tool, every time",
-      "GPT forgets what you decided yesterday",
-      "Copy outputs from one AI co-worker into another",
-      "No single place where AI knows your company"
+      "Tracking down info from WhatsApp threads wastes time",
+      "Missing photos and details delay appointments and quotes",
+      "Customer emails get lost in the daily office routine",
+      "Missing phone calls while I'm out doing the work",
+      "Admin work eats up time that belongs in the business"
     ],
-    "closingLine": "Your AI tools don't talk to each other. Unison fixes that."
+    "consequenceLabel": "Every missed inquiry is lost revenue.",
+    "closingLine": "Takumiro brings structure to customer communication so no inquiry gets lost."
   },
   "solution": {
-    "title": "A workspace built for humans and AI co-workers",
-    "body": "Unison is where AI teammates live. AI co-workers work alongside your team inside the workflow, with shared context across conversations, docs, and tasks."
+    "title": "An AI agent that turns inquiries into work",
+    "body": "Takumiro receives customer inquiries, qualifies them, requests missing information, and prepares the next steps. Instead of scattered calls, WhatsApp messages, and emails, you get a clear overview of what has been done and what needs to happen next."
   },
   "coreBenefits": {
-    "title": "Why AI-native teams use Unison",
+    "title": "Why trade businesses use Takumiro",
     "items": [
       {
-        "title": "AI co-workers that remember your company context",
-        "body": "AI co-workers operate with full workspace memory. They retain decisions, documents, conversations, and past work so you don't have to repeat yourself."
+        "title": "No more lost inquiries",
+        "body": "Calls, WhatsApp messages, and emails are captured so no revenue opportunity slips through the cracks."
       },
       {
-        "title": "Centralized tools and knowledge",
-        "body": "Bring chat, docs, tasks, and AI execution into one workspace so context doesn't get lost between tools."
+        "title": "Missing info gets collected automatically",
+        "body": "Takumiro asks customers for missing photos, measurements, or details before the job gets stuck."
       },
       {
-        "title": "Shared AI teammates for the whole team",
-        "body": "AI co-workers belong to the workspace, not a single user. Multiple people can collaborate with and steer the same AI co-worker."
+        "title": "Always know what's next",
+        "body": "You see at a glance what happened last and which next step is still open."
       },
       {
-        "title": "Create your own AI co-workers and share them internally",
-        "body": "Build specialized AI teammates for your workflows, then publish them to your workspace so everyone can use them."
+        "title": "Less admin work, more focus on the business",
+        "body": "Less chasing, less searching, less chaos. More time for customers, your team, and real craft work."
       }
     ]
   },
   "workflow": {
-    "title": "From meeting to shipped work",
-    "intro": "Here's what Unison does for a typical product meeting:",
+    "title": "How it works",
+    "intro": "Here's how Takumiro works in the background for your business:",
     "steps": [
       {
-        "title": "AI co-worker joins your meeting",
-        "body": "Unison's AI co-worker attends and captures the conversation with full company context."
+        "title": "A customer gets in touch",
+        "body": "The inquiry comes in by phone, WhatsApp, or email."
       },
       {
-        "title": "Creates structured output",
-        "body": "It generates a meeting summary, decisions made, and action items."
+        "title": "Takumiro receives the inquiry",
+        "body": "The AI agent captures the request and gathers the key information about the job."
       },
       {
-        "title": "Turns outcomes into tasks",
-        "body": "It creates tasks in the workspace: assigns owners, sets priorities, and links context."
+        "title": "Missing details are requested",
+        "body": "If something is missing, Takumiro automatically asks for it — photos, measurements, or further details."
       },
       {
-        "title": "AI co-workers execute deep work",
-        "body": "AI co-workers can start work like competitor research, drafting a spec, or analyzing feedback."
+        "title": "The next step is prepared",
+        "body": "Depending on the case, Takumiro prepares an appointment, a follow-up, or a quote."
       },
       {
-        "title": "You approve before anything is shared",
-        "body": "AI co-workers draft outputs. Humans review and approve before sending or publishing."
+        "title": "You stay on top of everything",
+        "body": "Instead of message chaos, you see clearly what has been done and what needs to happen next."
       }
     ]
   },
   "capabilities": {
-    "title": "What AI teammates actually do",
+    "title": "What Takumiro specifically handles for you",
     "items": [
       {
-        "title": "Never lose a decision again",
-        "body": "Every meeting becomes structured knowledge. AI co-workers capture the discussion, extract decisions, and generate clear follow-ups automatically."
+        "title": "Receiving customer inquiries",
+        "body": "Takumiro captures new requests, even when no one can answer the phone or reply right away."
       },
       {
-        "title": "Turn conversations into tasks",
-        "body": "Decisions instantly become tasks with owners, priorities, and context. No manual task creation. No forgotten action items."
+        "title": "Qualifying inquiries",
+        "body": "The AI agent understands the request and structures it so you can work with it immediately."
       },
       {
-        "title": "Execute work in the background",
-        "body": "AI co-workers don't just summarize. They run research, draft specs, analyze feedback, and prepare reports using your company context."
+        "title": "Asking follow-up questions automatically",
+        "body": "Missing information is requested directly from the customer before time is wasted in the office."
       },
       {
-        "title": "Draft first, humans approve",
-        "body": "AI co-workers prepare outputs and suggestions. Humans review and approve before anything is shared or sent."
+        "title": "Preparing appointments and quotes",
+        "body": "Takumiro moves the job to the next logical step instead of just filing it away."
       },
       {
-        "title": "Keep the team informed automatically",
-        "body": "AI co-workers report progress, surface blockers, and update the team so everyone stays aligned without constant status meetings."
+        "title": "Turning communication into clarity",
+        "body": "Calls, emails, and WhatsApp messages become a structured workflow."
       }
     ]
   },
   "useCases": {
-    "title": "AI teammates in action",
+    "title": "Made for trade businesses",
     "items": [
       {
-        "title": "Product teams",
+        "title": "Electrical contractors",
         "bullets": [
-          "Meeting summaries automatically generated",
-          "Decisions extracted and documented",
-          "Tasks created and assigned",
-          "Specs drafted from conversations"
+          "Capture service requests in a structured way",
+          "Automatically request missing photos and info",
+          "Move inquiries to appointments or quotes faster",
+          "Reduce admin work in daily operations"
         ]
       },
       {
-        "title": "AI-native founders",
+        "title": "Plumbing & heating businesses",
         "bullets": [
-          "Market research executed automatically",
-          "Competitive analysis generated",
-          "Product documentation drafted automatically",
-          "Customer insights summarized"
+          "Properly capture faults and maintenance requests",
+          "Prioritize customer inquiries",
+          "Handle follow-up questions automatically",
+          "Keep track of open jobs"
         ]
       },
       {
-        "title": "Operations teams",
+        "title": "Roofing & construction businesses",
         "bullets": [
-          "Reports generated from internal data",
-          "Process documentation created",
-          "Operational issues flagged",
-          "Action plans suggested"
+          "Capture project inquiries centrally",
+          "Pre-qualify missing information",
+          "Bundle communication from multiple channels",
+          "Less chaos between office and job site"
         ]
       }
     ]
   },
   "differentiation": {
-    "title": "Why Unison is different",
+    "title": "Why Takumiro is different",
     "points": [
       {
-        "title": "AI teammates, not AI features",
-        "body": "Unison treats AI as a collaborator that operates inside the workflow, not a sidebar that generates text."
+        "title": "Starts at the inquiry, not the job",
+        "body": "Most tools only help once the job has been created. Takumiro starts earlier: directly at customer communication."
       },
       {
-        "title": "Shared memory and shared AI co-workers",
-        "body": "AI co-workers retain company context inside the workspace and can be used by multiple people on the team."
+        "title": "Not just capturing, but moving things forward",
+        "body": "Takumiro doesn't just receive inquiries — it qualifies them, requests missing info, and prepares the next step."
       },
       {
-        "title": "Real work with approvals",
-        "body": "AI co-workers do deep work and request approval when something is ready to share or send."
+        "title": "Less office madness in daily life",
+        "body": "Instead of digging through emails, calls, and WhatsApp threads, you get a clear structure for every job."
       },
       {
-        "title": "Create and share your own AI co-workers",
-        "body": "Build specialized AI co-workers for your team's workflows and make them available across the workspace."
+        "title": "Fits into existing workflows",
+        "body": "Takumiro is designed to take load off your business without requiring you to overhaul your entire software setup."
       }
     ]
   },
   "controlSafety": {
-    "title": "Human control, always",
+    "title": "You stay in control",
     "bullets": [
-      "Review the AI co-worker's drafts",
-      "Adjust instructions",
-      "Approve before sharing or sending",
-      "Redirect execution"
+      "Every inquiry stays traceable",
+      "You can review and adjust content",
+      "The next step is always visible",
+      "Takumiro supports but never decides without you"
     ],
-    "closingLine": "AI co-workers operate transparently and default to human approval."
+    "closingLine": "Takumiro works in the background, but your business always stays in the driver's seat."
   },
   "faq": {
     "title": "FAQ",
     "items": [
       {
-        "q": "Who is Unison for?",
-        "a": "Unison is for newly formed, AI-reliant teams (2-20 people) who want shared AI co-workers with persistent company context, centralized knowledge, and approvals by default."
+        "q": "Who is Takumiro for?",
+        "a": "Takumiro is designed for trade businesses that receive many customer inquiries by phone, WhatsApp, or email and want to reduce admin work in their daily operations."
       },
       {
-        "q": "Do AI co-workers send messages or updates automatically?",
-        "a": "No. AI co-workers draft outputs and ask for approval; humans review and approve before anything is shared."
+        "q": "Does Takumiro replace my existing trade software?",
+        "a": "No. Takumiro starts earlier and helps you capture, qualify, and turn customer inquiries into clear next steps."
       },
       {
-        "q": "How is Unison different from using AI inside tools like Notion or Slack?",
-        "a": "Most tools add AI as a feature that generates text. Unison makes AI a teammate with shared memory that participates in workflows, creates tasks, and executes work inside the workspace."
+        "q": "Which channels can Takumiro handle?",
+        "a": "Takumiro is designed for inquiries by phone, WhatsApp, and email."
       },
       {
-        "q": "Can I create my own AI co-workers?",
-        "a": "Yes. You can create specialized AI co-workers for your workflows and share them with your team inside the workspace."
+        "q": "Can I still speak directly with my customers?",
+        "a": "Yes. Takumiro supports your business in the background and makes sure nothing gets lost. Communication stays in your hands."
       },
       {
-        "q": "Can I watch a demo?",
-        "a": "Yes - use the Watch Demo link. If you want to try it with your team, request access."
+        "q": "What's the biggest benefit of Takumiro?",
+        "a": "Less office chaos, fewer lost inquiries, and more clarity about what needs to happen next."
       }
     ]
   },
   "finalCta": {
-    "title": "Join the beta",
-    "body": "We're running a limited beta with newly formed, AI-reliant teams exploring shared AI teammates. If your team is building with AI and wants AI co-workers with persistent company context, request access.",
-    "cta": { "label": "Request Access", "href": "#request-access" }
+    "title": "Less chaos. Fewer lost inquiries.",
+    "body": "Takumiro helps trade businesses turn customer communication into structured next steps. If you want to become a pilot partner, sign up now.",
+    "cta": { "label": "Become a Pilot Partner", "href": "#request-access" }
   },
   "requestAccess": {
-    "endpoint": "https://unison-landing-api.mcarvalho-de.workers.dev/api/request-access",
+    "endpoint": "https://takumiro-landing-api.mcarvalho-de.workers.dev/api/request-access",
     "fields": {
       "email": {
-        "label": "Work email",
-        "placeholder": "you@company.com"
+        "label": "Email",
+        "placeholder": "you@business.com"
       },
       "name": {
         "label": "Name (optional)",
         "placeholder": "Your name"
       },
       "companyOrRole": {
-        "label": "Company / role (optional)",
-        "placeholder": "e.g. AI-native startup"
+        "label": "Business / role (optional)",
+        "placeholder": "e.g. Electrical contractor"
       }
     },
-    "submitLabel": "Request Access",
+    "submitLabel": "Request access",
     "submittingLabel": "Submitting...",
     "successTitle": "Request received.",
-    "successBody": "You're on the list. We'll reach out soon with beta access details.",
+    "successBody": "Thanks, we'll be in touch soon with more information about the pilot phase.",
     "errorBody": "Something went wrong. Please try again."
   },
+  "nav": {
+    "links": [
+      { "label": "How it works", "href": "#workflow" },
+      { "label": "Use cases", "href": "#use-cases" },
+      { "label": "FAQ", "href": "#faq" }
+    ]
+  },
   "footer": {
-    "tagline": "AI-native workspace for shared AI teammates and human collaboration",
+    "tagline": "AI agent for less office madness in the trades",
     "columns": [
       { "title": "Company", "links": ["About", "Blog", "Careers"] },
-      { "title": "Product", "links": ["Features", "AI co-workers", "Roadmap"] },
+      { "title": "Product", "links": ["Features", "Workflow", "Roadmap"] },
       { "title": "Legal", "links": ["Privacy", "Terms"] }
     ]
   }

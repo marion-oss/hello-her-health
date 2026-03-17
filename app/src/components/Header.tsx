@@ -1,7 +1,19 @@
+import type { ReactNode } from "react";
 import { Container } from "@/components/Container";
 import { GlassButton } from "@/components/GlassButton";
+import type { LandingCopy } from "@/lib/landingCopy";
 
-export function Header({ productName }: { productName: string }) {
+export function Header({
+  productName,
+  nav,
+  hero,
+  languageSwitcher,
+}: {
+  productName: string;
+  nav: LandingCopy["nav"];
+  hero: LandingCopy["hero"];
+  languageSwitcher?: ReactNode;
+}) {
   return (
     <header className="sticky top-0 z-10 border-b border-white/10 bg-zinc-950/80 backdrop-blur-md">
       <Container>
@@ -14,19 +26,26 @@ export function Header({ productName }: { productName: string }) {
           </a>
 
           <nav className="hidden items-center gap-6 text-sm text-zinc-400 md:flex">
-            <a className="hover:text-white transition-colors" href="#how">How it works</a>
-            <a className="hover:text-white transition-colors" href="#use-cases">Use cases</a>
-            <a className="hover:text-white transition-colors" href="#faq">FAQ</a>
+            {nav.links.map((link) => (
+              <a
+                key={link.href}
+                className="hover:text-white transition-colors"
+                href={link.href}
+              >
+                {link.label}
+              </a>
+            ))}
           </nav>
 
           <div className="flex items-center gap-2">
+            {languageSwitcher}
             <span className="hidden sm:inline-flex">
               <GlassButton
-                href="#demo"
+                href={hero.secondaryCta.href}
                 variant="secondary"
-                eventName="watch_demo_clicked"
+                eventName="secondary_cta_clicked"
               >
-                Watch Demo
+                {hero.secondaryCta.label}
               </GlassButton>
             </span>
             <GlassButton
@@ -34,7 +53,7 @@ export function Header({ productName }: { productName: string }) {
               href="#request-access"
               eventName="request_access_clicked"
             >
-              Request Access
+              {hero.primaryCta.label}
             </GlassButton>
           </div>
         </div>
