@@ -98,7 +98,7 @@ function validateEmail(email: string): boolean {
 export function AccountScreen() {
   const navigation = useNavigation<any>()
   const route = useRoute<RouteProp<OnboardingStackParamList, 'Account'>>()
-  const { language, objective, setBirthYear, setCountry } = useOnboarding()
+  const { language, objective, setBirthYear, setCountry, markDone } = useOnboarding()
   const copy = COPY[language]
 
   // Allow WelcomeScreen to open this directly in login mode
@@ -121,7 +121,7 @@ export function AccountScreen() {
   function handleContinueAnonymously() {
     // In production: generate UUID, store in AsyncStorage
     // const sessionId = uuid(); await AsyncStorage.setItem('anoqi_session_id', sessionId)
-    navigation.navigate('Home')
+    markDone()
   }
 
   function validateBirthYear(year: string): boolean {
@@ -158,13 +158,13 @@ export function AccountScreen() {
         //     country: countryInput.trim() || null } }
         // })
         // if (authError) throw authError
-        navigation.navigate('Home')
+        markDone()
       } else {
         // const { error: authError } = await supabase.auth.signInWithPassword({
         //   email: email.trim(), password,
         // })
         // if (authError) throw authError
-        navigation.navigate('Home')
+        markDone()
       }
     } catch (err: any) {
       setError(err?.message ?? 'Something went wrong. Please try again.')
