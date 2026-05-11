@@ -15,11 +15,9 @@
  *   then invoke the onComplete prop on OnboardingNavigator — the gate
  *   here re-reads the flag and swaps navigators.
  *
- * Font assets must be in assets/fonts/:
- *   BricolageGrotesque-ExtraBold.ttf
- *   DMSans-Regular.ttf
- *   DMSans-Medium.ttf
- *   DMSans-Bold.ttf
+ * Font assets in assets/fonts/ (variable fonts — one file per family):
+ *   BricolageGrotesque.ttf   — covers all weights incl. 800 (ExtraBold)
+ *   DMSans.ttf               — covers 400 (Regular), 500 (Medium), 700 (Bold)
  *
  * Install required packages (if not already in package.json):
  *   npx expo install expo-font expo-splash-screen @react-navigation/native
@@ -57,10 +55,15 @@ export default function App() {
       try {
         const [, flag] = await Promise.all([
           Font.loadAsync({
-            'BricolageGrotesque-ExtraBold': require('./assets/fonts/BricolageGrotesque-ExtraBold.ttf'),
-            'DMSans-Regular':               require('./assets/fonts/DMSans-Regular.ttf'),
-            'DMSans-Medium':                require('./assets/fonts/DMSans-Medium.ttf'),
-            'DMSans-Bold':                  require('./assets/fonts/DMSans-Bold.ttf'),
+            // Variable fonts — one file per family covers all weights.
+            // We register under the names used in StyleSheets so no
+            // screen-level changes are needed. fontWeight in each
+            // StyleSheet selects the correct axis on platforms that
+            // support variable fonts (iOS 14+, Android 8+).
+            'BricolageGrotesque-ExtraBold': require('./assets/fonts/BricolageGrotesque.ttf'),
+            'DMSans-Regular':               require('./assets/fonts/DMSans.ttf'),
+            'DMSans-Medium':                require('./assets/fonts/DMSans.ttf'),
+            'DMSans-Bold':                  require('./assets/fonts/DMSans.ttf'),
           }),
           AsyncStorage.getItem(ONBOARDING_KEY),
         ])
