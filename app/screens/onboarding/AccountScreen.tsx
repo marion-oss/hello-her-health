@@ -36,7 +36,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import { useOnboarding } from '../../context/OnboardingContext'
 import type { OnboardingStackParamList } from './OnboardingNavigator'
 
-// import { supabase } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 
 type AuthMode = 'choose' | 'signup' | 'login'
 
@@ -151,19 +151,22 @@ export function AccountScreen() {
         if (countryInput.trim()) {
           setCountry(countryInput.trim())
         }
-        // const { error: authError } = await supabase.auth.signUp({
-        //   email: email.trim(), password,
-        //   options: { data: { language, objective: objective ?? 'general',
-        //     birth_year: birthYearInput ? parseInt(birthYearInput, 10) : null,
-        //     country: countryInput.trim() || null } }
-        // })
-        // if (authError) throw authError
+        const { error: authError } = await supabase.auth.signUp({
+          email: email.trim(), password,
+          options: { data: {
+            language,
+            objective: objective ?? 'general',
+            birth_year: birthYearInput ? parseInt(birthYearInput, 10) : null,
+            country: countryInput.trim() || null,
+          }},
+        })
+        if (authError) throw authError
         markDone()
       } else {
-        // const { error: authError } = await supabase.auth.signInWithPassword({
-        //   email: email.trim(), password,
-        // })
-        // if (authError) throw authError
+        const { error: authError } = await supabase.auth.signInWithPassword({
+          email: email.trim(), password,
+        })
+        if (authError) throw authError
         markDone()
       }
     } catch (err: any) {
