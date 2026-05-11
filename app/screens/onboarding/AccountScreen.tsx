@@ -1,7 +1,7 @@
 /**
  * anoqi — AccountScreen
  *
- * Step 5 of onboarding — final, optional step.
+ * Final step of onboarding — shown after Consent (step 3 of 3).
  *
  * Accepts an optional `mode` route param:
  *   'login'  — opened directly from WelcomeScreen "I already have an account"
@@ -60,6 +60,9 @@ const COPY = {
     errorPasswordMatch: 'Les mots de passe ne correspondent pas',
     errorPasswordLength: 'Le mot de passe doit contenir au moins 8 caractères',
     errorEmailInvalid: 'Adresse email invalide',
+    errorBirthYearInvalid: 'Année de naissance invalide (ex. 1985)',
+    birthYearPlaceholder: 'Année de naissance (ex. 1985)',
+    countryPlaceholder: 'Pays (ex. France, Royaume-Uni)',
     privacyNote: 'Tes données sont hébergées en Europe (UE) et ne sont jamais vendues.',
   },
   en: {
@@ -81,6 +84,9 @@ const COPY = {
     errorPasswordMatch: 'Passwords do not match',
     errorPasswordLength: 'Password must be at least 8 characters',
     errorEmailInvalid: 'Invalid email address',
+    errorBirthYearInvalid: 'Invalid birth year (e.g. 1985)',
+    birthYearPlaceholder: 'Birth year (e.g. 1985)',
+    countryPlaceholder: 'Country (e.g. France, United Kingdom)',
     privacyNote: 'Your data is hosted in Europe (EU) and never sold.',
   },
 }
@@ -92,7 +98,7 @@ function validateEmail(email: string): boolean {
 export function AccountScreen() {
   const navigation = useNavigation<any>()
   const route = useRoute<RouteProp<OnboardingStackParamList, 'Account'>>()
-  const { language, objective } = useOnboarding()
+  const { language, objective, setBirthYear, setCountry } = useOnboarding()
   const copy = COPY[language]
 
   // Allow WelcomeScreen to open this directly in login mode
@@ -102,6 +108,8 @@ export function AccountScreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
+  const [birthYearInput, setBirthYearInput] = useState('')
+  const [countryInput, setCountryInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -116,10 +124,16 @@ export function AccountScreen() {
     navigation.navigate('Home')
   }
 
+  function validateBirthYear(year: string): boolean {
+    const y = parseInt(year, 10)
+    return /^\d{4}$/.test(year) && y >= 1920 && y <= new Date().getFullYear() - 16
+  }
+
   function validateForm(): string | null {
     if (!validateEmail(email)) return copy.errorEmailInvalid
     if (password.length < 8) return copy.errorPasswordLength
     if (mode === 'signup' && password !== passwordConfirm) return copy.errorPasswordMatch
+    if (mode === 'signup' && birthYearInput && !validateBirthYear(birthYearInput)) return copy.errorBirthYearInvalid
     return null
   }
 
@@ -130,9 +144,18 @@ export function AccountScreen() {
     setLoading(true)
     try {
       if (mode === 'signup') {
+        // Save profile fields to context before navigating
+        if (birthYearInput && validateBirthYear(birthYearInput)) {
+          setBirthYear(parseInt(birthYearInput, 10))
+        }
+        if (countryInput.trim()) {
+          setCountry(countryInput.trim())
+        }
         // const { error: authError } = await supabase.auth.signUp({
         //   email: email.trim(), password,
-        //   options: { data: { language, objective: objective ?? 'general' } }
+        //   options: { data: { language, objective: objective ?? 'general',
+        //     birth_year: birthYearInput ? parseInt(birthYearInput, 10) : null,
+        //     country: countryInput.trim() || null } }
         // })
         // if (authError) throw authError
         navigation.navigate('Home')
@@ -287,6 +310,32 @@ export function AccountScreen() {
                 secureTextEntry
                 autoCapitalize="none"
                 autoComplete="new-password"
+                returnKeyType="next"
+              />
+            )}
+
+            {mode === 'signup' && (
+              <TextInput
+                style={styles.input}
+                placeholder={copy.birthYearPlaceholder}
+                placeholderTextColor="#BBBBBB"
+                value={birthYearInput}
+                onChangeText={setBirthYearInput}
+                keyboardType="number-pad"
+                maxLength={4}
+                returnKeyType="next"
+              />
+            )}
+
+            {mode === 'signup' && (
+              <TextInput
+                style={styles.input}
+                placeholder={copy.countryPlaceholder}
+                placeholderTextColor="#BBBBBB"
+                value={countryInput}
+                onChangeText={setCountryInput}
+                autoCapitalize="words"
+                autoCorrect={false}
                 returnKeyType="done"
                 onSubmitEditing={handleSubmit}
               />

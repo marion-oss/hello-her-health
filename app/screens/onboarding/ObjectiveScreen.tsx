@@ -85,24 +85,22 @@ export function ObjectiveScreen() {
 
   function handleContinue() {
     if (selected) setObjective(selected)
-    navigation.navigate('HowItWorks')
+    navigation.navigate('Consent')
   }
 
   function handleSkip() {
     setObjective('general')
-    navigation.navigate('HowItWorks')
+    navigation.navigate('Consent')
   }
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
 
-        {/* Progress: step 2 of 5 */}
+        {/* Progress: step 2 of 3 */}
         <View style={styles.progressRow}>
           <View style={[styles.dot, styles.dotDone]} />
           <View style={[styles.dot, styles.dotActive]} />
-          <View style={styles.dot} />
-          <View style={styles.dot} />
           <View style={styles.dot} />
         </View>
 
@@ -234,7 +232,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   optionSelected: {
-    borderColor: '#FF0472',
+    borderColor: '#FF6B3D',
     backgroundColor: '#FFF3EE',
   },
   optionEmoji: {
@@ -250,7 +248,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   optionLabelSelected: {
-    color: '#FF0472',
+    color: '#FF6B3D',
   },
   optionDescription: {
     fontSize: 13,
@@ -262,7 +260,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#FF0472',
+    backgroundColor: '#FF6B3D',
     alignItems: 'center',
     justifyContent: 'center',
   },

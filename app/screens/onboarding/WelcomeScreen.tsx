@@ -39,7 +39,7 @@ const COPY = {
     trust: [
       'Sources médicales validées (NHS, HAS, NICE…)',
       'Recherches menées sur les femmes',
-      'Tes données ne quittent jamais ton appareil',
+      'Jamais lié à ton nom ou ton identité',
     ],
     cta: "J'ai une question →",
     login: 'J\'ai déjà un compte',
@@ -50,7 +50,7 @@ const COPY = {
     trust: [
       'Validated medical sources (NHS, HAS, NICE…)',
       'Research conducted on women',
-      'Your data never leaves your device',
+      'Never linked to your name or identity',
     ],
     cta: 'I have a question →',
     login: 'I already have an account',

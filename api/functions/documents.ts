@@ -3,31 +3,38 @@
  *
  * POST /functions/v1/documents
  *
- * Handles medical document upload. Full pipeline:
- *   receive file → store original in Storage → extract text →
- *   pseudonymise → auto-classify → save to DB → return record
+ * Receives a pre-processed, de-identified document payload from the
+ * mobile app and persists it to the documents table.
  *
- * The original file is stored untouched in private Supabase Storage.
- * Only the pseudonymised text extract is stored in the DB and
- * ever passed to the AI. PII never reaches Gemini.
+ * Architecture — privacy by design:
+ *   All processing happens on the user's device BEFORE this function
+ *   is called. This server never sees raw files or unstripped text.
  *
- * Supported file types for text extraction (v1):
- * - Plain text (.txt)
- * - Markdown (.md)
- * - Pre-extracted text sent directly in the request body
+ *   Device pipeline (app/lib/documentStore.ts):
+ *     raw text → pseudonymise() → classifyDocument() → extractStructured()
+ *         ↓
+ *   This function receives:
+ *     { documentType, documentDate, cleanText, labValues, medications,
+ *       researchConsent, birthYear, country }
  *
- * PDF and image OCR require client-side extraction in v1.
- * The mobile app extracts text before upload; this function
- * receives the extracted text alongside the raw file.
- * Full server-side PDF extraction is planned for Phase 2.
+ * What this function does:
+ *   1. Authenticate the request
+ *   2. Validate the payload
+ *   3. Insert into documents table
+ *   4. Write audit log
+ *   5. Return the new document id
+ *
+ * What this function does NOT do:
+ *   - OCR, file storage, text extraction, pseudonymisation
+ *   - Accept raw files or multipart form data
+ *   - Store original filenames or unstripped content
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { pseudonymise, classifyDocument } from '../lib/pseudonymise.ts'
 
 // ─────────────────────────────────────────────────────────────
-// CORS headers
+// CORS
 // ─────────────────────────────────────────────────────────────
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -36,32 +43,31 @@ const CORS_HEADERS = {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Constants
+// CONSTANTS
 // ─────────────────────────────────────────────────────────────
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024   // 10MB
-const STORAGE_BUCKET = 'documents'
+const VALID_DOCUMENT_TYPES = [
+  'analyses', 'imagerie', 'comptes_rendus',
+  'ordonnances', 'vaccins', 'antecedents', 'autre',
+] as const
 
-const ALLOWED_MIME_TYPES = [
-  'application/pdf',
-  'image/jpeg',
-  'image/png',
-  'image/heic',
-  'image/heif',
-  'text/plain',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-]
+type DocumentType = typeof VALID_DOCUMENT_TYPES[number]
 
-// GDPR retention — documents deleted after this many days by default
-const DEFAULT_RETENTION_DAYS = 365 * 3  // 3 years
+const MAX_TEXT_LENGTH  = 50_000   // chars — must match app/lib/documentStore.ts
+const DEFAULT_RETENTION_DAYS = 365 * 3
 
 // ─────────────────────────────────────────────────────────────
-// Request shape
+// REQUEST PAYLOAD
 // ─────────────────────────────────────────────────────────────
-// The request must be multipart/form-data with:
-//   file          — the raw document file (required)
-//   extractedText — pre-extracted plain text from the file (required for PDF/image)
-//   conversationId — optional, links document to a conversation
-//   retentionDays — optional, override default retention
+type DocumentPayload = {
+  documentType: DocumentType
+  documentDate: string | null          // "YYYY-MM-DD" or null
+  cleanText: string                    // pseudonymised, required
+  labValues: object[] | null           // [{name, value, unit, referenceRange, flag}]
+  medications: object[] | null         // [{name, dose, frequency, duration}]
+  researchConsent: boolean
+  birthYear: number | null             // from user profile (sign-up)
+  country: string | null               // ISO 3166-1 alpha-2 or null
+}
 
 // ─────────────────────────────────────────────────────────────
 // MAIN HANDLER
@@ -84,195 +90,159 @@ serve(async (req: Request) => {
     )
 
     const authHeader = req.headers.get('Authorization')
-    let userId: string | null = null
-
-    if (authHeader) {
-      const { data: { user }, error } = await supabase.auth.getUser(
-        authHeader.replace('Bearer ', '')
-      )
-      if (!error && user) userId = user.id
+    if (!authHeader) {
+      return errorResponse(401, 'Authentication required')
     }
 
-    if (!userId) {
-      return errorResponse(401, 'Authentication required to upload documents')
+    const { data: { user }, error: authError } = await supabase.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    )
+
+    if (authError || !user) {
+      return errorResponse(401, 'Invalid or expired token')
     }
 
-    // ── 2. Parse multipart form ────────────────────────────────
-    let formData: FormData
+    const userId = user.id
+
+    // ── 2. Parse body ──────────────────────────────────────────
+    let body: DocumentPayload
     try {
-      formData = await req.formData()
+      body = await req.json() as DocumentPayload
     } catch {
-      return errorResponse(400, 'Request must be multipart/form-data')
+      return errorResponse(400, 'Request body must be valid JSON')
     }
 
-    const file = formData.get('file') as File | null
-    const extractedText = formData.get('extractedText') as string | null
-    const conversationId = formData.get('conversationId') as string | null
-    const retentionDaysRaw = formData.get('retentionDays') as string | null
-    const retentionDays = retentionDaysRaw ? parseInt(retentionDaysRaw, 10) : DEFAULT_RETENTION_DAYS
-
-    // ── 3. Validate file ───────────────────────────────────────
-    if (!file) {
-      return errorResponse(400, 'No file provided')
+    // ── 3. Validate ────────────────────────────────────────────
+    const validationError = validatePayload(body)
+    if (validationError) {
+      return errorResponse(400, validationError)
     }
 
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      return errorResponse(413, `File too large. Maximum size is ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB`)
-    }
-
-    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-      return errorResponse(415, `File type not supported: ${file.type}. Allowed: PDF, JPEG, PNG, HEIC, TXT, DOCX`)
-    }
-
-    // Determine file type category
-    const fileType = getFileType(file.type)
-
-    // ── 4. Store original file in Supabase Storage ─────────────
-    // Path: {userId}/{timestamp}-{random}.{ext}
-    const ext = getExtension(file.type)
-    const timestamp = Date.now()
-    const randomSuffix = crypto.randomUUID().split('-')[0]
-    const storagePath = `${userId}/${timestamp}-${randomSuffix}.${ext}`
-
-    const fileBuffer = await file.arrayBuffer()
-
-    const { error: storageError } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .upload(storagePath, fileBuffer, {
-        contentType: file.type,
-        upsert: false,
-      })
-
-    if (storageError) {
-      console.error('Storage upload failed:', storageError)
-      return errorResponse(500, 'Failed to store document')
-    }
-
-    // ── 5. Pseudonymise extracted text ─────────────────────────
-    // For PDFs and images, the app extracts text client-side and sends it
-    // For text files, we can extract server-side
-    let textForProcessing = extractedText || ''
-
-    if (!textForProcessing && fileType === 'text') {
-      // Extract text from plain text files server-side
-      const decoder = new TextDecoder('utf-8')
-      textForProcessing = decoder.decode(fileBuffer)
-    }
-
-    let pseudonymisedExtract: string | null = null
-    let detectedPiiTypes: string[] = []
-
-    if (textForProcessing.trim().length > 0) {
-      const pseudoResult = pseudonymise(textForProcessing)
-      pseudonymisedExtract = pseudoResult.pseudonymisedText
-      detectedPiiTypes = pseudoResult.detectedTypes
-
-      // Audit log: how many PII items were stripped
-      console.log(`Pseudonymised document: ${pseudoResult.replacementCount} PII items removed, types: ${detectedPiiTypes.join(', ')}`)
-    }
-
-    // ── 6. Auto-classify document ──────────────────────────────
-    const autoCategory = pseudonymisedExtract
-      ? classifyDocument(pseudonymisedExtract)
-      : 'autre'
-
-    // ── 7. Calculate retention date ────────────────────────────
+    // ── 4. Build document record ───────────────────────────────
     const retentionUntil = new Date()
-    retentionUntil.setDate(retentionUntil.getDate() + retentionDays)
+    retentionUntil.setDate(retentionUntil.getDate() + DEFAULT_RETENTION_DAYS)
 
-    // ── 8. Save document record to DB ──────────────────────────
-    const documentRecord = {
-      user_id: userId,
-      conversation_id: conversationId || null,
-      storage_path: storagePath,
-      original_filename: file.name || null,
-      category: autoCategory,
-      category_confirmed: false,       // user must confirm auto-classification
-      pseudonymised: pseudonymisedExtract !== null,
-      pseudonymised_at: pseudonymisedExtract !== null ? new Date().toISOString() : null,
-      extracted_content: pseudonymisedExtract,
-      file_type: fileType,
-      file_size_bytes: file.size,
-      retention_until: retentionUntil.toISOString().split('T')[0],  // date only
+    const record = {
+      user_id:          userId,
+      document_type:    body.documentType,
+      document_date:    body.documentDate ?? null,
+      birth_year:       body.birthYear ?? null,
+      country:          body.country ?? null,
+      clean_text:       body.cleanText,
+      lab_values:       body.labValues ?? null,
+      medications:      body.medications ?? null,
+      research_consent: body.researchConsent,
+      pseudonymised_at: new Date().toISOString(),
+      retention_until:  retentionUntil.toISOString().split('T')[0],
     }
 
-    const { data: savedDoc, error: dbError } = await supabase
+    // ── 5. Insert ──────────────────────────────────────────────
+    const { data: saved, error: dbError } = await supabase
       .from('documents')
-      .insert(documentRecord)
-      .select('id, category, category_confirmed, pseudonymised, file_type, file_size_bytes, created_at')
+      .insert(record)
+      .select('id, document_type, created_at')
       .single()
 
-    if (dbError || !savedDoc) {
+    if (dbError || !saved) {
       console.error('DB insert failed:', dbError)
-      // Clean up the uploaded file if DB insert fails
-      await supabase.storage.from(STORAGE_BUCKET).remove([storagePath])
-      return errorResponse(500, 'Failed to save document record')
+      return errorResponse(500, 'Failed to save document')
     }
 
-    // ── 9. Audit log ───────────────────────────────────────────
+    // ── 6. Audit log ───────────────────────────────────────────
     await supabase.from('audit_logs').insert({
-      user_id: userId,
-      actor_id: userId,
-      action: 'document.upload',
-      resource: 'document',
-      resource_id: savedDoc.id,
+      user_id:     userId,
+      actor_id:    userId,
+      action:      'document.upload',
+      resource:    'document',
+      resource_id: saved.id,
       metadata: {
-        file_type: fileType,
-        file_size_bytes: file.size,
-        pii_types_detected: detectedPiiTypes,
-        auto_category: autoCategory,
-      }
+        document_type:    body.documentType,
+        has_lab_values:   body.labValues !== null && body.labValues.length > 0,
+        has_medications:  body.medications !== null && body.medications.length > 0,
+        research_consent: body.researchConsent,
+        text_length:      body.cleanText.length,
+      },
     })
 
-    // ── 10. Return response ────────────────────────────────────
+    // ── 7. Respond ─────────────────────────────────────────────
     return jsonResponse(201, {
       document: {
-        id: savedDoc.id,
-        category: savedDoc.category,
-        categoryConfirmed: savedDoc.category_confirmed,
-        pseudonymised: savedDoc.pseudonymised,
-        fileType: savedDoc.file_type,
-        fileSizeBytes: savedDoc.file_size_bytes,
-        createdAt: savedDoc.created_at,
-        // Note: we never return original filename, storage path, or extracted content
-        // in the response — these stay server-side only
+        id:           saved.id,
+        documentType: saved.document_type,
+        createdAt:    saved.created_at,
       },
-      // Tell the client whether text was successfully extracted and pseudonymised
-      textExtracted: pseudonymisedExtract !== null,
-      // If text couldn't be extracted, prompt user to confirm category manually
-      requiresCategoryConfirmation: true,
     })
 
-  } catch (error) {
-    console.error('Unhandled error in /documents:', error)
+  } catch (err) {
+    console.error('Unhandled error in /documents:', err)
     return errorResponse(500, 'An unexpected error occurred')
   }
 })
 
 // ─────────────────────────────────────────────────────────────
+// VALIDATION
+// ─────────────────────────────────────────────────────────────
+function validatePayload(body: unknown): string | null {
+  if (!body || typeof body !== 'object') {
+    return 'Request body is required'
+  }
+
+  const b = body as Record<string, unknown>
+
+  // documentType
+  if (!b.documentType || !VALID_DOCUMENT_TYPES.includes(b.documentType as DocumentType)) {
+    return `documentType must be one of: ${VALID_DOCUMENT_TYPES.join(', ')}`
+  }
+
+  // cleanText
+  if (typeof b.cleanText !== 'string' || b.cleanText.trim().length === 0) {
+    return 'cleanText is required and must be a non-empty string'
+  }
+  if (b.cleanText.length > MAX_TEXT_LENGTH) {
+    return `cleanText exceeds maximum length of ${MAX_TEXT_LENGTH} characters`
+  }
+
+  // Sanity check: cleanText must not contain obvious PII patterns
+  // (belt-and-suspenders — the device should have stripped these already)
+  if (containsObviousPii(b.cleanText)) {
+    console.warn(`PII detected in cleanText — rejecting document upload`)
+    return 'cleanText appears to contain unstripped personal information. Please update the app.'
+  }
+
+  // documentDate
+  if (b.documentDate !== null && b.documentDate !== undefined) {
+    if (typeof b.documentDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(b.documentDate)) {
+      return 'documentDate must be in YYYY-MM-DD format or null'
+    }
+  }
+
+  // researchConsent
+  if (typeof b.researchConsent !== 'boolean') {
+    return 'researchConsent must be a boolean'
+  }
+
+  // birthYear
+  if (b.birthYear !== null && b.birthYear !== undefined) {
+    const year = Number(b.birthYear)
+    if (!Number.isInteger(year) || year < 1920 || year > 2020) {
+      return 'birthYear must be an integer between 1920 and 2020, or null'
+    }
+  }
+
+  return null
+}
+
+// Quick server-side PII check — belt-and-suspenders only.
+// The full pseudonymisation pipeline lives on the device.
+function containsObviousPii(text: string): boolean {
+  const EMAIL = /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/
+  const NIR   = /\b[12]\s?\d{2}\s?\d{2}\s?\d{2}\s?\d{3}\s?\d{3}\s?\d{2}\b/
+  return EMAIL.test(text) || NIR.test(text)
+}
+
+// ─────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────
-
-function getFileType(mimeType: string): 'pdf' | 'image' | 'text' | 'docx' {
-  if (mimeType === 'application/pdf') return 'pdf'
-  if (mimeType.startsWith('image/')) return 'image'
-  if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return 'docx'
-  return 'text'
-}
-
-function getExtension(mimeType: string): string {
-  const map: Record<string, string> = {
-    'application/pdf': 'pdf',
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/heic': 'heic',
-    'image/heif': 'heif',
-    'text/plain': 'txt',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
-  }
-  return map[mimeType] || 'bin'
-}
-
 function errorResponse(status: number, message: string): Response {
   return new Response(
     JSON.stringify({ error: message }),

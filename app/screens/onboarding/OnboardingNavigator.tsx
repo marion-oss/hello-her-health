@@ -1,11 +1,14 @@
 /**
  * anoqi — OnboardingNavigator
  *
- * React Navigation stack for the 5-step onboarding flow.
+ * React Navigation stack for the 3-step onboarding flow.
  * Rendered at app root ONLY when the user has not yet completed onboarding.
  *
  * Screen order:
- *   Welcome → Objective → HowItWorks → Consent → Account → (Home)
+ *   Welcome → Objective → Consent → Account → (Home)
+ *
+ * HowItWorks was removed — anoqi's intro message in ChatScreen
+ * covers the "how it works" explanation at the right moment.
  *
  * Skip logic (no re-showing onboarding screens once done):
  *   • Returning users who tap "I already have an account" on Welcome
@@ -44,21 +47,19 @@
 import React from 'react'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 
-import { WelcomeScreen }    from './WelcomeScreen'
-import { ObjectiveScreen }  from './ObjectiveScreen'
-import { HowItWorksScreen } from './HowItWorksScreen'
-import { ConsentScreen }    from './ConsentScreen'
-import { AccountScreen }    from './AccountScreen'
+import { WelcomeScreen }   from './WelcomeScreen'
+import { ObjectiveScreen } from './ObjectiveScreen'
+import { ConsentScreen }   from './ConsentScreen'
+import { AccountScreen }   from './AccountScreen'
 
 export type OnboardingStackParamList = {
-  Welcome:    undefined
-  Objective:  undefined
-  HowItWorks: undefined
-  Consent:    undefined
+  Welcome:   undefined
+  Objective: undefined
+  Consent:   undefined
   /**
    * mode:
    *   'choose'  — three-way pick (default, from Consent screen)
-   *   'login'   — direct login, opened from WelcomeScreen (skips steps 2–4)
+   *   'login'   — direct login, opened from WelcomeScreen (skips steps 2–3)
    *   'signup'  — jump straight to sign-up form
    */
   Account: { mode?: 'choose' | 'login' | 'signup' } | undefined
@@ -82,10 +83,9 @@ export function OnboardingNavigator(_props: Props) {
         contentStyle: { backgroundColor: '#FFF8F5' },
       }}
     >
-      <Stack.Screen name="Welcome"    component={WelcomeScreen}    />
-      <Stack.Screen name="Objective"  component={ObjectiveScreen}  />
-      <Stack.Screen name="HowItWorks" component={HowItWorksScreen} />
-      <Stack.Screen name="Consent"    component={ConsentScreen}    />
+      <Stack.Screen name="Welcome"   component={WelcomeScreen}   />
+      <Stack.Screen name="Objective" component={ObjectiveScreen} />
+      <Stack.Screen name="Consent"   component={ConsentScreen}   />
       <Stack.Screen
         name="Account"
         component={AccountScreen}

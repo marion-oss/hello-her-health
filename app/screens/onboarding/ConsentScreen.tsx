@@ -1,7 +1,7 @@
 /**
  * anoqi — ConsentScreen
  *
- * Step 4 of onboarding — GDPR / informed consent.
+ * Step 3 of onboarding — GDPR / informed consent.
  *
  * Required (cannot proceed without):
  *   ✓ Terms of Service
@@ -53,8 +53,8 @@ const COPY = {
     privacyLink: 'Politique de confidentialité',
     healthLabel: 'J\'accepte que mes questions de santé soient traitées pour me fournir des réponses.',
     healthNote: 'Tes données de santé ne sont jamais partagées. Elles restent sur ton appareil.',
-    researchLabel: 'Je souhaite contribuer à la recherche sur la santé des femmes.',
-    researchNote: 'Données anonymisées uniquement. Aucun identifiant personnel. Tu peux changer d\'avis à tout moment.',
+    researchLabel: 'Aide à personnaliser tes recommandations et à soutenir la recherche en santé féminine avec des partenaires accrédités. Tes documents originaux restent sur ton téléphone — nous n\'envoyons que des données dont tout ce qui t\'identifie a été retiré.',
+    researchNote: 'En savoir plus →',
     cta: 'Accepter et continuer',
     ctaDisabled: 'Accepte les conditions pour continuer',
   },
@@ -69,8 +69,8 @@ const COPY = {
     privacyLink: 'Privacy Policy',
     healthLabel: 'I agree to my health questions being processed to provide answers.',
     healthNote: 'Your health data is never shared. It stays on your device.',
-    researchLabel: 'I\'d like to contribute to women\'s health research.',
-    researchNote: 'Anonymised data only. No personal identifiers. You can opt out anytime.',
+    researchLabel: 'Help personalise your recommendations and support women\'s health research with vetted partners. Your original documents stay on your phone — we only upload data with everything that identifies you removed.',
+    researchNote: 'Learn more →',
     cta: 'Accept & continue',
     ctaDisabled: 'Accept the required terms to continue',
   },
@@ -124,13 +124,11 @@ export function ConsentScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
 
-        {/* Progress: step 4 of 5 */}
+        {/* Progress: step 3 of 3 */}
         <View style={styles.progressRow}>
           <View style={[styles.dot, styles.dotDone]} />
           <View style={[styles.dot, styles.dotDone]} />
-          <View style={[styles.dot, styles.dotDone]} />
           <View style={[styles.dot, styles.dotActive]} />
-          <View style={styles.dot} />
         </View>
 
         {/* Header */}

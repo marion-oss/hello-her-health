@@ -20,8 +20,12 @@ export type HealthObjective =
 type OnboardingState = {
   language: Language
   objective: HealthObjective | null
+  birthYear: number | null
+  country: string | null
   setLanguage: (lang: Language) => void
   setObjective: (obj: HealthObjective) => void
+  setBirthYear: (year: number) => void
+  setCountry: (country: string) => void
 }
 
 const OnboardingContext = createContext<OnboardingState | null>(null)
@@ -29,9 +33,14 @@ const OnboardingContext = createContext<OnboardingState | null>(null)
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>('fr')
   const [objective, setObjective] = useState<HealthObjective | null>(null)
+  const [birthYear, setBirthYear] = useState<number | null>(null)
+  const [country, setCountry] = useState<string | null>(null)
 
   return (
-    <OnboardingContext.Provider value={{ language, objective, setLanguage, setObjective }}>
+    <OnboardingContext.Provider value={{
+      language, objective, birthYear, country,
+      setLanguage, setObjective, setBirthYear, setCountry,
+    }}>
       {children}
     </OnboardingContext.Provider>
   )
