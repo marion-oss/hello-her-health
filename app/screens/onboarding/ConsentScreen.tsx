@@ -29,6 +29,7 @@ import {
   ScrollView,
   Linking,
 } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useNavigation } from '@react-navigation/native'
 import { useOnboarding } from '../../context/OnboardingContext'
 
@@ -114,8 +115,13 @@ export function ConsentScreen() {
     setConsent(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
-  function handleContinue() {
+  async function handleContinue() {
     if (!canProceed) return
+    // Mirror the chat-consent flag so signed-up users (who go through this
+    // formal Consent screen) don't see the lighter anon-mode gate in
+    // ChatScreen. The two surfaces are different presentations of the same
+    // agreement — see ROADMAP "Consent strategy".
+    await AsyncStorage.setItem('anoqi_chat_consent_accepted', 'true')
     // In production: store consent flags in OnboardingContext / Supabase
     navigation.navigate('Account')
   }

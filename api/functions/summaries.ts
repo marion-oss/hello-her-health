@@ -9,7 +9,7 @@
  *
  * Pipeline:
  *   load conversation + messages → validate journey is complete →
- *   ask Claude to structure the summary → validate JSON output →
+ *   ask Gemini to structure the summary → validate JSON output →
  *   save to summaries table → return summary record
  *
  * Summary structure (content_json):
@@ -22,12 +22,12 @@
  *   - prochaines_etapes : recommended next steps
  *
  * The summary is ALWAYS generated from pseudonymised conversation content.
- * No PII is passed to Claude during summary generation.
+ * No PII is passed to Gemini during summary generation.
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { generateSummary } from '../lib/claude.ts'
+import { generateSummary } from '../lib/gemini.ts'
 import { parseSummaryJson, type SummaryContent, type Symptom } from '../lib/summaryParser.ts'
 
 // ─────────────────────────────────────────────────────────────
@@ -42,7 +42,7 @@ const CORS_HEADERS = {
 // Types and parseSummaryJson live in ../lib/summaryParser.ts
 
 // ─────────────────────────────────────────────────────────────
-// Summary prompt — instructs Claude to output structured JSON
+// Summary prompt — instructs Gemini to output structured JSON
 // ─────────────────────────────────────────────────────────────
 function buildSummaryPrompt(
   messages: Array<{ role: string; content: string }>,
@@ -194,15 +194,15 @@ serve(async (req: Request) => {
       return errorResponse(409, 'A summary already exists for this conversation. Fetch it instead.')
     }
 
-    // ── 6. Build prompt and call Claude ───────────────────────
-    // Uses claude-sonnet-4-6 for higher-quality structured JSON output.
-    // The prompt instructs strict JSON-only output — no markdown wrapper.
+    // ── 6. Build prompt and call Gemini ───────────────────────
+    // Uses gemini-2.5-pro for higher-quality structured JSON output.
+    // responseMimeType: 'application/json' is set in gemini.ts to enforce strict JSON.
     const prompt = buildSummaryPrompt(messages, conversation.journey_type || 'free_chat', language)
 
     const rawContent = await generateSummary(prompt)
 
     if (!rawContent) {
-      console.error('Claude call failed during summary generation')
+      console.error('Gemini call failed during summary generation')
       return errorResponse(503, 'AI service temporarily unavailable. Please try again.')
     }
 
@@ -210,7 +210,7 @@ serve(async (req: Request) => {
     const summaryContent = parseSummaryJson(rawContent)
 
     if (!summaryContent) {
-      console.error('Failed to parse summary from Claude output:', rawContent.slice(0, 500))
+      console.error('Failed to parse summary from Gemini output:', rawContent.slice(0, 500))
       return errorResponse(500, 'Failed to generate a valid summary. Please try again.')
     }
 

@@ -4,7 +4,7 @@
  * POST /functions/v1/chat
  *
  * Receives a user message, runs the full pipeline:
- *   classifyInput → Claude → checkPolicy → persist → respond
+ *   classifyInput → Gemini → checkPolicy → persist → respond
  *
  * Handles both authenticated users and anonymous sessions.
  * Every request is validated, every response is policy-checked.
@@ -13,7 +13,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { chat } from '../lib/claude.ts'
+import { chat } from '../lib/gemini.ts'
 import { classifyInput } from '../policy/policyChecker.ts'
 
 // ─────────────────────────────────────────────────────────────
@@ -204,7 +204,7 @@ serve(async (req: Request) => {
       return jsonResponse(200, responsePayload)
     }
 
-    // ── 6. Build message history for Claude ───────────────────
+    // ── 6. Build message history for Gemini ───────────────────
     const messageHistory = [
       ...(existingMessages ?? []).map(m => ({
         role: m.role as 'user' | 'assistant',
@@ -213,7 +213,7 @@ serve(async (req: Request) => {
       { role: 'user' as const, content: message.trim() },
     ]
 
-    // ── 7. Call Claude (policy check runs inside claude.ts) ───
+    // ── 7. Call Gemini (policy check runs inside gemini.ts) ───
     const aiResponse = await chat(messageHistory, journeyType)
 
     if (aiResponse.error === 'api_error') {
@@ -231,7 +231,7 @@ serve(async (req: Request) => {
       userMessage: message.trim(),
       assistantContent: aiResponse.content,
       policyFlags: aiResponse.policyResult.flags,
-      sources: [],  // TODO: extract cited sources from Claude response in Phase 2
+      sources: [],  // TODO: extract cited sources from Gemini response in Phase 2
       tokensUsed: aiResponse.tokensUsed,
       modelUsed: aiResponse.modelUsed,
     })

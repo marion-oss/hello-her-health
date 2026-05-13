@@ -45,6 +45,7 @@ import {
   Pressable,
 } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useNavigation } from '@react-navigation/native'
 import { useOnboarding, type HealthObjective, type Language } from '../../context/OnboardingContext'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -74,7 +75,7 @@ type Message = {
 
 const COPY = {
   fr: {
-    greeting: 'Qu\'est-ce qui t\'occupe aujourd\'hui ?',
+    greeting: 'Qu\'est-ce qui te préoccupe aujourd\'hui ?',
     inputPlaceholder: 'Pose ta question…',
     safetyNote: 'Anoqi informe, elle ne diagnostique pas. Consulte toujours ton médecin.',
     summaryBanner: 'Générer un résumé pour ton médecin →',
@@ -83,6 +84,18 @@ const COPY = {
     attach: 'Joindre un document',
     errorGeneric: 'Une erreur s\'est produite. Réessaie.',
     introMessage: 'Bonjour, je suis anoqi. Pose-moi toutes tes questions — je te montrerai toujours la source derrière chaque réponse. Et rien de ce que tu partages ici n\'est lié à ton nom ou à ton identité.',
+    consentGate: {
+      title: 'Avant ta première question',
+      subtitle: 'Quelques points pour utiliser Anoqi en toute confiance.',
+      points: [
+        'Anoqi t\'informe, elle ne pose pas de diagnostic.',
+        'Tes données sont pseudonymisées avant tout traitement.',
+        'Tes données sont hébergées en Europe (UE).',
+        'Tu peux demander la suppression de tes données à tout moment.',
+      ],
+      cta: 'Je comprends et j\'accepte',
+      footnote: 'Pour le consentement détaillé, crée un compte plus tard.',
+    },
   },
   en: {
     greeting: 'What\'s on your mind today?',
@@ -94,6 +107,18 @@ const COPY = {
     attach: 'Attach a document',
     errorGeneric: 'Something went wrong. Please try again.',
     introMessage: 'Hi, I\'m anoqi. Ask me anything — I\'ll always show you the source behind my answer. And nothing you share here is linked to your name or any personal identifier.',
+    consentGate: {
+      title: 'Before your first question',
+      subtitle: 'A few things so you can use Anoqi with full confidence.',
+      points: [
+        'Anoqi informs you — it does not diagnose.',
+        'Your data is pseudonymised before any processing.',
+        'Your data is hosted in Europe (EU).',
+        'You can request deletion of your data at any time.',
+      ],
+      cta: 'I understand and agree',
+      footnote: 'For detailed consent, sign up later.',
+    },
   },
 }
 
@@ -315,6 +340,7 @@ function MessageBubble({ message, language }: { message: Message; language: Lang
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function ChatScreen() {
+  const navigation = useNavigation<any>()
   const { language, objective } = useOnboarding()
   const copy = COPY[language]
 
@@ -327,8 +353,32 @@ export function ChatScreen() {
   const flatListRef = useRef<FlatList>(null)
   const anoqiMessageCount = useRef(0)
 
-  // ── First-visit intro message ─────────────────────────────────
+  // ── Consent gate (anon-mode lighter "I understand and agree") ─
+  // The "Commencer la conversation →" shortcut on Objective bypasses formal
+  // Consent, so we block the chat UI here until the user accepts the short
+  // version. ConsentScreen mirrors this flag — signed-up users skip the
+  // gate. See ROADMAP "Consent strategy (GDPR — three-tier)".
+  // ──────────────────────────────────────────────────────────────
+  const [consentChecked, setConsentChecked] = useState(false)
+  const [consentAccepted, setConsentAccepted] = useState(false)
+
   useEffect(() => {
+    AsyncStorage.getItem('anoqi_chat_consent_accepted').then(v => {
+      setConsentAccepted(v === 'true')
+      setConsentChecked(true)
+    })
+  }, [])
+
+  async function handleAcceptConsent() {
+    await AsyncStorage.setItem('anoqi_chat_consent_accepted', 'true')
+    setConsentAccepted(true)
+  }
+
+  // ── First-visit intro message ─────────────────────────────────
+  // Deferred until consent is accepted so the persisted intro_shown flag
+  // isn't burned before the user actually sees the chat.
+  useEffect(() => {
+    if (!consentAccepted) return
     const currentLanguage = language // capture at mount
     async function maybeShowIntro() {
       const shown = await AsyncStorage.getItem('anoqi_intro_shown')
@@ -351,7 +401,7 @@ export function ChatScreen() {
       setStreamingId(introId)
     }
     maybeShowIntro()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [consentAccepted]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const starters = STARTERS[objective ?? 'general'][language]
   const showSummaryBanner = userMessageCount >= 3
@@ -457,6 +507,56 @@ export function ChatScreen() {
     setStreamingId(anoqiId)
   }, [input, language, objective])
 
+  // ── Consent gate render (anon-mode lighter consent before chat) ──
+  // Wait for the AsyncStorage check to resolve so users who've already
+  // accepted don't get a gate flash on every Chat mount.
+  if (!consentChecked) {
+    return <SafeAreaView style={styles.safe} />
+  }
+  if (!consentAccepted) {
+    const gate = copy.consentGate
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.gateContainer}>
+          <View style={styles.gateHeader}>
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={styles.backButton}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={language === 'fr' ? 'Retour' : 'Back'}
+            >
+              <Text style={styles.backIcon}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.wordmark}>anoqi</Text>
+          </View>
+          <View style={styles.gateContent}>
+            <Text style={styles.gateTitle}>{gate.title}</Text>
+            <Text style={styles.gateSubtitle}>{gate.subtitle}</Text>
+            <View style={styles.gateList}>
+              {gate.points.map((p, i) => (
+                <View key={i} style={styles.gateRow}>
+                  <Text style={styles.gateBullet}>✓</Text>
+                  <Text style={styles.gateRowText}>{p}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+          <View style={styles.gateFooter}>
+            <TouchableOpacity
+              style={styles.gateButton}
+              onPress={handleAcceptConsent}
+              accessibilityRole="button"
+            >
+              <Text style={styles.gateButtonText}>{gate.cta}</Text>
+            </TouchableOpacity>
+            <Text style={styles.gateFootnote}>{gate.footnote}</Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    )
+  }
+
   // ── Render ────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safe}>
@@ -468,6 +568,15 @@ export function ChatScreen() {
 
         {/* ── Header ───────────────────────────────────────── */}
         <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={language === 'fr' ? 'Retour' : 'Back'}
+          >
+            <Text style={styles.backIcon}>←</Text>
+          </TouchableOpacity>
           <Text style={styles.wordmark}>anoqi</Text>
         </View>
 
@@ -594,11 +703,22 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#FFE8E0',
+    gap: 12,
+  },
+  backButton: {
+    padding: 4,
+  },
+  backIcon: {
+    fontSize: 22,
+    color: '#FF0472',
+    lineHeight: 24,
   },
   wordmark: {
     fontSize: 18,
@@ -872,5 +992,80 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
     lineHeight: 22,
+  },
+
+  // Consent gate (lighter "I understand and agree" — anon-mode entry)
+  gateContainer: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+  },
+  gateHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 8,
+    gap: 12,
+  },
+  gateContent: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 24,
+  },
+  gateTitle: {
+    fontSize: 28,
+    fontFamily: 'BricolageGrotesque-ExtraBold',
+    color: '#000E28',
+    letterSpacing: -0.8,
+  },
+  gateSubtitle: {
+    fontSize: 15,
+    fontFamily: 'DMSans-Regular',
+    color: '#777777',
+    lineHeight: 22,
+  },
+  gateList: {
+    gap: 14,
+  },
+  gateRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  gateBullet: {
+    fontSize: 14,
+    color: '#FF0472',
+    fontFamily: 'DMSans-Medium',
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  gateRowText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'DMSans-Regular',
+    color: '#000E28',
+    lineHeight: 21,
+  },
+  gateFooter: {
+    paddingTop: 16,
+    gap: 12,
+  },
+  gateButton: {
+    backgroundColor: '#FF0472',
+    borderRadius: 16,
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
+  gateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontFamily: 'BricolageGrotesque-ExtraBold',
+    letterSpacing: -0.3,
+  },
+  gateFootnote: {
+    fontSize: 12,
+    fontFamily: 'DMSans-Regular',
+    color: '#AAAAAA',
+    textAlign: 'center',
   },
 })
