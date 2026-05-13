@@ -20,7 +20,7 @@
  * Fonts: BricolageGrotesque-ExtraBold (headlines), DMSans-Regular / DMSans-Medium (body)
  */
 
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo } from 'react'
 import {
   View,
   Text,
@@ -30,8 +30,14 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useNavigation } from '@react-navigation/native'
 import { useOnboarding, type HealthObjective, type Language } from '../../context/OnboardingContext'
+
+// Deep-link flag set by the "Let's start chatting →" CTA on the Objective
+// screen. We read + clear it on Home mount so the user lands in Chat
+// without having to tap the hero card.
+const CHAT_INTENT_KEY = 'anoqi_chat_intent'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Copy — all user-facing strings
@@ -43,7 +49,7 @@ const COPY = {
     greetingAfternoon: 'Bonjour',
     greetingEvening:   'Bonsoir',
     focusAreaLabel:    'Ton objectif santé',
-    heroTitle:         'Qu\'est-ce qui t\'occupe aujourd\'hui ?',
+    heroTitle:         'Qu\'est-ce qui te préoccupe aujourd\'hui ?',
     summariesTitle:    'Tes résumés',
     summariesEmpty:    'Après quelques échanges, anoqi rédigera un résumé que tu pourras partager avec ton médecin.',
     documentsTitle:    'Tes documents',
@@ -184,6 +190,17 @@ export function HomeScreen() {
   const summaries: Summary[] = STUB_SUMMARIES
   const documentCount = STUB_DOCUMENT_COUNT
 
+  // If the user reached Home from the Objective "Let's start chatting" CTA,
+  // deep-link them straight to Chat and clear the flag.
+  useEffect(() => {
+    AsyncStorage.getItem(CHAT_INTENT_KEY).then(v => {
+      if (v === 'true') {
+        AsyncStorage.removeItem(CHAT_INTENT_KEY)
+        navigation.navigate('Chat')
+      }
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFF8F5" />
@@ -214,7 +231,7 @@ export function HomeScreen() {
           <Text style={styles.focusLabel}>{copy.focusAreaLabel}</Text>
           <TouchableOpacity
             style={styles.focusPill}
-            onPress={() => { /* navigation.navigate('Objective') to change */ }}
+            onPress={() => navigation.navigate('Objective', { mode: 'change' })}
             accessibilityRole="button"
             accessibilityLabel={objectiveLabel}
           >

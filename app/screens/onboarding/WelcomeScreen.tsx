@@ -35,7 +35,7 @@ import { useOnboarding, type Language } from '../../context/OnboardingContext'
 const COPY = {
   fr: {
     tagline: 'Mieux informée.\nMieux entendue.',
-    body: 'Anoqi est ta compagne santé — elle t\'aide à comprendre tes symptômes, préparer tes consultations et naviguer le système médical en confiance.',
+    body: 'Anoqi est ton assistante santé — elle t\'aide à comprendre tes symptômes, préparer tes consultations et naviguer le système médical en confiance.',
     trust: [
       'Sources médicales validées (NHS, HAS, NICE…)',
       'Recherches menées sur les femmes',

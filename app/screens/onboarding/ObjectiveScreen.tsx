@@ -19,8 +19,19 @@ import {
   SafeAreaView,
   ScrollView,
 } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useNavigation, useRoute } from '@react-navigation/native'
 import { useOnboarding, type HealthObjective } from '../../context/OnboardingContext'
+
+/**
+ * Mounted in two stacks with different behaviour:
+ *   • OnboardingNavigator (default) — step 2 of onboarding, has progress dots,
+ *     "Continuer" → Consent, optional "Commencer la conversation →" shortcut
+ *     skips remaining onboarding (anon mode) and deep-links straight to Chat.
+ *   • MainNavigator with mode='change' — topic switcher from Home; "Continuer"
+ *     saves the new objective and pops back to Home. No progress dots, no
+ *     start-chat shortcut, no skip button.
+ */
 
 type ObjectiveOption = {
   id: HealthObjective
@@ -65,27 +76,43 @@ const OBJECTIVES: ObjectiveOption[] = [
 const COPY = {
   fr: {
     title: 'Qu\'est-ce qui t\'amène ?',
+    titleChange: 'Change ton objectif santé',
     subtitle: 'Personnalise ton expérience. Tu pourras changer ça à tout moment.',
+    subtitleChange: 'Choisis ton nouvel objectif. Anoqi adaptera ses réponses.',
     cta: 'Continuer',
+    ctaChange: 'Enregistrer',
     skip: 'Je ne sais pas encore',
+    startChat: 'Commencer la conversation →',
   },
   en: {
     title: 'What brings you here?',
+    titleChange: 'Change your focus area',
     subtitle: 'Personalise your experience. You can change this anytime.',
+    subtitleChange: 'Pick a new focus. Anoqi will adapt its answers.',
     cta: 'Continue',
+    ctaChange: 'Save',
     skip: 'I\'m not sure yet',
+    startChat: 'Let\'s start chatting →',
   },
 }
 
+const CHAT_INTENT_KEY = 'anoqi_chat_intent'
+
 export function ObjectiveScreen() {
   const navigation = useNavigation<any>()
-  const { language, setObjective } = useOnboarding()
+  const route = useRoute<any>()
+  const isChangeMode = route.params?.mode === 'change'
+  const { language, setObjective, markDone } = useOnboarding()
   const [selected, setSelected] = useState<HealthObjective | null>(null)
   const copy = COPY[language]
 
   function handleContinue() {
     if (selected) setObjective(selected)
-    navigation.navigate('Consent')
+    if (isChangeMode) {
+      navigation.goBack()
+    } else {
+      navigation.navigate('Consent')
+    }
   }
 
   function handleSkip() {
@@ -93,21 +120,36 @@ export function ObjectiveScreen() {
     navigation.navigate('Consent')
   }
 
+  // Onboarding-mode shortcut: pick objective + jump straight to Chat
+  // (skips Consent + Account; anon session). Lighter consent gate inside
+  // Chat will catch the user before their first message — see ROADMAP.
+  async function handleStartChatting() {
+    setObjective(selected ?? 'general')
+    await AsyncStorage.setItem(CHAT_INTENT_KEY, 'true')
+    markDone()
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
 
-        {/* Progress: step 2 of 3 */}
-        <View style={styles.progressRow}>
-          <View style={[styles.dot, styles.dotDone]} />
-          <View style={[styles.dot, styles.dotActive]} />
-          <View style={styles.dot} />
-        </View>
+        {/* Progress: step 2 of 3 — hidden when changing objective from Home */}
+        {!isChangeMode && (
+          <View style={styles.progressRow}>
+            <View style={[styles.dot, styles.dotDone]} />
+            <View style={[styles.dot, styles.dotActive]} />
+            <View style={styles.dot} />
+          </View>
+        )}
 
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>{copy.title}</Text>
-          <Text style={styles.subtitle}>{copy.subtitle}</Text>
+          <Text style={styles.title}>
+            {isChangeMode ? copy.titleChange : copy.title}
+          </Text>
+          <Text style={styles.subtitle}>
+            {isChangeMode ? copy.subtitleChange : copy.subtitle}
+          </Text>
         </View>
 
         {/* Options */}
@@ -155,12 +197,27 @@ export function ObjectiveScreen() {
             accessibilityRole="button"
           >
             <Text style={[styles.ctaText, !selected && styles.ctaTextDisabled]}>
-              {copy.cta}
+              {isChangeMode ? copy.ctaChange : copy.cta}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleSkip} style={styles.skipButton} accessibilityRole="button">
-            <Text style={styles.skipText}>{copy.skip}</Text>
-          </TouchableOpacity>
+
+          {/* Onboarding-only: shortcut straight to Chat */}
+          {!isChangeMode && (
+            <TouchableOpacity
+              onPress={handleStartChatting}
+              style={styles.startChatButton}
+              accessibilityRole="button"
+            >
+              <Text style={styles.startChatText}>{copy.startChat}</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Onboarding-only: skip → defaults to 'general' */}
+          {!isChangeMode && (
+            <TouchableOpacity onPress={handleSkip} style={styles.skipButton} accessibilityRole="button">
+              <Text style={styles.skipText}>{copy.skip}</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
       </View>
@@ -298,5 +355,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'DMSans-Regular',
     color: '#AAAAAA',
+  },
+  startChatButton: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  startChatText: {
+    fontSize: 15,
+    fontFamily: 'DMSans-Medium',
+    color: '#FF6B3D',
+    fontWeight: '600',
   },
 })

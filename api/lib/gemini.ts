@@ -1,35 +1,35 @@
 /**
- * anoqi — Claude AI client
+ * anoqi — Gemini AI client
  *
- * Wraps the Anthropic Messages API for use in Supabase Edge Functions (Deno).
- * Uses native fetch — no npm package required.
+ * Wraps Google's Gemini API (AI Studio / Generative Language API) for use
+ * in Supabase Edge Functions (Deno). Uses native fetch — no npm package required.
  *
  * Exports:
  *   chat()            — conversational messages, runs policy check on output
  *   generateSummary() — structured JSON summary generation (higher-capability model)
  *
  * Required secret (set in Supabase Dashboard → Edge Functions → Secrets):
- *   ANTHROPIC_API_KEY=sk-ant-...
+ *   GEMINI_API_KEY=AIza...
+ *   Issued from: https://aistudio.google.com/apikey
  *
  * Models used:
- *   claude-haiku-4-5-20251001  — chat (fast + cost-efficient)
- *   claude-sonnet-4-6          — summaries (higher quality structured output)
+ *   gemini-2.5-flash  — chat (fast + cost-efficient)
+ *   gemini-2.5-pro    — summaries (higher quality structured output)
  */
 
 import { checkPolicy, type PolicyResult } from '../policy/policyChecker.ts'
 
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
-const ANTHROPIC_VERSION = '2023-06-01'
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 
-// claude-haiku-4-5-20251001 is the right model for real-time chat:
-// sub-second latency, cheap, capable enough for conversational health guidance.
-// Summaries use claude-sonnet-4-6 for higher-quality structured JSON output.
-const CHAT_MODEL    = 'claude-haiku-4-5-20251001'
-const SUMMARY_MODEL = 'claude-sonnet-4-6'
+// gemini-2.5-flash is the right model for real-time chat: sub-second latency,
+// cheap, capable enough for conversational health guidance.
+// Summaries use gemini-2.5-pro for higher-quality structured JSON output.
+const CHAT_MODEL    = 'gemini-2.5-flash'
+const SUMMARY_MODEL = 'gemini-2.5-pro'
 
 // ─────────────────────────────────────────────────────────────
 // SYSTEM PROMPT — anoqi's clinical persona and guardrails
-// Injected as the system turn on every chat request.
+// Injected as systemInstruction on every chat request.
 // ─────────────────────────────────────────────────────────────
 const BASE_SYSTEM_PROMPT = `Tu es Anoqi, une assistante en santé féminine bienveillante et experte. Tu aides les femmes à comprendre leurs symptômes, à se préparer pour leurs consultations médicales, et à naviguer dans le système de santé.
 
@@ -49,7 +49,6 @@ Langue : Réponds dans la langue de l'utilisatrice. Par défaut, réponds en fra
 
 // ─────────────────────────────────────────────────────────────
 // JOURNEY CONTEXTS — appended to the system prompt per journey type
-// Keeps routing logic close to the API layer, not in the DB
 // ─────────────────────────────────────────────────────────────
 const JOURNEY_CONTEXTS: Record<string, string> = {
   symptoms: "Contexte : L'utilisatrice cherche à comprendre ses symptômes gynécologiques. Aide-la à les décrire précisément (durée, fréquence, intensité, déclencheurs) et à préparer sa consultation.",
@@ -78,51 +77,59 @@ export interface ChatResult {
 
 // ─────────────────────────────────────────────────────────────
 // CHAT
-// Sends a conversation to Claude, runs policy check on output.
+// Sends a conversation to Gemini, runs policy check on output.
 // Called by api/functions/chat.ts for every user message.
 // ─────────────────────────────────────────────────────────────
 export async function chat(
   messages: ChatMessage[],
   journeyType?: string
 ): Promise<ChatResult> {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  const apiKey = Deno.env.get('GEMINI_API_KEY')
 
   if (!apiKey) {
-    console.error('[claude] ANTHROPIC_API_KEY secret not set in Edge Functions')
+    console.error('[gemini] GEMINI_API_KEY secret not set in Edge Functions')
     return apiError(CHAT_MODEL)
   }
 
-  // Build system prompt with optional journey context appended
   const journeyContext = JOURNEY_CONTEXTS[journeyType ?? 'free_chat'] ?? ''
   const systemPrompt   = journeyContext
     ? `${BASE_SYSTEM_PROMPT}\n\n${journeyContext}`
     : BASE_SYSTEM_PROMPT
 
+  // Gemini uses 'model' for assistant turns and a parts[] wrapper around text.
+  const contents = messages.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }))
+
   try {
-    const response = await fetch(ANTHROPIC_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type':    'application/json',
-        'x-api-key':        apiKey,
-        'anthropic-version': ANTHROPIC_VERSION,
-      },
-      body: JSON.stringify({
-        model:      CHAT_MODEL,
-        max_tokens: 1024,
-        system:     systemPrompt,
-        messages,
-      }),
-    })
+    const response = await fetch(
+      `${GEMINI_API_BASE}/${CHAT_MODEL}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':    'application/json',
+          'x-goog-api-key':   apiKey,
+        },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents,
+          generationConfig: {
+            maxOutputTokens: 1024,
+          },
+        }),
+      }
+    )
 
     if (!response.ok) {
       const errorBody = await response.text()
-      console.error('[claude] API error:', response.status, errorBody)
+      console.error('[gemini] API error:', response.status, errorBody)
       return apiError(CHAT_MODEL)
     }
 
     const data = await response.json()
-    const rawContent: string  = data.content?.[0]?.text ?? ''
-    const tokensUsed: number | null = data.usage?.output_tokens ?? null
+    const rawContent: string  = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+    const tokensUsed: number | null = data.usageMetadata?.candidatesTokenCount ?? null
 
     // Every AI response is checked by the deterministic policy layer
     // before being returned. The policy layer can block, modify, or pass through.
@@ -138,53 +145,56 @@ export async function chat(
     }
 
   } catch (e) {
-    console.error('[claude] Unexpected error in chat():', e)
+    console.error('[gemini] Unexpected error in chat():', e)
     return apiError(CHAT_MODEL)
   }
 }
 
 // ─────────────────────────────────────────────────────────────
 // GENERATE SUMMARY
-// Higher-capability model, low temperature, JSON output.
+// Higher-capability model with JSON response mode enforced.
 // Called by api/functions/summaries.ts.
 // Returns the raw text response — parsing is handled by summaryParser.ts.
 // ─────────────────────────────────────────────────────────────
 export async function generateSummary(prompt: string): Promise<string | null> {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  const apiKey = Deno.env.get('GEMINI_API_KEY')
 
   if (!apiKey) {
-    console.error('[claude] ANTHROPIC_API_KEY secret not set in Edge Functions')
+    console.error('[gemini] GEMINI_API_KEY secret not set in Edge Functions')
     return null
   }
 
   try {
-    const response = await fetch(ANTHROPIC_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type':    'application/json',
-        'x-api-key':        apiKey,
-        'anthropic-version': ANTHROPIC_VERSION,
-      },
-      body: JSON.stringify({
-        model:      SUMMARY_MODEL,
-        max_tokens: 2000,
-        // temperature is not supported in all API versions via this parameter;
-        // we instruct low-variance output via the prompt instead (see summaries.ts)
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    })
+    const response = await fetch(
+      `${GEMINI_API_BASE}/${SUMMARY_MODEL}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':    'application/json',
+          'x-goog-api-key':   apiKey,
+        },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            maxOutputTokens:  2000,
+            // Enforce strict JSON output — no markdown wrapper, no preamble.
+            responseMimeType: 'application/json',
+          },
+        }),
+      }
+    )
 
     if (!response.ok) {
       const errorBody = await response.text()
-      console.error('[claude] Summary API error:', response.status, errorBody)
+      console.error('[gemini] Summary API error:', response.status, errorBody)
       return null
     }
 
     const data = await response.json()
-    return data.content?.[0]?.text ?? null
+    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? null
 
   } catch (e) {
-    console.error('[claude] Unexpected error in generateSummary():', e)
+    console.error('[gemini] Unexpected error in generateSummary():', e)
     return null
   }
 }
