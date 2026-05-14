@@ -12,7 +12,7 @@
  *       ↓
  *   extractStructured()     — parse lab values or medications
  *       ↓
- *   saveDocument()          — write JSON to expo-file-system
+ *   saveDocument()          — write JSON via the DocumentStorage interface
  *       ↓
  *   uploadToServer()        — send ONLY clean payload to Supabase
  *
@@ -20,15 +20,15 @@
  * Clean text + structured data are uploaded once research_consent = true
  * or when needed for the user's own summaries (always pseudonymised).
  *
- * Local storage path:
- *   FileSystem.documentDirectory + 'anoqi/documents/<id>.json'
+ * Local storage is delegated to `./storage/documentStorage` — Metro
+ * resolves to the native (expo-file-system) or web (localStorage)
+ * implementation at bundle time.
  *
  * Dependencies:
- *   expo-file-system     — file I/O
- *   @react-native-async-storage/async-storage  — document index
+ *   ./storage/documentStorage                  — blob I/O (platform-pluggable)
+ *   @react-native-async-storage/async-storage  — document index (cross-platform)
  */
 
-import * as FileSystem from 'expo-file-system/legacy'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
   pseudonymise,
@@ -39,11 +39,11 @@ import {
   type LabValue,
   type Medication,
 } from './pseudonymise'
+import { storage } from './storage/documentStorage'
 
 // ─────────────────────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────────────────────
-const DOCS_DIR        = `${FileSystem.documentDirectory}anoqi/documents/`
 const INDEX_KEY       = 'anoqi_document_index'   // AsyncStorage key for the doc list
 const MAX_TEXT_LENGTH = 50_000                   // chars — refuse suspiciously large pastes
 
@@ -88,17 +88,6 @@ export type DocumentUploadPayload = {
 // ─────────────────────────────────────────────────────────────
 // STORAGE HELPERS
 // ─────────────────────────────────────────────────────────────
-async function ensureDocsDir(): Promise<void> {
-  const info = await FileSystem.getInfoAsync(DOCS_DIR)
-  if (!info.exists) {
-    await FileSystem.makeDirectoryAsync(DOCS_DIR, { intermediates: true })
-  }
-}
-
-function docPath(id: string): string {
-  return `${DOCS_DIR}${id}.json`
-}
-
 async function readIndex(): Promise<DocumentIndexEntry[]> {
   const raw = await AsyncStorage.getItem(INDEX_KEY)
   if (!raw) return []
@@ -179,12 +168,7 @@ export function processText(
 // Writes doc to FileSystem and updates the AsyncStorage index
 // ─────────────────────────────────────────────────────────────
 export async function saveDocument(doc: LocalDocument): Promise<void> {
-  await ensureDocsDir()
-  await FileSystem.writeAsStringAsync(
-    docPath(doc.id),
-    JSON.stringify(doc),
-    { encoding: FileSystem.EncodingType.UTF8 }
-  )
+  await storage.writeDocument(doc.id, JSON.stringify(doc))
 
   // Update index
   const index = await readIndex()
@@ -203,13 +187,8 @@ export async function saveDocument(doc: LocalDocument): Promise<void> {
 // LOAD
 // ─────────────────────────────────────────────────────────────
 export async function loadDocument(id: string): Promise<LocalDocument | null> {
-  const path = docPath(id)
-  const info = await FileSystem.getInfoAsync(path)
-  if (!info.exists) return null
-
-  const raw = await FileSystem.readAsStringAsync(path, {
-    encoding: FileSystem.EncodingType.UTF8,
-  })
+  const raw = await storage.readDocument(id)
+  if (!raw) return null
   try {
     return JSON.parse(raw) as LocalDocument
   } catch {
@@ -227,11 +206,7 @@ export async function listDocuments(): Promise<DocumentIndexEntry[]> {
 // Removes the file and the index entry
 // ─────────────────────────────────────────────────────────────
 export async function deleteDocument(id: string): Promise<void> {
-  const path = docPath(id)
-  const info = await FileSystem.getInfoAsync(path)
-  if (info.exists) {
-    await FileSystem.deleteAsync(path, { idempotent: true })
-  }
+  await storage.deleteDocument(id)
   const index = await readIndex()
   await writeIndex(index.filter(e => e.id !== id))
 }
