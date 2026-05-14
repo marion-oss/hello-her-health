@@ -20,7 +20,7 @@
  * Fonts: BricolageGrotesque-ExtraBold (headlines), DMSans-Regular / DMSans-Medium (body)
  */
 
-import React, { useEffect, useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   View,
   Text,
@@ -33,6 +33,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useNavigation } from '@react-navigation/native'
 import { useOnboarding, type HealthObjective, type Language } from '../../context/OnboardingContext'
+import { listDocuments } from '../../lib/documentStore'
 
 // Deep-link flag set by the "Let's start chatting →" CTA on the Objective
 // screen. We read + clear it on Home mount so the user lands in Chat
@@ -158,9 +159,6 @@ type Summary = {
 // WIRE DATA — fetch from Supabase summaries table
 const STUB_SUMMARIES: Summary[] = []
 
-// WIRE DATA — fetch from Supabase documents table
-const STUB_DOCUMENT_COUNT = 0
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -188,7 +186,7 @@ export function HomeScreen() {
   const insight = INSIGHTS[objective ?? 'general'][language]
 
   const summaries: Summary[] = STUB_SUMMARIES
-  const documentCount = STUB_DOCUMENT_COUNT
+  const [documentCount, setDocumentCount] = useState(0)
 
   // If the user reached Home from the Objective "Let's start chatting" CTA,
   // deep-link them straight to Chat and clear the flag.
@@ -200,6 +198,12 @@ export function HomeScreen() {
       }
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    listDocuments()
+      .then(docs => setDocumentCount(docs.length))
+      .catch(err => console.warn('Failed to load documents:', err))
+  }, [])
 
   return (
     <SafeAreaView style={styles.safe}>
