@@ -1,13 +1,48 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Node / Expo
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.yarn/
+.pnp.*
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Metro bundler
+.metro-health-check*
+
+# TypeScript build
+*.tsbuildinfo
+
 # Wrangler / Cloudflare
 .wrangler/
 
-# Env files
+# Environment variables — never commit secrets
 .env
 .env.*
 !.env.example
+.env.local
+.env.*.local
 
-# Dependencies
-node_modules/
+# Supabase local dev
+supabase/.branches/
+supabase/.temp/
 
-# Misc
-.DS_Store
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
