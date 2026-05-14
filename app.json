@@ -21,6 +21,10 @@
       "package": "health.anoqi.app",
       "versionCode": 1
     },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
     "plugins": [
       "expo-font",
       "expo-splash-screen",
