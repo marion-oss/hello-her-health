@@ -79,10 +79,16 @@ export interface ChatResult {
 // CHAT
 // Sends a conversation to Gemini, runs policy check on output.
 // Called by api/functions/chat.ts for every user message.
+//
+// `systemAddendum` is appended to the system prompt verbatim. chat.ts uses
+// it to inject the rendered retrieval snippets (see api/lib/retrieval.ts
+// → renderSnippetsForPrompt). Kept as an opaque string so retrieval
+// concerns stay out of this file.
 // ─────────────────────────────────────────────────────────────
 export async function chat(
   messages: ChatMessage[],
-  journeyType?: string
+  journeyType?: string,
+  systemAddendum?: string,
 ): Promise<ChatResult> {
   const apiKey = Deno.env.get('GEMINI_API_KEY')
 
@@ -92,9 +98,12 @@ export async function chat(
   }
 
   const journeyContext = JOURNEY_CONTEXTS[journeyType ?? 'free_chat'] ?? ''
-  const systemPrompt   = journeyContext
+  const baseWithJourney = journeyContext
     ? `${BASE_SYSTEM_PROMPT}\n\n${journeyContext}`
     : BASE_SYSTEM_PROMPT
+  const systemPrompt = systemAddendum
+    ? `${baseWithJourney}\n\n${systemAddendum}`
+    : baseWithJourney
 
   // Gemini uses 'model' for assistant turns and a parts[] wrapper around text.
   const contents = messages.map(m => ({
