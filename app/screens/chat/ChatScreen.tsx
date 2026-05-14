@@ -15,8 +15,10 @@
  *   • Keyboard-aware layout
  *   • Full FR / EN support
  *
- * API: stubbed — wire to Supabase chat.ts edge function (streaming fetch).
- * Search for "WIRE API" to find the integration point.
+ * API: calls /functions/v1/chat (api/functions/chat.ts) via supabase.functions.invoke.
+ *      Anon-mode sessions use a persisted session_id; signed-in users send the
+ *      JWT. Responses arrive in one shot today (no token streaming yet — the
+ *      visual streaming below is a presentation effect over the full payload).
  *
  * Brand palette:
  *   Neon Fuchsia  #FF0472  · Hot Coral  #FF6B3D
@@ -47,15 +49,29 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useNavigation } from '@react-navigation/native'
 import { useOnboarding, type HealthObjective, type Language } from '../../context/OnboardingContext'
+import { supabase } from '../../lib/supabase'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Display-side shape used by SourceChip. The server's /chat endpoint
+// returns persisted citation refs in `messages.sources` plus optional
+// display enrichment in `sources_display` (see api/functions/chat.ts
+// step 7.5). Mobile coerces both into this shape for rendering.
 type Source = {
-  name: string   // e.g. "NHS"
-  topic: string  // e.g. "Menstrual health"
+  /** Citation label as rendered inline in the message body, e.g. 'S1'. Optional for legacy / non-RAG sources. */
+  label?: string
+  /** Display name, e.g. 'NHS' or the pathway title. Falls back to label if missing. */
+  name: string
+  /** Short topic line, e.g. 'Menstrual health' or pathway key. */
+  topic: string
+  /** Tappable link if available. */
   url?: string
+  /** Provenance refs from the server — useful for analytics, not rendered. */
+  source_kind?: 'pathway' | 'source' | 'pathway_red_flag'
+  source_ref?: string
+  pathway_key?: string | null
 }
 
 type Message = {
@@ -67,6 +83,53 @@ type Message = {
   sources?: Source[]
   isFirst?: boolean      // first anoqi message → show safety note
   timestamp: Date
+}
+
+// Response shape from /functions/v1/chat. Mirror of ChatResponse in
+// api/functions/chat.ts plus sources_display from the server-side enricher.
+type ChatApiResponse = {
+  message: {
+    id:              string
+    content:         string
+    role:            'assistant'
+    sources:         Array<{
+      label:           string
+      row_id:          string
+      source_kind:     'pathway' | 'source' | 'pathway_red_flag'
+      source_ref:      string
+      pathway_key:     string | null
+      pathway_version: string | null
+    }>
+    sources_display: Array<{
+      label:       string
+      source_kind: 'pathway' | 'source' | 'pathway_red_flag'
+      source_ref:  string
+      name:        string
+      topic:       string
+      url?:        string
+    }>
+    policyFlags:     unknown[]
+    createdAt:       string
+  }
+  conversationId: string
+  blocked:        boolean
+}
+
+// Lightweight UUID-ish session ID. Tries crypto.randomUUID (Hermes ≥0.74,
+// modern web) and falls back to a timestamp+random hex string. The server
+// only uses this as an opaque key, so format isn't load-bearing.
+function generateSessionId(): string {
+  try {
+    // @ts-ignore — crypto.randomUUID exists in Hermes recent enough
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID()
+    }
+  } catch { /* fall through */ }
+  return (
+    Date.now().toString(36) + '-' +
+    Math.random().toString(36).slice(2, 10) +
+    Math.random().toString(36).slice(2, 10)
+  )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -200,45 +263,6 @@ const STARTERS: Record<HealthObjective | 'general', { fr: string[]; en: string[]
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sample sources — rotate based on message index
-// ─────────────────────────────────────────────────────────────────────────────
-
-const SAMPLE_SOURCES: Source[][] = [
-  [{ name: 'NHS', topic: 'Menstrual health', url: 'https://www.nhs.uk/conditions/periods/' },
-   { name: 'NICE', topic: 'Gynaecology', url: 'https://www.nice.org.uk/guidance/ng88' }],
-  [{ name: 'FSRH', topic: 'Contraception', url: 'https://www.fsrh.org/standards-and-guidance/' },
-   { name: 'NHS', topic: 'Sexual health', url: 'https://www.nhs.uk/contraception/' }],
-  [{ name: 'BMS', topic: 'Menopause', url: 'https://thebms.org.uk/publications/' },
-   { name: 'NICE', topic: 'Menopause', url: 'https://www.nice.org.uk/guidance/ng23' }],
-  [{ name: 'NHS', topic: 'Women\'s health', url: 'https://www.nhs.uk/womens-health/' },
-   { name: 'HAS', topic: 'Santé féminine', url: 'https://www.has-sante.fr/' }],
-  [{ name: 'Cochrane', topic: 'Systematic review', url: 'https://www.cochranelibrary.com/' },
-   { name: 'FSRH', topic: 'Reproductive health', url: 'https://www.fsrh.org/' }],
-]
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Mock response generator — replace with real API call (see WIRE API below)
-// ─────────────────────────────────────────────────────────────────────────────
-
-const MOCK_RESPONSES: Record<Language, string[]> = {
-  en: [
-    'What you\'re describing is something many women experience, and it\'s worth taking seriously. Symptoms like these can have several underlying causes — hormonal fluctuations, thyroid function, nutritional factors, or conditions like PCOS or endometriosis. Tracking the timing, intensity, and any accompanying symptoms will give your doctor a much clearer picture. Would you like help preparing a summary of what you\'ve been experiencing?',
-    'There are important nuances here that often get missed. Research conducted specifically on women\'s health — rather than extrapolated from male studies — shows that hormonal influences on this are significant and often underestimated. The evidence from NICE and FSRH guidelines suggests that a personalised approach works better than a one-size-fits-all answer. What\'s your current situation?',
-    'This is one of those areas where women are often dismissed, but the evidence is clear. Your symptoms are real, they have a clinical basis, and there are evidence-based options available. Let me break down what the research says and help you go into your next appointment prepared to have this conversation effectively.',
-  ],
-  fr: [
-    'Ce que tu décris est quelque chose que beaucoup de femmes vivent, et ça mérite d\'être pris au sérieux. Ces symptômes peuvent avoir plusieurs causes — fluctuations hormonales, fonction thyroïdienne, facteurs nutritionnels, ou des conditions comme le SOPK ou l\'endométriose. Noter le moment, l\'intensité et les symptômes associés donnera à ton médecin une image beaucoup plus claire. Tu veux que je t\'aide à préparer un résumé de ce que tu vis ?',
-    'Il y a des nuances importantes ici qui passent souvent inaperçues. Les recherches menées spécifiquement sur la santé des femmes — plutôt qu\'extrapolées d\'études masculines — montrent que les influences hormonales sur ce sujet sont significatives et souvent sous-estimées. Les recommandations de la HAS et du NICE suggèrent qu\'une approche personnalisée fonctionne mieux. Quelle est ta situation actuelle ?',
-    'C\'est un domaine où les femmes sont souvent ignorées, mais les preuves sont claires. Tes symptômes sont réels, ils ont une base clinique, et des options fondées sur des données probantes existent. Laisse-moi te détailler ce que dit la recherche et t\'aider à aborder ta prochaine consultation de façon efficace.',
-  ],
-}
-
-function getMockResponse(lang: Language, index: number): string {
-  const responses = MOCK_RESPONSES[lang]
-  return responses[index % responses.length]
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // TypingIndicator — three pulsing dots
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -280,16 +304,18 @@ function TypingIndicator() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function SourceChip({ source }: { source: Source }) {
+  const labelBadge = source.label ? `[${source.label}] ` : ''
   return (
     <TouchableOpacity
       style={styles.sourceChip}
       onPress={() => source.url && Linking.openURL(source.url)}
-      accessibilityRole="link"
-      accessibilityLabel={`${source.name} · ${source.topic}`}
+      accessibilityRole={source.url ? 'link' : 'button'}
+      accessibilityLabel={`${source.label ? source.label + ' — ' : ''}${source.name} · ${source.topic}`}
     >
+      {source.label && <Text style={styles.sourceChipLabel}>{labelBadge}</Text>}
       <Text style={styles.sourceChipName}>{source.name}</Text>
-      <Text style={styles.sourceChipDot}> · </Text>
-      <Text style={styles.sourceChipTopic}>{source.topic}</Text>
+      {source.topic ? <Text style={styles.sourceChipDot}> · </Text> : null}
+      {source.topic ? <Text style={styles.sourceChipTopic}>{source.topic}</Text> : null}
     </TouchableOpacity>
   )
 }
@@ -352,6 +378,11 @@ export function ChatScreen() {
 
   const flatListRef = useRef<FlatList>(null)
   const anoqiMessageCount = useRef(0)
+  // Server-assigned conversation UUID. Null until the first /chat response
+  // creates it; reused on every subsequent turn so the server can rebuild
+  // history. Stays in the screen's lifetime — leaving and re-entering Chat
+  // starts a fresh conversation, which matches the current UX.
+  const conversationIdRef = useRef<string | null>(null)
 
   // ── Consent gate (anon-mode lighter "I understand and agree") ─
   // The "Commencer la conversation →" shortcut on Objective bypasses formal
@@ -462,49 +493,86 @@ export function ChatScreen() {
     setUserMessageCount(prev => prev + 1)
     setIsTyping(true)
 
-    // ── WIRE API ────────────────────────────────────────────────
-    // Replace this block with a real streaming fetch to chat.ts:
+    // ── Call /functions/v1/chat ─────────────────────────────────
+    // Anon-mode sessions: we mint a session_id once per install and stash
+    // it in AsyncStorage. The server accepts either an auth JWT or a
+    // sessionId (see api/functions/chat.ts step 2).
     //
-    // const response = await fetch(SUPABASE_CHAT_URL, {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //     'Authorization': `Bearer ${supabaseAnonKey}`,
-    //   },
-    //   body: JSON.stringify({
-    //     message: content,
-    //     language,
-    //     objective: objective ?? 'general',
-    //     sessionId: await AsyncStorage.getItem('anoqi_session_id'),
-    //   }),
-    // })
-    //
-    // Then stream the response body and call setMessages to update
-    // the streaming message incrementally.
-    // ────────────────────────────────────────────────────────────
+    // Failure path: any error (network, 503, blocked) surfaces as an
+    // error bubble. The server-side policy layer and citation parser
+    // already strip unsafe / hallucinated content before it reaches here.
+    try {
+      let sessionId = await AsyncStorage.getItem('anoqi_session_id')
+      if (!sessionId) {
+        sessionId = generateSessionId()
+        await AsyncStorage.setItem('anoqi_session_id', sessionId)
+      }
 
-    await new Promise(r => setTimeout(r, 900 + Math.random() * 400))
-    setIsTyping(false)
+      const { data, error } = await supabase.functions.invoke<ChatApiResponse>('chat', {
+        body: {
+          message:        content,
+          conversationId: conversationIdRef.current,
+          sessionId,
+          journeyType:    objective ?? 'free_chat',
+          language,
+        },
+      })
 
-    const isFirstAnoqi = anoqiMessageCount.current === 0
-    anoqiMessageCount.current += 1
-    const responseText = getMockResponse(language, anoqiMessageCount.current - 1)
-    const sources = SAMPLE_SOURCES[anoqiMessageCount.current % SAMPLE_SOURCES.length]
-    const anoqiId = `anoqi-${Date.now()}`
+      setIsTyping(false)
 
-    const anoqiMessage: Message = {
-      id: anoqiId,
-      role: 'anoqi',
-      text: '',
-      fullText: responseText,
-      isStreaming: true,
-      sources,
-      isFirst: isFirstAnoqi,
-      timestamp: new Date(),
+      if (error || !data) {
+        const errId = `error-${Date.now()}`
+        setMessages(prev => [...prev, {
+          id:         errId,
+          role:       'anoqi',
+          text:       copy.errorGeneric,
+          fullText:   copy.errorGeneric,
+          isStreaming: false,
+          timestamp:  new Date(),
+        }])
+        return
+      }
+
+      conversationIdRef.current = data.conversationId
+
+      const isFirstAnoqi = anoqiMessageCount.current === 0
+      anoqiMessageCount.current += 1
+
+      const displaySources: Source[] = (data.message.sources_display ?? []).map(s => ({
+        label:       s.label,
+        name:        s.name,
+        topic:       s.topic,
+        url:         s.url,
+        source_kind: s.source_kind,
+        source_ref:  s.source_ref,
+      }))
+
+      const anoqiMessage: Message = {
+        id:          data.message.id,
+        role:        'anoqi',
+        text:        '',
+        fullText:    data.message.content,
+        isStreaming: true,
+        sources:     displaySources,
+        isFirst:     isFirstAnoqi,
+        timestamp:   new Date(data.message.createdAt),
+      }
+
+      setMessages(prev => [...prev, anoqiMessage])
+      setStreamingId(data.message.id)
+    } catch (e) {
+      setIsTyping(false)
+      console.error('[ChatScreen] /chat call failed:', e)
+      const errId = `error-${Date.now()}`
+      setMessages(prev => [...prev, {
+        id:          errId,
+        role:        'anoqi',
+        text:        copy.errorGeneric,
+        fullText:    copy.errorGeneric,
+        isStreaming: false,
+        timestamp:   new Date(),
+      }])
     }
-
-    setMessages(prev => [...prev, anoqiMessage])
-    setStreamingId(anoqiId)
   }, [input, language, objective])
 
   // ── Consent gate render (anon-mode lighter consent before chat) ──
@@ -868,6 +936,13 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderWidth: 1,
     borderColor: '#FFB0CC',
+  },
+  sourceChipLabel: {
+    fontSize: 10,
+    fontFamily: 'DMSans-Medium',
+    color: '#FF0472',
+    fontWeight: '700',
+    marginRight: 2,
   },
   sourceChipName: {
     fontSize: 11,
