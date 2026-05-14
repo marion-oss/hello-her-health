@@ -6,21 +6,35 @@ A single place to park future work — features that are implied or scoped but n
 
 ## Physician portal
 
-A separate surface where physicians can review and shape clinical pathway content. **Decision needed:** which format Anoqi commits to. Each has different implications for clinical governance and engineering scope.
+A separate surface where physicians can review and shape clinical pathway content.
 
-### Format options
+**Format decision (2026-05-13):** PR-style review. AI/admin proposes pathway updates → physicians comment → a clinical_lead approves before changes go live. Rejected: wiki (no governance) and annotation overlay (no direct effect on AI behaviour).
 
-- **Wiki / structured form** — Physicians edit pathway content directly in a CMS-like interface: the questions to ask, red-flag triggers, prep checklists. Highest physician agency, highest governance burden (every edit ships to production).
-- **PR-style review** — AI suggests pathway updates; physicians comment, a clinical lead approves before changes go live. Closer to a software-engineering workflow. Slower iteration, stronger audit trail.
-- **Annotation overlay** — Physicians flag specific AI responses or summary fields ("this should escalate to urgent", "missing question about X"). Lightweight feedback loop. Doesn't directly modify AI behaviour, just feeds product/prompt improvements.
+**Backend status:** schema is live in Supabase as of 2026-05-14 (migration `003_physician_backend.sql` applied, plus `005_pathways_anon_read.sql` for the v0 read-only view). Tables: `physician_roles`, `clinical_pathways`, `pathway_change_proposals`, `proposal_comments`, `pathway_red_flags`, `source_library`, `source_validation_queue`, `clinical_audit_log`. 4 draft pathways seeded; 29 sources in `source_library`.
 
-### Where it lives
+### v0 — Read-only portal (shipped 2026-05-14)
 
-Separate Next.js or Remix web app pointed at the same Supabase backend, with its own RLS rules (physician role distinct from end user). Reuses Anoqi's existing pseudonymisation pipeline and audit logs.
+Lives at `physician-portal/` (Next.js 16 + Tailwind, same repo). No auth. Public read-only view of non-archived pathways via the `pathways_select_anon_read` RLS policy. Two pages: list (`/`) and detail (`/pathways/[id]`). Deployed as a separate Vercel project pointed at the same Supabase backend.
+
+Scope chosen for v0: enough to demo the pathway content to design partners and clinicians without an auth detour, while the full PR-style workflow lands in v1.
+
+### v1 — Auth + PR-style workflow (deferred)
+
+Adds login, role-gated writes, and the full propose → review → approve loop.
+
+**Pieces to build:**
+1. **Auth** — Supabase Auth (magic-link recommended). Gate every page on an active `physician_roles` row. Seed Marion as `role='admin'` on first login.
+2. **Propose pathway change** — form that creates a `pathway_change_proposals` row. Fields: target pathway (or blank for new), proposed content (JSON editor), `clinical_rationale`, `source_references` (multi-select from `source_library`).
+3. **Review** — proposal list filtered by status. Detail view shows diff vs. base pathway. Physicians comment via `proposal_comments` (`comment` / `concern` / `approval` / `rejection`).
+4. **Approve + deploy** — clinical_lead-only action. Approval inserts a new `clinical_pathways` row at `version_number + 1`, status `live`. Previous live row → `archived`. Writes to `clinical_audit_log`. This is the gated action; everyone else can propose and comment.
+5. **Source validation queue** — physicians propose sources via `source_validation_queue`; clinical_lead scores and approves into `source_library`. Mirrors the pathway workflow.
+6. **Red flags management** — CRUD for `pathway_red_flags` with `clinical_lead`/`admin` approval.
+
+**RLS tightening on rollout:** the v0 `pathways_select_anon_read` policy may be kept (published pathways are arguably public content for transparency) or dropped (everything behind auth). Decide based on whether end-user pathways should be discoverable without login.
 
 ### Clinical governance angle (flag early)
 
-If physicians can edit pathway content that shapes AI behaviour for end users, Anoqi crosses into **medical-device territory** — CE marking under EU MDR for software-as-medical-device. Even a "decision-support" framing has regulatory implications in France. This deserves a separate, deliberate decision *before* the portal scope is locked in; it may constrain which of the three formats is feasible without a Notified Body involvement.
+Once physicians can edit pathway content that shapes AI behaviour for end users, Anoqi crosses into **medical-device territory** — CE marking under EU MDR for software-as-medical-device. Even a "decision-support" framing has regulatory implications in France. v1 should not ship publicly without a deliberate regulatory decision; v0 (read-only) is below this threshold because no editing happens through the app.
 
 ---
 
