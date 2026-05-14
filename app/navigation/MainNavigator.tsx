@@ -24,6 +24,7 @@
 import React from 'react'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 
+import { useTheme } from '../theme'
 import { HomeScreen } from '../screens/home/HomeScreen'
 import { ChatScreen } from '../screens/chat/ChatScreen'
 import { ObjectiveScreen } from '../screens/onboarding/ObjectiveScreen'
@@ -49,13 +50,14 @@ const Stack = createNativeStackNavigator<MainStackParamList>()
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function MainNavigator() {
+  const theme = useTheme()
   return (
     <Stack.Navigator
       initialRouteName="Home"
       screenOptions={{
         headerShown:  false,
         animation:    'slide_from_right',
-        contentStyle: { backgroundColor: '#FFF8F5' },
+        contentStyle: { backgroundColor: theme.colors.bg.canvas },
       }}
     >
       <Stack.Screen name="Home"      component={HomeScreen}      />

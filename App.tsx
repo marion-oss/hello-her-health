@@ -26,15 +26,21 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { View, StyleSheet } from 'react-native'
+import { View, StyleSheet, Platform } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { NavigationContainer } from '@react-navigation/native'
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native'
 import * as Font from 'expo-font'
 import * as SplashScreen from 'expo-splash-screen'
+
+import {
+  DMSerifDisplay_400Regular,
+  DMSerifDisplay_400Regular_Italic,
+} from '@expo-google-fonts/dm-serif-display'
 
 import { OnboardingProvider }  from './app/context/OnboardingContext'
 import { OnboardingNavigator } from './app/screens/onboarding/OnboardingNavigator'
 import { MainNavigator }       from './app/navigation/MainNavigator'
+import { ThemeProvider, lightColors } from './app/theme'
 
 // Keep the splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync()
@@ -55,15 +61,16 @@ export default function App() {
       try {
         const [, flag] = await Promise.all([
           Font.loadAsync({
-            // Variable fonts — one file per family covers all weights.
-            // We register under the names used in StyleSheets so no
-            // screen-level changes are needed. fontWeight in each
-            // StyleSheet selects the correct axis on platforms that
-            // support variable fonts (iOS 14+, Android 8+).
-            'BricolageGrotesque-ExtraBold': require('./assets/fonts/BricolageGrotesque.ttf'),
-            'DMSans-Regular':               require('./assets/fonts/DMSans.ttf'),
-            'DMSans-Medium':                require('./assets/fonts/DMSans.ttf'),
-            'DMSans-Bold':                  require('./assets/fonts/DMSans.ttf'),
+            // DM Serif Display — editorial display family, paired with DM Sans
+            // (same designer family). Two variants: regular + italic, used for
+            // mavie-style emphasis on one word per heading.
+            'DMSerifDisplay-Regular': DMSerifDisplay_400Regular,
+            'DMSerifDisplay-Italic':  DMSerifDisplay_400Regular_Italic,
+            // DM Sans — body. Variable fonts: one TTF covers all weights via
+            // the fontWeight axis on iOS 14+ / Android 8+.
+            'DMSans-Regular': require('./assets/fonts/DMSans.ttf'),
+            'DMSans-Medium':  require('./assets/fonts/DMSans.ttf'),
+            'DMSans-Bold':    require('./assets/fonts/DMSans.ttf'),
           }),
           AsyncStorage.getItem(ONBOARDING_KEY),
         ])
@@ -87,6 +94,9 @@ export default function App() {
     }
   }, [appReady])
 
+  // Locked to light mode — Anoqi's editorial aesthetic is light-only.
+  const colors = lightColors
+
   if (!appReady) return null
 
   // ── Onboarding completion handler ─────────────────────────────────────────
@@ -95,20 +105,42 @@ export default function App() {
     setOnboardingDone(true)
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────────────────
+  // Mirror the Anoqi role tokens into React Navigation's theme so screens
+  // mounted by the nav container pick up canvas + ink without extra plumbing.
+  const navTheme = {
+    ...DefaultTheme,
+    colors: {
+      ...DefaultTheme.colors,
+      background: colors.bg.canvas,
+      card:       colors.bg.surface,
+      text:       colors.text.primary,
+      border:     colors.border.subtle,
+      primary:    colors.accent.primary,
+      notification: colors.accent.celebration,
+    },
+  }
 
+  // On web, constrain content screens to 60% of the viewport width and
+  // center them. The Welcome screen escapes the column on its own via
+  // position: 'fixed' so its photograph fills the viewport edge to edge.
+  // Native is untouched — phones already have the right aspect.
   return (
-    <View style={styles.root} onLayout={onLayoutRootView}>
-      <NavigationContainer>
-        <OnboardingProvider onComplete={handleOnboardingComplete}>
-          {onboardingDone
-            ? <MainNavigator />
-            : <OnboardingNavigator />
-          }
-        </OnboardingProvider>
-      </NavigationContainer>
+    <View
+      style={[styles.root, { backgroundColor: colors.bg.canvas }]}
+      onLayout={onLayoutRootView}
+    >
+      <View style={[styles.appShell, { backgroundColor: colors.bg.canvas }]}>
+        <ThemeProvider mode="light">
+          <NavigationContainer theme={navTheme}>
+            <OnboardingProvider onComplete={handleOnboardingComplete}>
+              {onboardingDone
+                ? <MainNavigator />
+                : <OnboardingNavigator />
+              }
+            </OnboardingProvider>
+          </NavigationContainer>
+        </ThemeProvider>
+      </View>
     </View>
   )
 }
@@ -116,6 +148,20 @@ export default function App() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FFF8F5',
+    ...Platform.select({
+      web: { alignItems: 'center' as const },
+      default: {},
+    }),
+  },
+  appShell: {
+    flex: 1,
+    ...Platform.select({
+      web: {
+        width: '60%' as const,
+        maxWidth: 1200,
+        minWidth: 360,
+      },
+      default: { width: '100%' as const },
+    }),
   },
 })
