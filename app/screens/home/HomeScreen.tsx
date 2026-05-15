@@ -22,6 +22,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native'
 
 import { useOnboarding, type HealthObjective } from '../../context/OnboardingContext'
 import { listDocuments } from '../../lib/documentStore'
+import { supabase } from '../../lib/supabase'
 import { hover, palette, useTheme } from '../../theme'
 import {
   GoalSheet,
@@ -162,6 +163,9 @@ export function HomeScreen() {
   const insight = INSIGHTS[objKey][language]
   const summaries = STUB_SUMMARIES
   const [documentCount, setDocumentCount] = useState(0)
+  // Incognito = no Supabase session (user chose "Continue anonymously" in
+  // AccountScreen). We hide the personal greeting name in that case.
+  const [isIncognito, setIsIncognito] = useState(true)
 
   useEffect(() => {
     AsyncStorage.getItem(CHAT_INTENT_KEY).then((v) => {
@@ -171,6 +175,20 @@ export function HomeScreen() {
       }
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    let mounted = true
+    supabase.auth.getSession().then(({ data }) => {
+      if (mounted) setIsIncognito(!data.session)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
+      if (mounted) setIsIncognito(!session)
+    })
+    return () => {
+      mounted = false
+      sub.subscription.unsubscribe()
+    }
+  }, [])
 
   useFocusEffect(
     useCallback(() => {
@@ -248,11 +266,13 @@ export function HomeScreen() {
             {copy.todayLabel.toUpperCase()}
           </Text>
           <Text variant="h1Italic" style={{ color: palette.warmWhite[100] }}>
-            {greeting},
+            {isIncognito ? `${greeting}.` : `${greeting},`}
           </Text>
-          <Text variant="h1Italic" style={{ color: palette.ember[400], marginTop: -4 }}>
-            Marie.
-          </Text>
+          {isIncognito ? null : (
+            <Text variant="h1Italic" style={{ color: palette.ember[400], marginTop: -4 }}>
+              Marie.
+            </Text>
+          )}
           <Text
             variant="bodyLight"
             style={{
