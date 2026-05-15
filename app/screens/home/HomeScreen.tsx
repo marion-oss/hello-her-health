@@ -214,7 +214,18 @@ export function HomeScreen() {
           paddingBottom: theme.spacing[2],
         }}
       >
-        <Wordmark size={20} />
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Home"
+          onPress={() => navigation.navigate('Home')}
+          hitSlop={8}
+          style={({ pressed, hovered }: any) => ({
+            opacity: pressed ? 0.6 : hovered ? 0.85 : 1,
+            transform: pressed ? [{ scale: 0.97 }] : undefined,
+          })}
+        >
+          <Wordmark size={20} />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -477,15 +488,20 @@ export function HomeScreen() {
                 <Pressable
                   hitSlop={8}
                   accessibilityRole="button"
-                  style={({ hovered }: any) => [
+                  onPress={() => navigation.navigate('Documents')}
+                  style={({ hovered, pressed }: any) => [
                     hover.transition,
                     hovered && hover.lift,
+                    pressed && { transform: [{ scale: 0.97 }] },
                   ]}
                 >
-                  {({ hovered }: any) => (
+                  {({ hovered, pressed }: any) => (
                     <Text
                       variant="label"
-                      style={{ color: hovered ? palette.fuchsia[300] : palette.fuchsia[400] }}
+                      style={{
+                        color: hovered ? palette.fuchsia[300] : palette.fuchsia[400],
+                        opacity: pressed ? 0.6 : 1,
+                      }}
                     >
                       {copy.documentsView} →
                     </Text>
@@ -493,12 +509,22 @@ export function HomeScreen() {
                 </Pressable>
               }
             />
-            <View
-              style={{
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => navigation.navigate('Documents')}
+              style={({ pressed, hovered }: any) => ({
                 flexDirection: 'row',
                 alignItems: 'center',
                 paddingVertical: theme.spacing[3],
-              }}
+                paddingHorizontal: theme.spacing[2],
+                marginHorizontal: -theme.spacing[2],
+                borderRadius: theme.radii.md,
+                backgroundColor: hovered
+                  ? 'rgba(255, 245, 238, 0.04)'
+                  : 'transparent',
+                opacity: pressed ? 0.7 : 1,
+                transform: pressed ? [{ scale: 0.99 }] : undefined,
+              })}
             >
               <Icon
                 name="FileText"
@@ -506,11 +532,20 @@ export function HomeScreen() {
                 color={palette.ember[300]}
                 strokeWidth={1.6}
               />
-              <Text variant="bodyMed" style={{ color: palette.warmWhite[100], marginLeft: theme.spacing[3] }}>
+              <Text
+                variant="bodyMed"
+                style={{ color: palette.warmWhite[100], marginLeft: theme.spacing[3], flex: 1 }}
+              >
                 {documentCount} {copy.documentsUnit}
                 {documentCount > 1 ? 's' : ''}
               </Text>
-            </View>
+              <Icon
+                name="ChevronRight"
+                size={18}
+                color="rgba(255, 245, 238, 0.4)"
+                strokeWidth={1.6}
+              />
+            </Pressable>
           </View>
         ) : null}
 

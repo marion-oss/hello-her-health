@@ -283,7 +283,7 @@ export type LabValue = {
 //   Hémoglobine : 13.5 g/dL   (12.0–16.0)
 //   TSH             2.3 mUI/L
 const LAB_LINE_PATTERN =
-  /^([\wÀ-ÿ\s\-\/()]{2,40?}?)\s*:?\s+([\d.,]+)\s*([\w\/µ%°]+)(?:\s+[\[(]([\d.,\s\-–]+)[\])])?(?:\s*([↓↑H|L|B]))?/gm
+  /^([\wÀ-ÿ\s\-\/()]{2,40}?)\s*:?\s+([\d.,]+)\s*([\w\/µ%°]+)(?:\s+[\[(]([\d.,\s\-–]+)[\])])?(?:\s*([↓↑H|L|B]))?/gm
 
 const FLAG_MAP: Record<string, LabValue['flag']> = {
   '↓': 'low', 'L': 'low', 'B': 'low',   // Bas
