@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { Platform, Pressable, SafeAreaView, StatusBar, View } from 'react-native'
+import { useNavigation } from '@react-navigation/native'
 
 import { useOnboarding, type Language } from '../../context/OnboardingContext'
 import { hover, palette, useTheme } from '../../theme'
@@ -29,6 +30,7 @@ const COPY = {
 
 export function ProfileScreen() {
   const theme = useTheme()
+  const navigation = useNavigation<any>()
   const { language, setLanguage } = useOnboarding()
   const copy = COPY[language]
 
@@ -46,7 +48,18 @@ export function ProfileScreen() {
           paddingBottom: theme.spacing[2],
         }}
       >
-        <Wordmark size={20} />
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Home"
+          onPress={() => navigation.navigate('Home')}
+          hitSlop={8}
+          style={({ pressed, hovered }: any) => ({
+            opacity: pressed ? 0.6 : hovered ? 0.85 : 1,
+            transform: pressed ? [{ scale: 0.97 }] : undefined,
+          })}
+        >
+          <Wordmark size={20} />
+        </Pressable>
       </View>
 
       <View

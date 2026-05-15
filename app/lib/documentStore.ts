@@ -52,6 +52,7 @@ const MAX_TEXT_LENGTH = 50_000                   // chars — refuse suspiciousl
 // ─────────────────────────────────────────────────────────────
 export type LocalDocument = {
   id: string
+  name: string | null                  // user-facing label — filename on import, editable later
   documentType: DocumentCategory
   documentDate: string | null          // ISO date string "YYYY-MM-DD", from user or parsed
   createdAt: string                    // ISO datetime string
@@ -66,6 +67,7 @@ export type LocalDocument = {
 // Minimal record stored in the AsyncStorage index (avoids loading every full doc)
 export type DocumentIndexEntry = {
   id: string
+  name: string | null
   documentType: DocumentCategory
   documentDate: string | null
   createdAt: string
@@ -119,6 +121,7 @@ export function processText(
     documentDate?: string | null
     researchConsent: boolean
     overrideType?: DocumentCategory  // if user manually selected a type
+    name?: string | null             // user-facing label — defaults to the filename if absent
   }
 ): ProcessResult {
   if (!rawText || rawText.trim().length === 0) {
@@ -144,6 +147,7 @@ export function processText(
   // 4. Build LocalDocument (not yet persisted)
   const doc: LocalDocument = {
     id: generateId(),
+    name: options.name ?? null,
     documentType,
     documentDate: options.documentDate ?? null,
     createdAt: new Date().toISOString(),
@@ -174,6 +178,7 @@ export async function saveDocument(doc: LocalDocument): Promise<void> {
   const index = await readIndex()
   const entry: DocumentIndexEntry = {
     id: doc.id,
+    name: doc.name,
     documentType: doc.documentType,
     documentDate: doc.documentDate,
     createdAt: doc.createdAt,

@@ -3,6 +3,7 @@
 
 import React from 'react'
 import { Pressable, View } from 'react-native'
+import { useNavigation } from '@react-navigation/native'
 
 import { hover, useTheme } from '../theme'
 import { Icon } from './Icon'
@@ -16,6 +17,7 @@ type Props = {
 
 export function BackHeader({ onBack, rightSlot, showWordmark = true }: Props) {
   const theme = useTheme()
+  const navigation = useNavigation<any>()
 
   return (
     <View
@@ -43,7 +45,20 @@ export function BackHeader({ onBack, rightSlot, showWordmark = true }: Props) {
             <Icon name="ChevronLeft" size={22} color={theme.colors.text.secondary} />
           </Pressable>
         ) : null}
-        {showWordmark ? <Wordmark size={20} /> : null}
+        {showWordmark ? (
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="Home"
+            onPress={() => navigation.navigate('Home')}
+            hitSlop={8}
+            style={({ pressed, hovered }: any) => ({
+              opacity: pressed ? 0.6 : hovered ? 0.85 : 1,
+              transform: pressed ? [{ scale: 0.97 }] : undefined,
+            })}
+          >
+            <Wordmark size={20} />
+          </Pressable>
+        ) : null}
       </View>
       {rightSlot}
     </View>

@@ -24,7 +24,9 @@ import {
   View,
 } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { useNavigation, useIsFocused } from '@react-navigation/native'
+import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native'
+import { listDocuments } from '../../lib/documentStore'
+import { setPendingFile } from '../../lib/pendingFile'
 
 import {
   useOnboarding,
@@ -74,6 +76,11 @@ const COPY = {
     summaryBanner: 'Générer un résumé pour ton médecin',
     send: 'Envoyer',
     attach: 'Joindre un document',
+    docsSingular: 'document en mémoire',
+    docsPlural:   'documents en mémoire',
+    docsManage:   'gérer',
+    dropTitle:    'Dépose ton document.',
+    dropBody:     'PDF ou texte · nettoyé sur ton appareil avant d\'être enregistré.',
     introMessage:
       'Bonjour, je suis Anoqi. Pose-moi toutes tes questions — je te montrerai toujours la source derrière chaque réponse. Rien de ce que tu partages ici n\'est lié à ton nom.',
     consentGate: {
@@ -96,6 +103,11 @@ const COPY = {
     summaryBanner: 'Generate a summary for your doctor',
     send: 'Send',
     attach: 'Attach a document',
+    docsSingular: 'document in context',
+    docsPlural:   'documents in context',
+    docsManage:   'manage',
+    dropTitle:    'Drop your document.',
+    dropBody:     'PDF or text · cleaned on your device before anything is saved.',
     introMessage:
       "Hi, I'm Anoqi. Ask me anything — I'll always show you the source behind my answer. Nothing you share here is linked to your name.",
     consentGate: {
@@ -144,6 +156,62 @@ export function ChatScreen() {
 
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
+  const [documentCount, setDocumentCount] = useState(0)
+  const [isDraggingFile, setIsDraggingFile] = useState(false)
+
+  // Re-poll the doc count whenever the chat regains focus so a doc added in
+  // the Documents flow shows up in the in-context pill immediately.
+  useFocusEffect(
+    useCallback(() => {
+      listDocuments()
+        .then((docs) => setDocumentCount(docs.length))
+        .catch(() => { /* silent — pill simply won't show */ })
+    }, []),
+  )
+
+  // Drag-and-drop file uploads (web only). Dropping a file anywhere on
+  // the chat screen sets the pending file + opens the AddDocument modal.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return
+
+    let depth = 0
+    const onDragEnter = (e: DragEvent) => {
+      if (!e.dataTransfer?.types?.includes('Files')) return
+      e.preventDefault()
+      depth++
+      setIsDraggingFile(true)
+    }
+    const onDragOver = (e: DragEvent) => {
+      if (!e.dataTransfer?.types?.includes('Files')) return
+      e.preventDefault()
+      e.dataTransfer!.dropEffect = 'copy'
+    }
+    const onDragLeave = (e: DragEvent) => {
+      if (!e.dataTransfer?.types?.includes('Files')) return
+      depth = Math.max(0, depth - 1)
+      if (depth === 0) setIsDraggingFile(false)
+    }
+    const onDrop = (e: DragEvent) => {
+      if (!e.dataTransfer?.files?.length) return
+      e.preventDefault()
+      depth = 0
+      setIsDraggingFile(false)
+      const file = e.dataTransfer.files[0]
+      setPendingFile(file)
+      navigation.navigate('Documents', { screen: 'AddDocument' })
+    }
+
+    window.addEventListener('dragenter', onDragEnter)
+    window.addEventListener('dragover',  onDragOver)
+    window.addEventListener('dragleave', onDragLeave)
+    window.addEventListener('drop',      onDrop)
+    return () => {
+      window.removeEventListener('dragenter', onDragEnter)
+      window.removeEventListener('dragover',  onDragOver)
+      window.removeEventListener('dragleave', onDragLeave)
+      window.removeEventListener('drop',      onDrop)
+    }
+  }, [navigation])
   const [isTyping, setIsTyping] = useState(false)
   const [streamingId, setStreamingId] = useState<string | null>(null)
   const [userMessageCount, setUserMessageCount] = useState(0)
@@ -854,6 +922,47 @@ export function ChatScreen() {
           </Pressable>
         ) : null}
 
+        {/* Documents-in-context pill — small, ember-tinted, sits right
+            above the input border so the user always knows what the model
+            can see. Quiet by design — subordinate to the conversation. */}
+        {documentCount > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('Documents', { screen: 'DocumentsList' })}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignSelf: 'flex-start',
+              alignItems: 'center',
+              gap: theme.spacing[2],
+              marginLeft: theme.spacing[5],
+              marginBottom: theme.spacing[2],
+              paddingHorizontal: theme.spacing[3],
+              paddingVertical: theme.spacing[2],
+              backgroundColor: theme.colors.bg.surfaceWarm,
+              borderRadius: theme.radii.pill,
+              borderWidth: 1,
+              borderColor: 'rgba(196, 128, 106, 0.20)',
+              opacity: pressed ? 0.7 : 1,
+              transform: pressed ? [{ scale: 0.985 }] : undefined,
+            })}
+          >
+            <View
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: theme.colors.accent.primary,
+              }}
+            />
+            <Text variant="label" style={{ color: theme.colors.text.accent }}>
+              {documentCount} {documentCount === 1 ? copy.docsSingular : copy.docsPlural}
+            </Text>
+            <Text variant="label" tone="tertiary">
+              · {copy.docsManage} →
+            </Text>
+          </Pressable>
+        ) : null}
+
         {/* Input bar — sits above the floating LiquidTabBar. The pill is
             ~62px tall and floats 14px above the safe-area; 92px of bottom
             clearance keeps the input fully visible. Background is intentionally
@@ -875,8 +984,10 @@ export function ChatScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={copy.attach}
-            onPress={() => {}}
-            style={{
+            onPress={() =>
+              navigation.navigate('Documents', { screen: 'AddDocument' })
+            }
+            style={({ pressed }) => ({
               width: 38,
               height: 38,
               borderRadius: 19,
@@ -884,7 +995,8 @@ export function ChatScreen() {
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: 1,
-            }}
+              transform: pressed ? [{ scale: 0.97 }] : undefined,
+            })}
           >
             <Icon
               name="Paperclip"
@@ -1012,6 +1124,59 @@ export function ChatScreen() {
         onSelect={setObjective}
         onClose={() => setGoalSheetOpen(false)}
       />
+
+      {/* Drop overlay (web only) — appears while a file is being dragged
+          anywhere over the chat window. */}
+      {isDraggingFile && Platform.OS === 'web' ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 0, left: 0, right: 0, bottom: 0,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: theme.spacing[6],
+            backgroundColor: 'rgba(13, 13, 18, 0.85)',
+          }}
+        >
+          <View
+            style={{
+              alignItems: 'center',
+              paddingVertical: theme.spacing[10],
+              paddingHorizontal: theme.spacing[8],
+              borderRadius: theme.radii.xl,
+              borderWidth: 2,
+              borderColor: theme.colors.accent.primary,
+              borderStyle: 'dashed' as any,
+              backgroundColor: 'rgba(196, 128, 106, 0.06)',
+              maxWidth: 420,
+            }}
+          >
+            <Icon
+              name="UploadCloud"
+              size={48}
+              color={theme.colors.accent.primary}
+              strokeWidth={1.5}
+            />
+            <Text
+              variant="h3Italic"
+              tone="primary"
+              align="center"
+              style={{ marginTop: theme.spacing[4] }}
+            >
+              {copy.dropTitle}
+            </Text>
+            <Text
+              variant="bodyLight"
+              tone="secondary"
+              align="center"
+              style={{ marginTop: theme.spacing[2], maxWidth: 320 }}
+            >
+              {copy.dropBody}
+            </Text>
+          </View>
+        </View>
+      ) : null}
     </SafeAreaView>
   )
 }
