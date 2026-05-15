@@ -1,110 +1,119 @@
-/**
- * anoqi — AccountScreen
- *
- * Final step of onboarding — shown after Consent (step 3 of 3).
- *
- * Accepts an optional `mode` route param:
- *   'login'  — opened directly from WelcomeScreen "I already have an account"
- *              (skips steps 2–4 entirely for returning users)
- *   'signup' — jump straight to sign-up form
- *   'choose' — default: show the three-way choice (default)
- *
- * Three paths:
- *   A) Create account (email + password) → full experience, history saved
- *   B) Login → skip all onboarding, go straight to Home
- *   C) Continue anonymously → session-based, claimable later via /auth/claim
- *
- * Auth via Supabase — signUp / signInWithPassword (stubbed, ready to wire).
- *
- * Brand palette: Fuchsia #FF0472 | Coral #FF6B3D | Navy #000E28
- *                Cream #FFF3EE | Off White #FFF8F5 | Pink #FFB0CC
- */
+// Anoqi — AccountScreen.
+//
+// Segmented control with three tabs (signup / login / anonymous). The selected
+// pill slides between tabs. Anonymous tab shows a Cotton Rose info card with a
+// sage ShieldCheck icon and a CTA. Forms use sage focus rings.
 
 import React, { useState } from 'react'
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
   SafeAreaView,
   ScrollView,
-  ActivityIndicator,
-  Platform,
+  View,
 } from 'react-native'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
+
 import { useOnboarding } from '../../context/OnboardingContext'
 import type { OnboardingStackParamList } from './OnboardingNavigator'
-
 import { supabase } from '../../lib/supabase'
+import { useTheme } from '../../theme'
+import {
+  BackHeader,
+  Button,
+  Icon,
+  Input,
+  ProgressBar,
+  SegmentedControl,
+  Text,
+} from '../../components'
 
-type AuthMode = 'choose' | 'signup' | 'login'
+type AuthMode = 'signup' | 'login' | 'anon'
 
 const COPY = {
   fr: {
     title: 'Ton espace sécurisé',
-    subtitle: 'Crée un compte pour retrouver tes résumés depuis n\'importe quel appareil.',
-    createAccount: 'Créer un compte',
-    login: 'J\'ai déjà un compte',
-    continueAnon: 'Continuer sans compte',
-    anonNote: 'Tes données restent sur cet appareil. Tu peux créer un compte plus tard.',
-    emailPlaceholder: 'Ton adresse email',
-    passwordPlaceholder: 'Mot de passe (8 caractères minimum)',
-    passwordConfirmPlaceholder: 'Confirme ton mot de passe',
+    subtitle:
+      "Crée un compte pour retrouver tes résumés depuis n'importe quel appareil.",
+    step: 'Étape 3 sur 3',
+    tabs: {
+      signup: 'Crée un compte',
+      login: 'Connecte-toi',
+      anon: 'Anonyme',
+    },
+    email: 'Email',
+    emailPlaceholder: 'toi@exemple.fr',
+    password: 'Mot de passe',
+    passwordPlaceholder: '8 caractères minimum',
+    passwordConfirm: 'Confirme le mot de passe',
+    birthYear: 'Année de naissance',
+    birthYearPlaceholder: 'ex. 1985',
+    country: 'Pays',
+    countryPlaceholder: 'ex. France',
     signupCta: 'Créer mon compte',
     loginCta: 'Me connecter',
-    loginPrompt: 'Déjà un compte ? ',
-    loginLink: 'Se connecter',
-    signupPrompt: 'Pas encore de compte ? ',
-    signupLink: 'S\'inscrire',
+    anonTitle: 'Continue sans compte',
+    anonBody:
+      "Tes données restent sur cet appareil et ne sont jamais liées à ton nom. Tu pourras créer un compte plus tard si tu changes d'avis.",
+    anonCta: 'Continuer en anonyme',
+    privacy: 'Tes données sont hébergées en Europe (UE) et ne sont jamais vendues.',
     errorPasswordMatch: 'Les mots de passe ne correspondent pas',
     errorPasswordLength: 'Le mot de passe doit contenir au moins 8 caractères',
     errorEmailInvalid: 'Adresse email invalide',
-    errorBirthYearInvalid: 'Année de naissance invalide (ex. 1985)',
-    birthYearPlaceholder: 'Année de naissance (ex. 1985)',
-    countryPlaceholder: 'Pays (ex. France, Royaume-Uni)',
-    privacyNote: 'Tes données sont hébergées en Europe (UE) et ne sont jamais vendues.',
+    errorBirthYearInvalid: 'Année de naissance invalide',
   },
   en: {
     title: 'Your secure space',
     subtitle: 'Create an account to access your summaries from any device.',
-    createAccount: 'Create an account',
-    login: 'I already have an account',
-    continueAnon: 'Continue without an account',
-    anonNote: 'Your data stays on this device. You can create an account later.',
-    emailPlaceholder: 'Your email address',
-    passwordPlaceholder: 'Password (minimum 8 characters)',
-    passwordConfirmPlaceholder: 'Confirm your password',
+    step: 'Step 3 of 3',
+    tabs: {
+      signup: 'Sign up',
+      login: 'Log in',
+      anon: 'Anonymous',
+    },
+    email: 'Email',
+    emailPlaceholder: 'you@example.com',
+    password: 'Password',
+    passwordPlaceholder: 'Minimum 8 characters',
+    passwordConfirm: 'Confirm password',
+    birthYear: 'Birth year',
+    birthYearPlaceholder: 'e.g. 1985',
+    country: 'Country',
+    countryPlaceholder: 'e.g. United Kingdom',
     signupCta: 'Create my account',
     loginCta: 'Log in',
-    loginPrompt: 'Already have an account? ',
-    loginLink: 'Log in',
-    signupPrompt: 'No account yet? ',
-    signupLink: 'Sign up',
+    anonTitle: 'Continue without an account',
+    anonBody:
+      "Your data stays on this device and is never linked to your name. You can create an account later if you change your mind.",
+    anonCta: 'Continue anonymously',
+    privacy: 'Your data is hosted in Europe (EU) and never sold.',
     errorPasswordMatch: 'Passwords do not match',
     errorPasswordLength: 'Password must be at least 8 characters',
     errorEmailInvalid: 'Invalid email address',
-    errorBirthYearInvalid: 'Invalid birth year (e.g. 1985)',
-    birthYearPlaceholder: 'Birth year (e.g. 1985)',
-    countryPlaceholder: 'Country (e.g. France, United Kingdom)',
-    privacyNote: 'Your data is hosted in Europe (EU) and never sold.',
+    errorBirthYearInvalid: 'Invalid birth year',
   },
-}
+} as const
 
-function validateEmail(email: string): boolean {
+function validateEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+}
+function validateBirthYear(year: string) {
+  const y = parseInt(year, 10)
+  return /^\d{4}$/.test(year) && y >= 1920 && y <= new Date().getFullYear() - 16
 }
 
 export function AccountScreen() {
   const navigation = useNavigation<any>()
   const route = useRoute<RouteProp<OnboardingStackParamList, 'Account'>>()
   const { language, objective, setBirthYear, setCountry, markDone } = useOnboarding()
+  const theme = useTheme()
   const copy = COPY[language]
 
-  // Allow WelcomeScreen to open this directly in login mode
-  const initialMode: AuthMode = (route.params?.mode as AuthMode) ?? 'choose'
-  const [mode, setMode] = useState<AuthMode>(initialMode)
+  const initialMode: AuthMode =
+    (route.params?.mode as AuthMode | undefined) === 'login' ? 'login' : 'signup'
+  const isDirectLogin = route.params?.mode === 'login'
 
+  const [mode, setMode] = useState<AuthMode>(initialMode)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
@@ -113,58 +122,47 @@ export function AccountScreen() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Whether this screen was reached by skipping onboarding (direct login)
-  const isDirectLogin = initialMode === 'login'
-  // Progress step: only show dots when inside the onboarding flow
-  const showProgress = !isDirectLogin
-
-  function handleContinueAnonymously() {
-    // In production: generate UUID, store in AsyncStorage
-    // const sessionId = uuid(); await AsyncStorage.setItem('anoqi_session_id', sessionId)
-    markDone()
-  }
-
-  function validateBirthYear(year: string): boolean {
-    const y = parseInt(year, 10)
-    return /^\d{4}$/.test(year) && y >= 1920 && y <= new Date().getFullYear() - 16
-  }
-
-  function validateForm(): string | null {
+  function validateForm() {
     if (!validateEmail(email)) return copy.errorEmailInvalid
     if (password.length < 8) return copy.errorPasswordLength
     if (mode === 'signup' && password !== passwordConfirm) return copy.errorPasswordMatch
-    if (mode === 'signup' && birthYearInput && !validateBirthYear(birthYearInput)) return copy.errorBirthYearInvalid
+    if (mode === 'signup' && birthYearInput && !validateBirthYear(birthYearInput))
+      return copy.errorBirthYearInvalid
     return null
   }
 
   async function handleSubmit() {
     const validationError = validateForm()
-    if (validationError) { setError(validationError); return }
+    if (validationError) {
+      setError(validationError)
+      return
+    }
     setError(null)
     setLoading(true)
     try {
       if (mode === 'signup') {
-        // Save profile fields to context before navigating
         if (birthYearInput && validateBirthYear(birthYearInput)) {
           setBirthYear(parseInt(birthYearInput, 10))
         }
-        if (countryInput.trim()) {
-          setCountry(countryInput.trim())
-        }
+        if (countryInput.trim()) setCountry(countryInput.trim())
         const { error: authError } = await supabase.auth.signUp({
-          email: email.trim(), password,
-          options: { data: {
-            language,
-            objective: objective ?? 'general',
-            birth_year: birthYearInput ? parseInt(birthYearInput, 10) : null,
-            country: countryInput.trim() || null,
-          }},
+          email: email.trim(),
+          password,
+          options: {
+            data: {
+              language,
+              objective: objective ?? 'general',
+              birth_year: birthYearInput ? parseInt(birthYearInput, 10) : null,
+              country: countryInput.trim() || null,
+            },
+          },
         })
         if (authError) throw authError
         markDone()
-      } else {
+      } else if (mode === 'login') {
         const { error: authError } = await supabase.auth.signInWithPassword({
-          email: email.trim(), password,
+          email: email.trim(),
+          password,
         })
         if (authError) throw authError
         markDone()
@@ -176,381 +174,189 @@ export function AccountScreen() {
     }
   }
 
-  // ── Choose mode ────────────────────────────────────────────────
-  if (mode === 'choose') {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.container}>
-
-          {showProgress && (
-            <View style={styles.progressRow}>
-              <View style={[styles.dot, styles.dotDone]} />
-              <View style={[styles.dot, styles.dotDone]} />
-              <View style={[styles.dot, styles.dotDone]} />
-              <View style={[styles.dot, styles.dotDone]} />
-              <View style={[styles.dot, styles.dotActive]} />
-            </View>
-          )}
-
-          <View style={styles.header}>
-            <Text style={styles.title}>{copy.title}</Text>
-            <Text style={styles.subtitle}>{copy.subtitle}</Text>
-          </View>
-
-          <View style={styles.chooseActions}>
-            <TouchableOpacity
-              style={styles.ctaButton}
-              onPress={() => setMode('signup')}
-              accessibilityRole="button"
-            >
-              <Text style={styles.ctaText}>{copy.createAccount}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={() => setMode('login')}
-              accessibilityRole="button"
-            >
-              <Text style={styles.secondaryText}>{copy.login}</Text>
-            </TouchableOpacity>
-
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <TouchableOpacity
-              style={styles.anonButton}
-              onPress={handleContinueAnonymously}
-              accessibilityRole="button"
-            >
-              <Text style={styles.anonText}>{copy.continueAnon}</Text>
-            </TouchableOpacity>
-            <Text style={styles.anonNote}>{copy.anonNote}</Text>
-          </View>
-
-          <Text style={styles.privacyNote}>{copy.privacyNote}</Text>
-        </View>
-      </SafeAreaView>
-    )
+  function handleAnonymous() {
+    markDone()
   }
 
-  // ── Sign up / Login form ───────────────────────────────────────
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView
-        contentContainerStyle={styles.formScrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.container}>
+        {isDirectLogin ? <BackHeader onBack={() => navigation.goBack()} /> : null}
 
-          {showProgress && (
-            <View style={styles.progressRow}>
-              <View style={[styles.dot, styles.dotDone]} />
-              <View style={[styles.dot, styles.dotDone]} />
-              <View style={[styles.dot, styles.dotDone]} />
-              <View style={[styles.dot, styles.dotDone]} />
-              <View style={[styles.dot, styles.dotActive]} />
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingHorizontal: theme.spacing[6],
+            paddingTop: isDirectLogin ? theme.spacing[2] : theme.spacing[5],
+            paddingBottom: theme.spacing[6],
+          }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {!isDirectLogin ? (
+            <View style={{ marginBottom: theme.spacing[8] }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  marginBottom: theme.spacing[2],
+                }}
+              >
+                <Text variant="eyebrow" tone="secondary" style={{ textTransform: 'uppercase' }}>
+                  anoqi
+                </Text>
+                <Text variant="eyebrow" tone="tertiary" style={{ textTransform: 'uppercase' }}>
+                  {copy.step}
+                </Text>
+              </View>
+              <ProgressBar progress={1} />
+            </View>
+          ) : null}
+
+          <Text variant="h1" tone="primary" style={{ marginBottom: theme.spacing[3] }}>
+            {copy.title}
+          </Text>
+          <Text variant="bodyLg" tone="secondary" style={{ marginBottom: theme.spacing[6] }}>
+            {copy.subtitle}
+          </Text>
+
+          <View style={{ marginBottom: theme.spacing[6] }}>
+            <SegmentedControl<AuthMode>
+              value={mode}
+              onChange={(v) => {
+                setMode(v)
+                setError(null)
+              }}
+              options={[
+                { value: 'signup', label: copy.tabs.signup },
+                { value: 'login',  label: copy.tabs.login },
+                { value: 'anon',   label: copy.tabs.anon },
+              ]}
+            />
+          </View>
+
+          {mode === 'anon' ? (
+            <View
+              style={{
+                backgroundColor: theme.colors.bg.surfaceMuted,
+                borderRadius: theme.radii.lg,
+                borderWidth: 1,
+                borderColor: theme.colors.border.subtle,
+                padding: theme.spacing[5],
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: theme.spacing[3],
+                  gap: theme.spacing[3],
+                }}
+              >
+                <Icon
+                  name="ShieldCheck"
+                  size={20}
+                  color={theme.colors.accent.success}
+                  strokeWidth={1.8}
+                />
+                <Text variant="h4" tone="primary">
+                  {copy.anonTitle}
+                </Text>
+              </View>
+              <Text variant="body" tone="secondary" style={{ marginBottom: theme.spacing[5] }}>
+                {copy.anonBody}
+              </Text>
+              <Button
+                label={copy.anonCta}
+                size="md"
+                fullWidth
+                variant="primary"
+                onPress={handleAnonymous}
+              />
+            </View>
+          ) : (
+            <View style={{ gap: theme.spacing[4] }}>
+              <Input
+                label={copy.email}
+                placeholder={copy.emailPlaceholder}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                returnKeyType="next"
+              />
+              <Input
+                label={copy.password}
+                placeholder={copy.passwordPlaceholder}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete={mode === 'signup' ? 'new-password' : 'password'}
+                returnKeyType={mode === 'signup' ? 'next' : 'done'}
+                onSubmitEditing={mode === 'login' ? handleSubmit : undefined}
+              />
+
+              {mode === 'signup' ? (
+                <>
+                  <Input
+                    label={copy.passwordConfirm}
+                    value={passwordConfirm}
+                    onChangeText={setPasswordConfirm}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoComplete="new-password"
+                    returnKeyType="next"
+                  />
+                  <Input
+                    label={copy.birthYear}
+                    placeholder={copy.birthYearPlaceholder}
+                    value={birthYearInput}
+                    onChangeText={setBirthYearInput}
+                    keyboardType="number-pad"
+                    maxLength={4}
+                  />
+                  <Input
+                    label={copy.country}
+                    placeholder={copy.countryPlaceholder}
+                    value={countryInput}
+                    onChangeText={setCountryInput}
+                    autoCapitalize="words"
+                  />
+                </>
+              ) : null}
+
+              {error ? (
+                <Text variant="caption" tone="danger" align="center">
+                  {error}
+                </Text>
+              ) : null}
+
+              <Button
+                label={mode === 'signup' ? copy.signupCta : copy.loginCta}
+                size="lg"
+                fullWidth
+                loading={loading}
+                onPress={handleSubmit}
+              />
             </View>
           )}
 
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => {
-              // If opened directly from Welcome (login mode), go back there
-              if (isDirectLogin && mode === initialMode) {
-                navigation.goBack()
-              } else {
-                setMode('choose')
-                setError(null)
-              }
-            }}
-            accessibilityRole="button"
+          <Text
+            variant="caption"
+            tone="tertiary"
+            align="center"
+            style={{ marginTop: theme.spacing[8] }}
           >
-            <Text style={styles.backText}>←</Text>
-          </TouchableOpacity>
-
-          <View style={styles.header}>
-            <Text style={styles.title}>
-              {mode === 'signup' ? copy.createAccount : copy.login}
-            </Text>
-          </View>
-
-          <View style={styles.form}>
-            <TextInput
-              style={styles.input}
-              placeholder={copy.emailPlaceholder}
-              placeholderTextColor="#BBBBBB"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="email"
-              returnKeyType="next"
-            />
-
-            <TextInput
-              style={styles.input}
-              placeholder={copy.passwordPlaceholder}
-              placeholderTextColor="#BBBBBB"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoCapitalize="none"
-              autoComplete={mode === 'signup' ? 'new-password' : 'password'}
-              returnKeyType={mode === 'signup' ? 'next' : 'done'}
-              onSubmitEditing={mode === 'login' ? handleSubmit : undefined}
-            />
-
-            {mode === 'signup' && (
-              <TextInput
-                style={styles.input}
-                placeholder={copy.passwordConfirmPlaceholder}
-                placeholderTextColor="#BBBBBB"
-                value={passwordConfirm}
-                onChangeText={setPasswordConfirm}
-                secureTextEntry
-                autoCapitalize="none"
-                autoComplete="new-password"
-                returnKeyType="next"
-              />
-            )}
-
-            {mode === 'signup' && (
-              <TextInput
-                style={styles.input}
-                placeholder={copy.birthYearPlaceholder}
-                placeholderTextColor="#BBBBBB"
-                value={birthYearInput}
-                onChangeText={setBirthYearInput}
-                keyboardType="number-pad"
-                maxLength={4}
-                returnKeyType="next"
-              />
-            )}
-
-            {mode === 'signup' && (
-              <TextInput
-                style={styles.input}
-                placeholder={copy.countryPlaceholder}
-                placeholderTextColor="#BBBBBB"
-                value={countryInput}
-                onChangeText={setCountryInput}
-                autoCapitalize="words"
-                autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={handleSubmit}
-              />
-            )}
-
-            {error && <Text style={styles.errorText}>{error}</Text>}
-
-            <TouchableOpacity
-              style={[styles.ctaButton, loading && styles.ctaButtonLoading]}
-              onPress={handleSubmit}
-              disabled={loading}
-              accessibilityRole="button"
-            >
-              {loading
-                ? <ActivityIndicator color="#FFFFFF" />
-                : <Text style={styles.ctaText}>
-                    {mode === 'signup' ? copy.signupCta : copy.loginCta}
-                  </Text>
-              }
-            </TouchableOpacity>
-
-            <View style={styles.switchRow}>
-              <Text style={styles.switchPrompt}>
-                {mode === 'signup' ? copy.loginPrompt : copy.signupPrompt}
-              </Text>
-              <TouchableOpacity
-                onPress={() => { setMode(mode === 'signup' ? 'login' : 'signup'); setError(null) }}
-              >
-                <Text style={styles.switchLink}>
-                  {mode === 'signup' ? copy.loginLink : copy.signupLink}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <Text style={styles.privacyNote}>{copy.privacyNote}</Text>
-        </View>
-      </ScrollView>
+            {copy.privacy}
+          </Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }
-
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#FFF8F5',
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 32,
-  },
-  formScrollContent: {
-    flexGrow: 1,
-  },
-
-  // Progress
-  progressRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 32,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#E8DDD9',
-  },
-  dotDone: {
-    backgroundColor: '#FF6B3D',
-  },
-  dotActive: {
-    backgroundColor: '#FF0472',
-    width: 24,
-  },
-
-  // Header
-  header: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 28,
-    fontFamily: 'BricolageGrotesque-ExtraBold',
-    color: '#000E28',
-    letterSpacing: -0.8,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 15,
-    fontFamily: 'DMSans-Regular',
-    color: '#777777',
-    lineHeight: 22,
-  },
-
-  // Choose mode
-  chooseActions: {
-    flex: 1,
-    gap: 12,
-  },
-  ctaButton: {
-    backgroundColor: '#FF0472',
-    borderRadius: 16,
-    paddingVertical: 18,
-    alignItems: 'center',
-  },
-  ctaButtonLoading: {
-    opacity: 0.7,
-  },
-  ctaText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontFamily: 'BricolageGrotesque-ExtraBold',
-    letterSpacing: -0.3,
-  },
-  secondaryButton: {
-    borderRadius: 16,
-    paddingVertical: 18,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FF0472',
-    backgroundColor: 'transparent',
-  },
-  secondaryText: {
-    color: '#FF0472',
-    fontSize: 17,
-    fontFamily: 'DMSans-Medium',
-    fontWeight: '600',
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 4,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#EDE5E0',
-  },
-  anonButton: {
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  anonText: {
-    fontSize: 15,
-    fontFamily: 'DMSans-Regular',
-    color: '#888888',
-  },
-  anonNote: {
-    fontSize: 12,
-    fontFamily: 'DMSans-Regular',
-    color: '#BBBBBB',
-    textAlign: 'center',
-    lineHeight: 18,
-    marginTop: -4,
-  },
-  privacyNote: {
-    fontSize: 12,
-    fontFamily: 'DMSans-Regular',
-    color: '#AAAAAA',
-    textAlign: 'center',
-    marginTop: 20,
-    lineHeight: 18,
-  },
-
-  // Back
-  backButton: {
-    marginBottom: 8,
-    alignSelf: 'flex-start',
-  },
-  backText: {
-    fontSize: 20,
-    color: '#FF0472',
-    paddingVertical: 4,
-  },
-
-  // Form
-  form: {
-    gap: 12,
-  },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#EDE5E0',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: Platform.OS === 'ios' ? 16 : 12,
-    fontSize: 15,
-    fontFamily: 'DMSans-Regular',
-    color: '#000E28',
-  },
-  errorText: {
-    fontSize: 13,
-    fontFamily: 'DMSans-Regular',
-    color: '#CC3A3A',
-    textAlign: 'center',
-    marginTop: -4,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  switchPrompt: {
-    fontSize: 14,
-    fontFamily: 'DMSans-Regular',
-    color: '#888888',
-  },
-  switchLink: {
-    fontSize: 14,
-    fontFamily: 'DMSans-Medium',
-    color: '#FF0472',
-    fontWeight: '600',
-  },
-})

@@ -47,6 +47,7 @@
 import React from 'react'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 
+import { useTheme } from '../../theme'
 import { WelcomeScreen }   from './WelcomeScreen'
 import { ObjectiveScreen } from './ObjectiveScreen'
 import { ConsentScreen }   from './ConsentScreen'
@@ -74,13 +75,14 @@ type Props = {
 }
 
 export function OnboardingNavigator(_props: Props) {
+  const theme = useTheme()
   return (
     <Stack.Navigator
       initialRouteName="Welcome"
       screenOptions={{
         headerShown: false,
         animation: 'slide_from_right',
-        contentStyle: { backgroundColor: '#FFF8F5' },
+        contentStyle: { backgroundColor: theme.colors.bg.canvas },
       }}
     >
       <Stack.Screen name="Welcome"   component={WelcomeScreen}   />
