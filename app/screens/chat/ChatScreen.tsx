@@ -236,6 +236,11 @@ export function ChatScreen() {
 
   const flatListRef = useRef<FlatList>(null)
   const anoqiMessageCount = useRef(0)
+  // Server-assigned conversation UUID. Null until the first /chat response
+  // creates it; reused on every subsequent turn so the server can rebuild
+  // history. Stays in the screen's lifetime — leaving and re-entering Chat
+  // starts a fresh conversation, which matches the current UX.
+  const conversationIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     AsyncStorage.getItem('anoqi_chat_consent_accepted').then((v) => {
