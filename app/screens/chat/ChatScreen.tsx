@@ -722,18 +722,97 @@ export function ChatScreen() {
             }}
             showsVerticalScrollIndicator={false}
             ListFooterComponent={
-              isTyping ? (
-                <View
-                  style={{
-                    alignSelf: 'center',
-                    width: '100%',
-                    maxWidth: 864,
-                    marginBottom: theme.spacing[5],
-                  }}
-                >
-                  <TypingIndicator />
-                </View>
-              ) : null
+              <>
+                {isTyping ? (
+                  <View
+                    style={{
+                      alignSelf: 'center',
+                      width: '100%',
+                      maxWidth: 864,
+                      marginBottom: theme.spacing[5],
+                    }}
+                  >
+                    <TypingIndicator />
+                  </View>
+                ) : null}
+
+                {userMessageCount === 0 && !streamingId ? (
+                  // Auto-intro pushes a single message into `messages` on
+                  // first visit, so the pure empty-state path doesn't fire.
+                  // Mirror the starter grid here so cards are reachable
+                  // below the intro. Hides after the first user turn.
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      gap: theme.spacing[3],
+                      marginTop: theme.spacing[6],
+                    }}
+                  >
+                    {starters.map((q, i) => (
+                      <View
+                        key={i}
+                        style={{
+                          flexGrow: 1,
+                          flexBasis: '47%',
+                          borderRadius: 22,
+                          overflow: 'hidden',
+                          position: 'relative',
+                          minHeight: 110,
+                        }}
+                      >
+                        <LiquidEmber
+                          intensity={0.55}
+                          fuchsia={false}
+                          blur={36}
+                          borderRadius={22}
+                        />
+                        <Pressable
+                          accessibilityRole="button"
+                          onPress={() => handleSend(q)}
+                          style={({ pressed }) => [
+                            {
+                              flex: 1,
+                              backgroundColor: pressed
+                                ? 'rgba(255, 245, 238, 0.10)'
+                                : 'rgba(255, 245, 238, 0.05)',
+                              borderWidth: 1,
+                              borderColor: 'rgba(255, 245, 238, 0.09)',
+                              borderRadius: 22,
+                              paddingVertical: theme.spacing[4],
+                              paddingHorizontal: theme.spacing[4],
+                              justifyContent: 'space-between',
+                            },
+                            Platform.OS === 'web'
+                              ? ({
+                                  backdropFilter: 'blur(18px) saturate(140%)',
+                                  WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+                                } as any)
+                              : null,
+                          ]}
+                        >
+                          <Icon
+                            name="Sparkles"
+                            size={14}
+                            color={palette.ember[300]}
+                            strokeWidth={1.8}
+                          />
+                          <Text
+                            variant="h4Italic"
+                            style={{
+                              color: palette.warmWhite[100],
+                              marginTop: theme.spacing[3],
+                              lineHeight: 24,
+                            }}
+                          >
+                            {q}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </>
             }
           />
         )}
