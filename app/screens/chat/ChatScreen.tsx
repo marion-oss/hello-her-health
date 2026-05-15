@@ -1,9 +1,12 @@
 // Anoqi — ChatScreen.
 //
-// Conversation UI. Peony user bubbles, white Anoqi bubbles with Cotton Rose
-// border, sage avatar with peony bloom glyph, breathing sage typing dots,
-// peony send button. Empty state: h3 greeting + 2x2 starter grid. Consent
-// gate is a Cotton Rose overlay (not a black scrim — hostile in this context).
+// Conversation UI. Assistant replies render as an article-style reading
+// pane (no bubble shell) with markdown structure: serif h2 title, sans-
+// serif section headings, bodyLg paragraphs, bulleted lists, **bold**
+// inline, and inline [Sn] citation pills. User questions stay in the
+// fuchsia bubble — kept as the brand "send" moment. Consent flows are
+// unchanged: full-screen gate for direct-to-Anoqi entry, bottom-sheet
+// ConsentSheet for the skip-and-chat path.
 
 import React, {
   useCallback,
@@ -14,7 +17,6 @@ import React, {
 import {
   FlatList,
   KeyboardAvoidingView,
-  Linking,
   Platform,
   Pressable,
   SafeAreaView,
@@ -35,17 +37,19 @@ import {
   BreathingForm,
   Bubble,
   Button,
+  type CitationSource,
   ConsentSheet,
   Icon,
   type IconName,
   LiquidEmber,
-  SourceChip,
+  Markdown,
+  parseMarkdown,
   StreamingCursor,
   Text,
   TypingIndicator,
 } from '../../components'
 
-type Source = { name: string; topic: string; url?: string }
+type Source = CitationSource & { topic: string }
 
 type Message = {
   id: string
@@ -107,37 +111,108 @@ const COPY = {
 
 const SAMPLE_SOURCES: Source[][] = [
   [
-    { name: 'NHS', topic: 'Menstrual health', url: 'https://www.nhs.uk/conditions/periods/' },
-    { name: 'NICE', topic: 'Gynaecology', url: 'https://www.nice.org.uk/guidance/ng88' },
+    { label: 'S1', name: 'NHS',  topic: 'Menstrual health', url: 'https://www.nhs.uk/conditions/periods/' },
+    { label: 'S2', name: 'NICE', topic: 'Gynaecology',      url: 'https://www.nice.org.uk/guidance/ng88' },
+    { label: 'S3', name: 'BMS',  topic: 'Endometriosis',    url: 'https://thebms.org.uk/publications/' },
   ],
   [
-    { name: 'FSRH', topic: 'Contraception', url: 'https://www.fsrh.org/standards-and-guidance/' },
-    { name: 'NHS', topic: 'Sexual health', url: 'https://www.nhs.uk/contraception/' },
+    { label: 'S1', name: 'FSRH', topic: 'Contraception',  url: 'https://www.fsrh.org/standards-and-guidance/' },
+    { label: 'S2', name: 'NHS',  topic: 'Sexual health',  url: 'https://www.nhs.uk/contraception/' },
+    { label: 'S3', name: 'NICE', topic: 'Contraception',  url: 'https://www.nice.org.uk/guidance/ng3' },
   ],
   [
-    { name: 'BMS', topic: 'Menopause', url: 'https://thebms.org.uk/publications/' },
-    { name: 'NICE', topic: 'Menopause', url: 'https://www.nice.org.uk/guidance/ng23' },
-  ],
-  [
-    { name: 'NHS', topic: 'Women\'s health' },
-    { name: 'HAS', topic: 'Santé féminine' },
-  ],
-  [
-    { name: 'Cochrane', topic: 'Systematic review' },
-    { name: 'FSRH', topic: 'Reproductive health' },
+    { label: 'S1', name: 'BMS',  topic: 'Menopause',  url: 'https://thebms.org.uk/publications/' },
+    { label: 'S2', name: 'NICE', topic: 'Menopause',  url: 'https://www.nice.org.uk/guidance/ng23' },
+    { label: 'S3', name: 'NHS',  topic: 'HRT',       url: 'https://www.nhs.uk/conditions/hormone-replacement-therapy-hrt/' },
   ],
 ]
 
 const MOCK_RESPONSES: Record<Language, string[]> = {
   en: [
-    "What you're describing is something many women experience, and it's worth taking seriously. Symptoms like these can have several underlying causes — hormonal fluctuations, thyroid function, nutritional factors, or conditions like PCOS or endometriosis. Tracking the timing, intensity, and any accompanying symptoms will give your doctor a much clearer picture. Would you like help preparing a summary of what you've been experiencing?",
-    "There are important nuances here that often get missed. Research conducted specifically on women's health — rather than extrapolated from male studies — shows that hormonal influences on this are significant and often underestimated. The evidence from NICE and FSRH guidelines suggests that a personalised approach works better than a one-size-fits-all answer.",
-    "This is one of those areas where women are often dismissed, but the evidence is clear. Your symptoms are real, they have a clinical basis, and there are evidence-based options available. Let me break down what the research says.",
+    `# What irregular periods can really mean
+
+What you're describing is something **many women experience**, and it's worth taking seriously. Symptoms like these can have several underlying causes, and the right next step depends on which pattern fits you. [S1]
+
+## Most likely causes
+
+- **Hormonal fluctuations** — thyroid, prolactin, or perimenopausal shifts
+- **PCOS or endometriosis** — especially if pain or skipped cycles are part of the picture [S2][S3]
+- **Lifestyle factors** — sleep, weight change, intense exercise, or stress
+
+## How to prepare for a consultation
+
+Track the **timing, intensity, and any accompanying symptoms** for at least one full cycle. That gives your doctor a much clearer picture than recall alone. [S1][S2]
+
+Would you like help building a summary you can bring with you?`,
+
+    `# Why women's health research keeps missing the point
+
+There are important nuances here that often get missed. Research conducted **specifically on women** — rather than extrapolated from male studies — shows that hormonal influences are significant and often underestimated. [S2]
+
+## What the evidence actually says
+
+- Recent NICE and FSRH guidelines lean toward a **personalised approach** over one-size-fits-all protocols [S1][S3]
+- Cycle phase changes how the body responds to medication, diet, and training load
+- Symptom clusters are more diagnostic than any single marker
+
+The implication: treatment that works in week one of your cycle may not work in week three, and that's a feature of the biology, not a failure of the patient. [S2]`,
+
+    `# Your symptoms are real — and there are evidence-based options
+
+This is one of those areas where women are often dismissed, but the **evidence is clear**: your symptoms have a clinical basis, and there are paths forward. [S1]
+
+## What the research supports
+
+- First-line HRT for vasomotor symptoms is well-established in NICE NG23 [S2]
+- Non-hormonal options exist for those who can't or prefer not to take HRT [S3]
+- Bone-density monitoring is recommended for anyone with early menopause [S1][S2]
+
+## What to ask your doctor
+
+Bring a **symptom diary** spanning at least 6 weeks. Ask specifically about **bone health, mood, and sleep** — these are the three areas most often under-treated. [S2]`,
   ],
   fr: [
-    "Ce que tu décris est vécu par beaucoup de femmes, et ça mérite d'être pris au sérieux. Ces symptômes peuvent avoir plusieurs causes — fluctuations hormonales, thyroïde, facteurs nutritionnels, ou des conditions comme le SOPK ou l'endométriose. Noter le moment, l'intensité et les symptômes associés donnera à ton médecin une image beaucoup plus claire. Tu veux que je t'aide à préparer un résumé ?",
-    'Il y a des nuances importantes ici qui passent souvent inaperçues. Les recherches menées spécifiquement sur la santé des femmes montrent que les influences hormonales sont significatives et souvent sous-estimées. Les recommandations HAS et NICE suggèrent une approche personnalisée.',
-    "C'est un domaine où les femmes sont souvent ignorées, mais les preuves sont claires. Tes symptômes sont réels, ils ont une base clinique, et des options fondées sur des données probantes existent.",
+    `# Ce que des règles irrégulières peuvent vraiment signifier
+
+Ce que tu décris est vécu par **beaucoup de femmes**, et ça mérite d'être pris au sérieux. Ces symptômes peuvent avoir plusieurs causes, et la suite dépend du schéma qui te correspond. [S1]
+
+## Causes les plus probables
+
+- **Fluctuations hormonales** — thyroïde, prolactine, ou périménopause
+- **SOPK ou endométriose** — surtout si douleur ou cycles sautés sont présents [S2][S3]
+- **Facteurs de vie** — sommeil, changement de poids, sport intense, stress
+
+## Préparer ta consultation
+
+Note le **moment, l'intensité et les symptômes associés** sur au moins un cycle complet. Ça donne à ton médecin une image bien plus claire que la mémoire seule. [S1][S2]
+
+Tu veux que je t'aide à préparer un résumé à apporter ?`,
+
+    `# Pourquoi la recherche sur la santé des femmes manque le coche
+
+Il y a des nuances importantes ici qui passent souvent inaperçues. Les recherches menées **spécifiquement sur les femmes** — plutôt qu'extrapolées d'études masculines — montrent que les influences hormonales sont significatives et souvent sous-estimées. [S2]
+
+## Ce que dit l'évidence
+
+- Les recommandations NICE et FSRH penchent vers une **approche personnalisée** plutôt qu'un protocole universel [S1][S3]
+- La phase du cycle modifie la réponse aux médicaments, à l'alimentation, à l'entraînement
+- Les grappes de symptômes sont plus diagnostiques qu'un seul marqueur
+
+Conséquence : un traitement qui marche en semaine 1 du cycle peut ne pas marcher en semaine 3 — c'est une caractéristique de la biologie, pas un échec de la patiente. [S2]`,
+
+    `# Tes symptômes sont réels — et il existe des options fondées sur des preuves
+
+C'est un domaine où les femmes sont souvent ignorées, mais les **preuves sont claires** : tes symptômes ont une base clinique, et des pistes existent. [S1]
+
+## Ce que soutient la recherche
+
+- Le THM en première ligne pour les symptômes vasomoteurs est bien établi (NICE NG23) [S2]
+- Des options non hormonales existent pour celles qui ne peuvent ou ne veulent pas du THM [S3]
+- Un suivi de la densité osseuse est recommandé en cas de ménopause précoce [S1][S2]
+
+## Quoi demander à ton médecin
+
+Apporte un **journal des symptômes** sur au moins 6 semaines. Demande spécifiquement à propos de la **santé osseuse, l'humeur, et le sommeil** — ce sont les trois zones les plus sous-traitées. [S2]`,
   ],
 }
 
@@ -254,11 +329,11 @@ export function ChatScreen() {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === streamingId
-            ? { ...m, text: m.fullText.slice(0, m.text.length + 3) }
+            ? { ...m, text: m.fullText.slice(0, m.text.length + 2) }
             : m,
         ),
       )
-    }, 18)
+    }, 15)
     return () => clearTimeout(timer)
   }, [streamingId, messages])
 
@@ -438,14 +513,15 @@ export function ChatScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
       {/* Decorative breathing form anchored low-right behind everything. Same
           composition as the Welcome screen so the brand visual stays present
-          in long conversation sessions without crowding the messages. */}
+          in long conversation sessions. Fades back once messages exist so it
+          doesn't compete with the article reading pane. */}
       <View
         pointerEvents="none"
         style={{
           position: 'absolute',
           right: -160,
           bottom: 80,
-          opacity: 0.45,
+          opacity: messages.length > 0 ? 0.18 : 0.45,
         }}
       >
         <BreathingForm size={520} />
@@ -561,77 +637,66 @@ export function ChatScreen() {
             ref={flatListRef}
             data={messages}
             keyExtractor={(m) => m.id}
-            renderItem={({ item }) => (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'flex-end',
-                  gap: theme.spacing[2],
-                  marginBottom: theme.spacing[3],
-                  justifyContent: item.role === 'user' ? 'flex-end' : 'flex-start',
-                }}
-              >
-                <View style={{ maxWidth: '85%' }}>
-                  <Bubble role={item.role}>
+            renderItem={({ item }) =>
+              item.role === 'user' ? (
+                <View
+                  style={{
+                    width: '100%',
+                    alignSelf: 'center',
+                    maxWidth: 864,
+                    flexDirection: 'row',
+                    justifyContent: 'flex-end',
+                    marginBottom: theme.spacing[5],
+                  }}
+                >
+                  {/* Bubble already caps its own width at 86%; nesting a
+                      second maxWidth wrapper collapses to per-character
+                      width on RN-Web for short messages like "test". */}
+                  <Bubble role="user">
                     <Text
-                      variant={item.role === 'user' ? 'body' : 'h4Italic'}
-                      style={{
-                        color: item.role === 'user'
-                          ? theme.colors.accent.primaryOnText
-                          : theme.colors.text.primary,
-                      }}
+                      variant="bodyLg"
+                      style={{ color: theme.colors.accent.primaryOnText }}
                     >
                       {item.text}
-                      {item.isStreaming ? (
-                        <>
-                          <StreamingCursor />
-                          {/* Invisible ghost of the remaining text. Reserves
-                              the final bubble shape so streamed characters
-                              don't cause the layout to jitter line-by-line. */}
-                          <Text style={{ opacity: 0 }}>
-                            {item.fullText.slice(item.text.length)}
-                          </Text>
-                        </>
-                      ) : null}
                     </Text>
-
-                    {!item.isStreaming && item.isFirst ? (
-                      <View
-                        style={{
-                          marginTop: theme.spacing[3],
-                          paddingTop: theme.spacing[3],
-                          borderTopWidth: 1,
-                          borderTopColor: theme.colors.border.subtle,
-                        }}
-                      >
-                        <Text variant="caption" tone="tertiary">
-                          {copy.safetyNote}
-                        </Text>
-                      </View>
-                    ) : null}
-
-                    {!item.isStreaming && item.sources && item.sources.length > 0 ? (
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          flexWrap: 'wrap',
-                          gap: theme.spacing[2],
-                          marginTop: theme.spacing[3],
-                        }}
-                      >
-                        {item.sources.map((s: Source, i: number) => (
-                          <SourceChip
-                            key={i}
-                            label={`${s.name} · ${s.topic}`}
-                            onPress={() => s.url && Linking.openURL(s.url)}
-                          />
-                        ))}
-                      </View>
-                    ) : null}
                   </Bubble>
                 </View>
-              </View>
-            )}
+              ) : (
+                // Assistant — article-style reading pane. No bubble shell;
+                // Markdown handles headings, body, bullets, and inline
+                // citation pills. Streaming cursor anchors to the tail of
+                // the last block in the parsed tree.
+                <View
+                  style={{
+                    width: '100%',
+                    alignSelf: 'center',
+                    maxWidth: 864,
+                    marginBottom: theme.spacing[8],
+                  }}
+                >
+                  <Markdown
+                    blocks={parseMarkdown(item.text)}
+                    sources={item.sources}
+                    trailingCursor={item.isStreaming ? <StreamingCursor /> : null}
+                  />
+
+                  {!item.isStreaming && item.isFirst ? (
+                    <Text
+                      variant="caption"
+                      tone="tertiary"
+                      style={{
+                        marginTop: theme.spacing[2],
+                        paddingTop: theme.spacing[3],
+                        borderTopWidth: 1,
+                        borderTopColor: theme.colors.border.subtle,
+                      }}
+                    >
+                      {copy.safetyNote}
+                    </Text>
+                  ) : null}
+                </View>
+              )
+            }
             contentContainerStyle={{
               paddingHorizontal: theme.spacing[5],
               paddingTop: theme.spacing[4],
@@ -639,21 +704,18 @@ export function ChatScreen() {
             }}
             showsVerticalScrollIndicator={false}
             ListFooterComponent={
-              <>
-                {isTyping ? (
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'flex-end',
-                      marginBottom: theme.spacing[3],
-                    }}
-                  >
-                    <Bubble role="assistant">
-                      <TypingIndicator />
-                    </Bubble>
-                  </View>
-                ) : null}
-              </>
+              isTyping ? (
+                <View
+                  style={{
+                    alignSelf: 'center',
+                    width: '100%',
+                    maxWidth: 864,
+                    marginBottom: theme.spacing[5],
+                  }}
+                >
+                  <TypingIndicator />
+                </View>
+              ) : null
             }
           />
         )}
@@ -744,6 +806,20 @@ export function ChatScreen() {
             returnKeyType="send"
             blurOnSubmit={false}
             onSubmitEditing={() => handleSend()}
+            // Web: Enter sends, Shift+Enter inserts a newline. multiline
+            // TextInputs don't fire onSubmitEditing on web, so intercept
+            // keypress directly. Native multiline keeps its default
+            // newline-on-Enter behaviour.
+            onKeyPress={
+              Platform.OS === 'web'
+                ? ((e: any) => {
+                    if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                      e.preventDefault?.()
+                      handleSend()
+                    }
+                  }) as any
+                : undefined
+            }
             style={{
               flex: 1,
               backgroundColor: 'rgba(255, 245, 238, 0.04)',

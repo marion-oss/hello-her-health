@@ -25,7 +25,7 @@ export const fontFamily = {
   })!,
 } as const
 
-type TypoStyle = Pick<TextStyle, 'fontFamily' | 'fontSize' | 'lineHeight' | 'letterSpacing'>
+type TypoStyle = Pick<TextStyle, 'fontFamily' | 'fontSize' | 'lineHeight' | 'letterSpacing' | 'fontStyle'>
 
 // Cormorant has a tall x-height and tight default tracking; we let it breathe
 // at display sizes by adding a touch of negative letter-spacing only at the
@@ -42,7 +42,9 @@ export const typography = {
   h4:             { fontFamily: fontFamily.displayMed,       fontSize: 20, lineHeight: 26, letterSpacing: 0 },
   h4Italic:       { fontFamily: fontFamily.displayMedIt,     fontSize: 20, lineHeight: 26, letterSpacing: 0 },
 
-  bodyLg:   { fontFamily: fontFamily.regular, fontSize: 17, lineHeight: 26, letterSpacing: 0 },
+  bodyLg:       { fontFamily: fontFamily.regular, fontSize: 17, lineHeight: 26, letterSpacing: 0 },
+  bodyLgBold:   { fontFamily: fontFamily.bold,    fontSize: 17, lineHeight: 26, letterSpacing: 0 },
+  bodyLgItalic: { fontFamily: fontFamily.regular, fontSize: 17, lineHeight: 26, letterSpacing: 0, fontStyle: 'italic' },
   body:     { fontFamily: fontFamily.regular, fontSize: 15, lineHeight: 24, letterSpacing: 0 },
   bodyLight:{ fontFamily: fontFamily.light,   fontSize: 15, lineHeight: 24, letterSpacing: 0 },
   bodyMed:  { fontFamily: fontFamily.medium,  fontSize: 15, lineHeight: 24, letterSpacing: 0 },
