@@ -1,23 +1,35 @@
-// Anoqi — HomeScreen.
+// Anoqi — HomeScreen (iridescent register).
 //
-// Greeting hero, Cotton Rose focus pill, full-bleed Cotton Rose hero CTA
-// (not a card), editorial summary/document lists with hairline dividers,
-// one Insight card with sage hairline TOP (not a side-stripe — banned).
+// Void canvas. A glass insight card with LiquidEmber breathing underneath
+// carries the day's main message ("Votre œstrogène baisse. C'est votre phase
+// lutéale."). Beneath it sits a glass cycle tracker, then editorial lists for
+// summaries and documents (kept lightweight — the insight is the moment).
+//
+// Greeting is set in italic Cormorant Garamond with the user's name in
+// Ember; everything else is Inter for precision.
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { Pressable, SafeAreaView, ScrollView, StatusBar, View } from 'react-native'
+import {
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  View,
+} from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useNavigation } from '@react-navigation/native'
 
 import { useOnboarding, type HealthObjective } from '../../context/OnboardingContext'
 import { listDocuments } from '../../lib/documentStore'
-import { useTheme } from '../../theme'
+import { palette, useTheme } from '../../theme'
 import {
-  Button,
   Icon,
   type IconName,
+  LiquidEmber,
   SectionTitle,
   Text,
+  Wordmark,
 } from '../../components'
 
 const CHAT_INTENT_KEY = 'anoqi_chat_intent'
@@ -27,39 +39,51 @@ const COPY = {
     greetingMorning:   'Bonjour',
     greetingAfternoon: 'Bon après-midi',
     greetingEvening:   'Bonsoir',
-    subhead:           "Pose-moi une question — j'écoute.",
+    todayLabel:        "Aujourd'hui",
+    cycleEyebrow:      'Jour 18 · Lutéale',
     focusAreaLabel:    'Ton focus',
     changeFocus:       'Changer',
-    heroEyebrow:       'Conversation',
-    heroTitle:         "Qu'est-ce qui te préoccupe aujourd'hui ?",
-    heroBody:          'Pose ta question. Sans détour.',
-    heroCta:           'Parler à Anoqi',
+    insightEyebrow:    'Votre insight',
+    cycleTitle:        'Cycle · 28 jours',
+    phase:             'Phase lutéale tardive',
+    prepareConsult:    'Préparer une consultation',
+    learnMore:         'En savoir plus',
+    subhead:           "Pose-moi une question. Sans détour.",
+    talkCta:           "Parler à Anoqi",
     summariesTitle:    'Tes résumés',
-    summariesEmpty:    'Tes résumés apparaîtront ici après quelques échanges.',
+    summariesEmpty:    "Tes résumés apparaîtront ici après quelques échanges.",
     documentsTitle:    'Tes documents',
     documentsUnit:     'document',
     documentsView:     'Voir',
-    insightEyebrow:    'Insight du jour',
     insightSourceLbl:  'Source',
+    knowledgeEyebrow:  'Savoir du jour',
+    knowledgeBody:     'Les fluctuations hormonales tout au long du cycle influencent ton énergie, ton humeur, et ta concentration. Comprendre ton schéma t\'aide à en tirer le meilleur.',
+    knowledgeSource:   'Cochrane',
   },
   en: {
     greetingMorning:   'Good morning',
     greetingAfternoon: 'Good afternoon',
     greetingEvening:   'Good evening',
-    subhead:           "Ask me anything — I'm listening.",
+    todayLabel:        'Today',
+    cycleEyebrow:      'Day 18 · Luteal',
     focusAreaLabel:    'Your focus',
     changeFocus:       'Change',
-    heroEyebrow:       'Conversation',
-    heroTitle:         "What's on your mind today?",
-    heroBody:          'Ask directly. No detours.',
-    heroCta:           'Talk to Anoqi',
+    insightEyebrow:    'Your insight',
+    cycleTitle:        'Cycle · 28 days',
+    phase:             'Late luteal phase',
+    prepareConsult:    'Prepare a consultation',
+    learnMore:         'Learn more',
+    subhead:           "Ask me anything. No detours.",
+    talkCta:           "Talk to Anoqi",
     summariesTitle:    'Your summaries',
-    summariesEmpty:    'Your summaries will appear here after a few exchanges.',
+    summariesEmpty:    "Your summaries will appear here after a few exchanges.",
     documentsTitle:    'Your documents',
     documentsUnit:     'document',
     documentsView:     'View',
-    insightEyebrow:    "Today's insight",
     insightSourceLbl:  'Source',
+    knowledgeEyebrow:  'Knowledge of the day',
+    knowledgeBody:     'Hormonal fluctuations throughout your cycle influence your energy, mood, and concentration. Understanding your pattern helps you make the most of it.',
+    knowledgeSource:   'Cochrane',
   },
 } as const
 
@@ -71,38 +95,58 @@ const OBJECTIVE_LABELS: Record<HealthObjective, { fr: string; en: string; icon: 
   general:       { fr: 'Santé générale', en: 'General health',   icon: 'MessageCircle' },
 }
 
-type Insight = { text: string; source: string }
+type Insight = { text: string; emphasis?: string; source: string }
 const INSIGHTS: Record<HealthObjective, { fr: Insight; en: Insight }> = {
   symptoms: {
-    en: { text: 'Tracking your symptoms for 2–3 cycles gives your doctor a much clearer picture. Note timing, duration, and intensity.', source: 'NHS' },
-    fr: { text: 'Suivre tes symptômes sur 2 à 3 cycles donne à ton médecin une image beaucoup plus claire. Note le moment, la durée et l\'intensité.', source: 'NHS' },
+    en: { text: 'Tracking your symptoms across 2–3 cycles gives your doctor a much clearer picture.', emphasis: 'much clearer picture', source: 'NHS' },
+    fr: { text: 'Suivre tes symptômes sur 2 à 3 cycles donne à ton médecin une image beaucoup plus claire.', emphasis: 'beaucoup plus claire', source: 'NHS' },
   },
   contraception: {
-    en: { text: 'Taking the pill at the same time every day reduces the failure rate to under 1%. A 3-hour window still counts as consistent.', source: 'FSRH' },
-    fr: { text: 'Prendre la pilule à la même heure chaque jour réduit le taux d\'échec à moins de 1 %. Une fenêtre de 3 heures reste régulière.', source: 'FSRH' },
+    en: { text: 'Taking the pill at the same time daily drops the failure rate under 1%.', emphasis: 'under 1%', source: 'FSRH' },
+    fr: { text: 'Prendre la pilule à la même heure réduit le taux d\'échec à moins de 1 %.', emphasis: 'moins de 1 %', source: 'FSRH' },
   },
   menopause: {
-    en: { text: 'Perimenopause can begin up to 10 years before your last period. Changes in cycle length — not hot flashes — are often the first sign.', source: 'BMS' },
-    fr: { text: 'La périménopause peut commencer jusqu\'à 10 ans avant tes dernières règles. Les changements de durée du cycle sont souvent le premier signe.', source: 'BMS' },
+    en: { text: 'Perimenopause can begin up to 10 years before your last period — changes in cycle length are often the first sign.', emphasis: 'first sign', source: 'BMS' },
+    fr: { text: 'La périménopause peut commencer 10 ans avant tes dernières règles — les changements de cycle sont souvent le premier signe.', emphasis: 'premier signe', source: 'BMS' },
   },
   fertility: {
-    en: { text: 'Your fertile window spans roughly 6 days — the 5 days before ovulation and the day itself. Cycle length alone doesn\'t tell you when.', source: 'NHS' },
-    fr: { text: 'Ta fenêtre de fertilité dure environ 6 jours — les 5 jours avant l\'ovulation et le jour J. La durée du cycle seul ne te le dit pas.', source: 'NHS' },
+    en: { text: 'Your fertile window spans roughly six days — the five before ovulation and the day itself.', emphasis: 'six days', source: 'NHS' },
+    fr: { text: 'Ta fenêtre de fertilité dure environ six jours — les cinq avant l\'ovulation et le jour J.', emphasis: 'six jours', source: 'NHS' },
   },
   general: {
-    en: { text: 'Hormonal fluctuations across your cycle affect energy, mood, and focus. Understanding your pattern helps you work with it.', source: 'Cochrane' },
-    fr: { text: 'Les fluctuations hormonales tout au long du cycle influencent ton énergie, ton humeur, et ta concentration.', source: 'Cochrane' },
+    en: { text: 'Your œstrogen drops in the late luteal phase — energy shifts this week are expected, not fatigue.', emphasis: 'not fatigue', source: 'NHS · HAS' },
+    fr: { text: "Ton œstrogène baisse — c'est ta phase lutéale, pas de la fatigue.", emphasis: 'pas de la fatigue', source: 'NHS · HAS' },
   },
 }
 
 type Summary = { id: string; topic: string; date: string }
 const STUB_SUMMARIES: Summary[] = []
 
-function getGreeting(copy: { greetingMorning: string; greetingAfternoon: string; greetingEvening: string }): string {
+function getGreeting(copy: {
+  greetingMorning: string
+  greetingAfternoon: string
+  greetingEvening: string
+}): string {
   const hour = new Date().getHours()
   if (hour >= 5 && hour < 12)  return copy.greetingMorning
   if (hour >= 12 && hour < 18) return copy.greetingAfternoon
   return copy.greetingEvening
+}
+
+// Render an Inter italic-style accent inside a Cormorant body, by splitting
+// on the configured emphasis substring.
+function renderWithEmphasis(text: string, emphasis: string | undefined) {
+  if (!emphasis || !text.includes(emphasis)) {
+    return <Text variant="h3Italic" style={{ color: palette.warmWhite[100] }}>{text}</Text>
+  }
+  const [before, after] = text.split(emphasis)
+  return (
+    <Text variant="h3Italic" style={{ color: palette.warmWhite[100] }}>
+      {before}
+      <Text variant="h3" style={{ color: palette.ember[400] }}>{emphasis}</Text>
+      {after}
+    </Text>
+  )
 }
 
 export function HomeScreen() {
@@ -134,12 +178,37 @@ export function HomeScreen() {
       .catch((err) => console.warn('Failed to load documents:', err))
   }, [])
 
+  // Simple cycle dot row — fake data, just for the visual; would wire to a
+  // real cycle store later.
+  const cycleDays = [14, 15, 16, 17, 18, 19, 20, 21, 22]
+  const currentDay = 18
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
-      <StatusBar
-        barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'}
-        backgroundColor={theme.colors.bg.canvas}
-      />
+      <StatusBar barStyle="light-content" backgroundColor={theme.colors.bg.canvas} />
+
+      {/* Faint Ember corner glow opposite the breathing form — gives the top
+          of the screen warmth without a card chrome */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          right: -120,
+          top: -80,
+          width: 360,
+          height: 360,
+          opacity: 0.7,
+        }}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(196, 128, 106, 0.32)',
+            borderRadius: 9999,
+            ...(Platform.OS === 'web' ? ({ filter: 'blur(80px)' } as any) : null),
+          }}
+        />
+      </View>
 
       {/* Header */}
       <View
@@ -152,33 +221,62 @@ export function HomeScreen() {
           paddingBottom: theme.spacing[2],
         }}
       >
-        <Text
-          variant="h2Italic"
-          style={{ color: theme.colors.text.primary, fontSize: 22, lineHeight: 26 }}
+        <Wordmark size={20} />
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: 'rgba(255, 245, 238, 0.10)',
+          }}
         >
-          anoqi
-        </Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Settings" hitSlop={10}>
-          <Icon name="Settings2" size={20} color={theme.colors.text.tertiary} />
-        </Pressable>
+          <View
+            style={{
+              width: 5,
+              height: 5,
+              borderRadius: 999,
+              backgroundColor: palette.ember[400],
+            }}
+          />
+          <Text variant="eyebrow" style={{ color: 'rgba(255, 245, 238, 0.7)' }}>
+            {copy.cycleEyebrow}
+          </Text>
+        </View>
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingBottom: theme.spacing[16] }}
+        contentContainerStyle={{ paddingBottom: theme.spacing[24] }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Greeting hero */}
+        {/* Greeting */}
         <View
           style={{
             paddingHorizontal: theme.spacing[6],
             paddingTop: theme.spacing[8],
-            paddingBottom: theme.spacing[5],
+            paddingBottom: theme.spacing[6],
           }}
         >
-          <Text variant="h1" tone="primary">
-            {greeting}.
+          <Text variant="eyebrow" style={{ color: 'rgba(255, 245, 238, 0.5)', marginBottom: 8 }}>
+            {copy.todayLabel.toUpperCase()}
           </Text>
-          <Text variant="bodyLg" tone="secondary" style={{ marginTop: theme.spacing[3] }}>
+          <Text variant="h1Italic" style={{ color: palette.warmWhite[100] }}>
+            {greeting},
+          </Text>
+          <Text variant="h1Italic" style={{ color: palette.ember[400], marginTop: -4 }}>
+            Marie.
+          </Text>
+          <Text
+            variant="bodyLight"
+            style={{
+              color: 'rgba(255, 245, 238, 0.65)',
+              marginTop: theme.spacing[3],
+              maxWidth: 420,
+            }}
+          >
             {copy.subhead}
           </Text>
 
@@ -191,56 +289,202 @@ export function HomeScreen() {
               alignSelf: 'flex-start',
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: theme.colors.bg.surfaceWarm,
-              paddingHorizontal: theme.spacing[4],
-              paddingVertical: theme.spacing[2],
+              backgroundColor: 'rgba(196, 128, 106, 0.12)',
+              borderWidth: 1,
+              borderColor: 'rgba(196, 128, 106, 0.28)',
+              paddingHorizontal: 14,
+              paddingVertical: 7,
               borderRadius: theme.radii.pill,
-              gap: theme.spacing[2],
+              gap: 8,
             }}
           >
-            <Icon name={objMeta.icon} size={16} color={theme.colors.text.accent} strokeWidth={2} />
-            <Text variant="label" tone="accent">
+            <Icon name={objMeta.icon} size={14} color={palette.ember[300]} strokeWidth={1.8} />
+            <Text variant="label" style={{ color: palette.ember[200] }}>
               {objectiveLabel}
             </Text>
-            <Icon name="ChevronRight" size={14} color={theme.colors.text.accent} strokeWidth={2} />
+            <Icon name="ChevronRight" size={12} color={palette.ember[300]} strokeWidth={1.8} />
           </Pressable>
         </View>
 
-        {/* Hero CTA — full-bleed Cotton Rose strip */}
-        <View
-          style={{
-            backgroundColor: theme.colors.bg.surfaceWarm,
-            paddingHorizontal: theme.spacing[6],
-            paddingVertical: theme.spacing[10],
-            marginVertical: theme.spacing[4],
-          }}
-        >
-          <Text
-            variant="eyebrow"
-            style={{ color: theme.colors.text.primary, textTransform: 'uppercase' }}
+        {/* Insight glass card — main daily moment */}
+        <View style={{ paddingHorizontal: theme.spacing[6], marginBottom: theme.spacing[5] }}>
+          <View
+            style={{
+              borderRadius: 24,
+              overflow: 'hidden',
+              position: 'relative',
+            }}
           >
-            {copy.heroEyebrow}
-          </Text>
-          <Text variant="h2" tone="primary" style={{ marginTop: theme.spacing[3] }}>
-            {copy.heroTitle}
-          </Text>
-          <Text variant="bodyLg" tone="secondary" style={{ marginTop: theme.spacing[3] }}>
-            {copy.heroBody}
-          </Text>
-          <View style={{ marginTop: theme.spacing[5], alignSelf: 'flex-start' }}>
-            <Button
-              label={copy.heroCta}
-              size="lg"
-              onPress={() => navigation.navigate('Chat')}
-              rightAdornment={
-                <Icon
-                  name="ArrowRight"
-                  size={18}
-                  color={theme.colors.accent.primaryOnText}
-                  strokeWidth={2}
-                />
-              }
-            />
+            <LiquidEmber intensity={1.2} blur={52} borderRadius={24} />
+
+            <View
+              style={[
+                {
+                  backgroundColor: 'rgba(255, 245, 238, 0.05)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(255, 245, 238, 0.09)',
+                  borderRadius: 24,
+                  padding: theme.spacing[6],
+                },
+                Platform.OS === 'web'
+                  ? ({
+                      backdropFilter: 'blur(22px) saturate(140%)',
+                      WebkitBackdropFilter: 'blur(22px) saturate(140%)',
+                    } as any)
+                  : null,
+              ]}
+            >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: theme.spacing[3],
+                }}
+              >
+                <Text variant="eyebrow" style={{ color: palette.fuchsia[400] }}>
+                  {copy.insightEyebrow.toUpperCase()}
+                </Text>
+                <Text variant="eyebrow" style={{ color: 'rgba(255, 245, 238, 0.4)' }}>
+                  {insight.source}
+                </Text>
+              </View>
+
+              {renderWithEmphasis(insight.text, insight.emphasis)}
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  marginTop: theme.spacing[5],
+                }}
+              >
+                <Pressable
+                  onPress={() => navigation.navigate('Chat')}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    paddingHorizontal: 14,
+                    paddingVertical: 9,
+                    borderRadius: 999,
+                    backgroundColor: 'rgba(255, 4, 114, 0.22)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(255, 4, 114, 0.42)',
+                  }}
+                >
+                  <Text variant="label" style={{ color: palette.warmWhite[100] }}>
+                    {copy.prepareConsult}
+                  </Text>
+                  <Icon name="ArrowRight" size={13} color={palette.warmWhite[100]} strokeWidth={2} />
+                </Pressable>
+
+                <Pressable
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 9,
+                    borderRadius: 999,
+                    backgroundColor: 'rgba(255, 245, 238, 0.06)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(255, 245, 238, 0.10)',
+                  }}
+                >
+                  <Text variant="label" style={{ color: palette.warmWhite[100] }}>
+                    {copy.learnMore}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Cycle tracker glass card */}
+        <View style={{ paddingHorizontal: theme.spacing[6], marginBottom: theme.spacing[6] }}>
+          <View
+            style={{
+              borderRadius: 22,
+              overflow: 'hidden',
+              position: 'relative',
+            }}
+          >
+            <LiquidEmber intensity={0.7} fuchsia={false} blur={48} borderRadius={22} />
+
+            <View
+              style={[
+                {
+                  backgroundColor: 'rgba(255, 245, 238, 0.04)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(255, 245, 238, 0.08)',
+                  borderRadius: 22,
+                  paddingHorizontal: theme.spacing[6],
+                  paddingVertical: theme.spacing[5],
+                },
+                Platform.OS === 'web'
+                  ? ({
+                      backdropFilter: 'blur(18px) saturate(140%)',
+                      WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+                    } as any)
+                  : null,
+              ]}
+            >
+              <Text variant="eyebrow" style={{ color: 'rgba(255, 245, 238, 0.5)', marginBottom: 12 }}>
+                {copy.cycleTitle.toUpperCase()}
+              </Text>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                {cycleDays.map((d) => {
+                  const isPast = d < currentDay
+                  const isNow = d === currentDay
+                  return (
+                    <View
+                      key={d}
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: 999,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: isNow
+                          ? palette.fuchsia[500]
+                          : isPast
+                            ? 'rgba(196, 128, 106, 0.20)'
+                            : 'rgba(255, 245, 238, 0.06)',
+                      }}
+                    >
+                      <Text
+                        variant="caption"
+                        style={{
+                          color: isNow
+                            ? palette.warmWhite[100]
+                            : isPast
+                              ? palette.ember[200]
+                              : 'rgba(255, 245, 238, 0.4)',
+                        }}
+                      >
+                        {d}
+                      </Text>
+                    </View>
+                  )
+                })}
+              </View>
+              <Text
+                variant="h4Italic"
+                style={{
+                  color: palette.ember[400],
+                  marginTop: 14,
+                  textAlign: 'center',
+                }}
+              >
+                {copy.phase}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -248,7 +492,10 @@ export function HomeScreen() {
         <View style={{ paddingHorizontal: theme.spacing[6], marginTop: theme.spacing[6] }}>
           <SectionTitle label={copy.summariesTitle} />
           {summaries.length === 0 ? (
-            <Text variant="body" tone="tertiary" style={{ maxWidth: 420 }}>
+            <Text
+              variant="bodyLight"
+              style={{ color: 'rgba(255, 245, 238, 0.5)', maxWidth: 420 }}
+            >
               {copy.summariesEmpty}
             </Text>
           ) : (
@@ -265,17 +512,17 @@ export function HomeScreen() {
               >
                 <View
                   style={{
-                    width: 8,
-                    height: 8,
+                    width: 6,
+                    height: 6,
                     borderRadius: 4,
-                    backgroundColor: theme.colors.accent.success,
+                    backgroundColor: palette.ember[400],
                     marginRight: theme.spacing[3],
                   }}
                 />
-                <Text variant="bodyMed" tone="primary" style={{ flex: 1 }}>
+                <Text variant="bodyMed" style={{ color: palette.warmWhite[100], flex: 1 }}>
                   {s.topic}
                 </Text>
-                <Text variant="caption" tone="tertiary">
+                <Text variant="caption" style={{ color: 'rgba(255, 245, 238, 0.5)' }}>
                   {s.date}
                 </Text>
               </View>
@@ -283,14 +530,14 @@ export function HomeScreen() {
           )}
         </View>
 
-        {/* Documents — same editorial pattern, only shown if non-zero */}
+        {/* Documents */}
         {documentCount > 0 ? (
           <View style={{ paddingHorizontal: theme.spacing[6], marginTop: theme.spacing[10] }}>
             <SectionTitle
               label={copy.documentsTitle}
               rightSlot={
                 <Pressable hitSlop={8} accessibilityRole="button">
-                  <Text variant="label" tone="accent">
+                  <Text variant="label" style={{ color: palette.fuchsia[400] }}>
                     {copy.documentsView} →
                   </Text>
                 </Pressable>
@@ -306,10 +553,10 @@ export function HomeScreen() {
               <Icon
                 name="FileText"
                 size={18}
-                color={theme.colors.text.secondary}
+                color={palette.ember[300]}
                 strokeWidth={1.6}
               />
-              <Text variant="bodyMed" tone="primary" style={{ marginLeft: theme.spacing[3] }}>
+              <Text variant="bodyMed" style={{ color: palette.warmWhite[100], marginLeft: theme.spacing[3] }}>
                 {documentCount} {copy.documentsUnit}
                 {documentCount > 1 ? 's' : ''}
               </Text>
@@ -317,50 +564,66 @@ export function HomeScreen() {
           </View>
         ) : null}
 
-        {/* Insight card — top hairline accent (not side-stripe) */}
+        {/* Knowledge of the day — quieter glass card at the foot of the
+            scroll. Lower LiquidEmber intensity so it doesn't compete with
+            the main insight up top. */}
         <View style={{ paddingHorizontal: theme.spacing[6], marginTop: theme.spacing[10] }}>
           <View
             style={{
-              backgroundColor: theme.colors.bg.surfaceMuted,
-              borderRadius: theme.radii.lg,
-              borderWidth: 1,
-              borderColor: theme.colors.border.subtle,
+              borderRadius: 22,
               overflow: 'hidden',
+              position: 'relative',
             }}
           >
+            <LiquidEmber intensity={0.55} fuchsia={false} blur={44} borderRadius={22} />
+
             <View
-              style={{
-                height: 1,
-                backgroundColor: theme.colors.accent.success,
-              }}
-            />
-            <View style={{ padding: theme.spacing[5] }}>
-              <Text
-                variant="eyebrow"
-                tone="secondary"
-                style={{ textTransform: 'uppercase', marginBottom: theme.spacing[3] }}
-              >
-                {copy.insightEyebrow}
+              style={[
+                {
+                  backgroundColor: 'rgba(255, 245, 238, 0.04)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(255, 245, 238, 0.08)',
+                  borderRadius: 22,
+                  padding: theme.spacing[6],
+                },
+                Platform.OS === 'web'
+                  ? ({
+                      backdropFilter: 'blur(18px) saturate(140%)',
+                      WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+                    } as any)
+                  : null,
+              ]}
+            >
+              <Text variant="eyebrow" style={{ color: palette.ember[400], marginBottom: 12 }}>
+                {copy.knowledgeEyebrow.toUpperCase()}
               </Text>
-              <Text variant="bodyLg" tone="primary">
-                {insight.text}
+              <Text
+                variant="h3Italic"
+                style={{
+                  color: palette.warmWhite[100],
+                  lineHeight: 32,
+                }}
+              >
+                {copy.knowledgeBody}
               </Text>
               <View
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   marginTop: theme.spacing[4],
-                  gap: theme.spacing[2],
+                  gap: 8,
                 }}
               >
-                <Icon
-                  name="BookOpen"
-                  size={13}
-                  color={theme.colors.text.tertiary}
-                  strokeWidth={1.6}
+                <View
+                  style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 999,
+                    backgroundColor: palette.ember[400],
+                  }}
                 />
-                <Text variant="caption" tone="tertiary">
-                  {copy.insightSourceLbl} · {insight.source}
+                <Text variant="eyebrow" style={{ color: palette.ember[400] }}>
+                  {copy.insightSourceLbl} · {copy.knowledgeSource}
                 </Text>
               </View>
             </View>

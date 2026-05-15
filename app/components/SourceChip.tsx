@@ -21,6 +21,8 @@ export function SourceChip({ label, onPress }: Props) {
         alignItems: 'center',
         backgroundColor: theme.colors.accent.infoSurface,
         borderRadius: theme.radii.pill,
+        borderWidth: 1,
+        borderColor: 'rgba(196, 128, 106, 0.32)',
         paddingVertical: 4,
         paddingHorizontal: theme.spacing[3],
       }}

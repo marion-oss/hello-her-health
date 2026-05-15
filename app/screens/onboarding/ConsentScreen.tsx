@@ -33,7 +33,7 @@ const COPY = {
     title: 'Avant de commencer',
     subtitle:
       "Anoqi traite des sujets sensibles. Voici comment tes données restent à toi — et ce qui change si tu choisis d'aider la recherche.",
-    step: 'Étape 3 sur 4',
+    step: 'Étape 2 sur 3',
     termsLabel: "J'accepte les ",
     termsLink: "Conditions d'utilisation",
     termsAnd: ' et la ',
@@ -53,7 +53,7 @@ const COPY = {
     title: 'Before we start',
     subtitle:
       "Anoqi handles sensitive topics. Here's how your data stays yours — and what changes if you choose to help research.",
-    step: 'Step 3 of 4',
+    step: 'Step 2 of 3',
     termsLabel: 'I agree to the ',
     termsLink: 'Terms of Service',
     termsAnd: ' and ',
@@ -120,7 +120,7 @@ export function ConsentScreen() {
               {copy.step}
             </Text>
           </View>
-          <ProgressBar progress={3 / 4} />
+          <ProgressBar progress={2 / 3} />
         </View>
 
         <Text variant="h1" tone="primary" style={{ marginBottom: theme.spacing[3] }}>

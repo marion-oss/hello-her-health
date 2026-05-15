@@ -1,11 +1,12 @@
-// Anoqi — BackHeader. Used on screens with a parent route. Chevron + wordmark.
+// Anoqi — BackHeader. Used on screens with a parent route. Chevron + wordmark
+// (with the brand-deck pulsing fuchsia dot) and an optional right slot.
 
 import React from 'react'
 import { Pressable, View } from 'react-native'
 
 import { useTheme } from '../theme'
 import { Icon } from './Icon'
-import { Text } from './Text'
+import { Wordmark } from './Wordmark'
 
 type Props = {
   onBack?: () => void
@@ -15,6 +16,7 @@ type Props = {
 
 export function BackHeader({ onBack, rightSlot, showWordmark = true }: Props) {
   const theme = useTheme()
+
   return (
     <View
       style={{
@@ -34,17 +36,10 @@ export function BackHeader({ onBack, rightSlot, showWordmark = true }: Props) {
             hitSlop={12}
             style={{ marginRight: theme.spacing[3] }}
           >
-            <Icon name="ChevronLeft" size={24} color={theme.colors.text.secondary} />
+            <Icon name="ChevronLeft" size={22} color={theme.colors.text.secondary} />
           </Pressable>
         ) : null}
-        {showWordmark ? (
-          <Text
-            variant="h2Italic"
-            style={{ color: theme.colors.text.primary, fontSize: 22, lineHeight: 26 }}
-          >
-            anoqi
-          </Text>
-        ) : null}
+        {showWordmark ? <Wordmark size={20} /> : null}
       </View>
       {rightSlot}
     </View>

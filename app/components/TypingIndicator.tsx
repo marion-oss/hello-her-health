@@ -1,69 +1,81 @@
-// Anoqi — TypingIndicator. Three sage dots that breathe.
+// Anoqi — TypingIndicator.
+//
+// Three fuchsia dots that wave-bounce up while Anoqi composes a reply. Each
+// dot uses the brand-deck breath curve (`cubic-bezier(0.45, 0, 0.55, 1)`)
+// and lifts 6px on its peak before settling. Phases are staggered by 180ms
+// so the wave reads left-to-right, then loops.
 
-import React, { useEffect, useRef } from 'react'
-import { Animated, View } from 'react-native'
+import React, { useEffect } from 'react'
+import { View } from 'react-native'
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated'
 
-import { useTheme } from '../theme'
+import { palette } from '../theme'
 
-export function TypingIndicator() {
-  const theme = useTheme()
-  const a1 = useRef(new Animated.Value(0.4)).current
-  const a2 = useRef(new Animated.Value(0.4)).current
-  const a3 = useRef(new Animated.Value(0.4)).current
+const ease = Easing.bezier(0.45, 0, 0.55, 1)
+const DURATION = 520
+
+function Dot({ delay }: { delay: number }) {
+  const t = useSharedValue(0)
 
   useEffect(() => {
-    const breathe = (val: Animated.Value, delay: number) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(val, {
-            toValue: 1,
-            duration: 600,
-            easing: theme.easing.inOutExpo,
-            useNativeDriver: true,
-          }),
-          Animated.timing(val, {
-            toValue: 0.4,
-            duration: 600,
-            easing: theme.easing.inOutExpo,
-            useNativeDriver: true,
-          }),
-        ]),
-      )
-    const animations = [
-      breathe(a1, 0),
-      breathe(a2, 200),
-      breathe(a3, 400),
-    ]
-    animations.forEach((a) => a.start())
-    return () => animations.forEach((a) => a.stop())
-  }, [a1, a2, a3, theme])
+    t.value = withDelay(
+      delay,
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: DURATION, easing: ease }),
+          withTiming(0, { duration: DURATION, easing: ease }),
+          // A brief held-low frame before the next round so the wave reads
+          // as three discrete steps, not a smear.
+          withTiming(0, { duration: 360 }),
+        ),
+        -1,
+      ),
+    )
+  }, [t, delay])
 
-  const dot = (val: Animated.Value) => (
+  const style = useAnimatedStyle(() => ({
+    opacity: 0.35 + 0.65 * t.value,
+    transform: [{ translateY: -6 * t.value }],
+  }))
+
+  return (
     <Animated.View
-      style={{
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: theme.colors.text.secondary,
-        opacity: val,
-        marginHorizontal: 2,
-      }}
+      style={[
+        style,
+        {
+          width: 6,
+          height: 6,
+          borderRadius: 999,
+          backgroundColor: palette.fuchsia[500],
+          marginHorizontal: 3,
+        },
+      ]}
     />
   )
+}
 
+export function TypingIndicator() {
   return (
     <View
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: theme.spacing[2],
-        paddingHorizontal: theme.spacing[4],
+        paddingVertical: 10,
+        paddingHorizontal: 8,
+        minHeight: 22,
       }}
     >
-      {dot(a1)}
-      {dot(a2)}
-      {dot(a3)}
+      <Dot delay={0} />
+      <Dot delay={180} />
+      <Dot delay={360} />
     </View>
   )
 }

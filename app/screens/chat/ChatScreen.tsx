@@ -29,15 +29,17 @@ import {
   type HealthObjective,
   type Language,
 } from '../../context/OnboardingContext'
-import { useTheme } from '../../theme'
+import { palette, useTheme } from '../../theme'
 import {
-  Avatar,
   BackHeader,
+  BreathingForm,
   Bubble,
   Button,
   Icon,
   type IconName,
+  LiquidEmber,
   SourceChip,
+  StreamingCursor,
   Text,
   TypingIndicator,
 } from '../../components'
@@ -353,7 +355,12 @@ export function ChatScreen() {
     const gate = copy.consentGate
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.surfaceMuted }}>
-        <BackHeader onBack={() => navigation.goBack()} />
+        <BackHeader
+          onBack={() => {
+            if (navigation.canGoBack()) navigation.goBack()
+            else navigation.navigate('Home')
+          }}
+        />
         <View
           style={{
             flex: 1,
@@ -431,12 +438,34 @@ export function ChatScreen() {
   // ── Main render ─────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
+      {/* Decorative breathing form anchored low-right behind everything. Same
+          composition as the Welcome screen so the brand visual stays present
+          in long conversation sessions without crowding the messages. */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          right: -160,
+          bottom: 80,
+          opacity: 0.45,
+        }}
+      >
+        <BreathingForm size={520} />
+      </View>
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
       >
-        <BackHeader onBack={() => navigation.goBack()} />
+        <BackHeader
+          onBack={() => {
+            // Chat lives in the tab navigator alongside Home — goBack() does
+            // nothing when there's no stack history, so route by name.
+            if (navigation.canGoBack()) navigation.goBack()
+            else navigation.navigate('Home')
+          }}
+        />
 
         {messages.length === 0 ? (
           // Empty state
@@ -448,9 +477,6 @@ export function ChatScreen() {
               paddingBottom: theme.spacing[16],
             }}
           >
-            <View style={{ alignItems: 'center', marginBottom: theme.spacing[6] }}>
-              <Avatar size={48} />
-            </View>
             <Text variant="h2" tone="primary" align="center">
               {copy.greeting}
             </Text>
@@ -470,36 +496,65 @@ export function ChatScreen() {
               }}
             >
               {starters.map((q, i) => (
-                <Pressable
+                <View
                   key={i}
-                  accessibilityRole="button"
-                  onPress={() => handleSend(q)}
-                  style={({ pressed }) => ({
+                  style={{
                     flexGrow: 1,
                     flexBasis: '47%',
-                    backgroundColor: pressed
-                      ? theme.colors.bg.surfaceWarm
-                      : theme.colors.bg.surfaceMuted,
-                    borderRadius: theme.radii.lg,
-                    paddingVertical: theme.spacing[4],
-                    paddingHorizontal: theme.spacing[4],
-                    minHeight: 80,
-                  })}
+                    borderRadius: 22,
+                    overflow: 'hidden',
+                    position: 'relative',
+                    minHeight: 110,
+                  }}
                 >
-                  <Icon
-                    name="Sparkles"
-                    size={14}
-                    color={theme.colors.accent.success}
-                    strokeWidth={1.8}
+                  <LiquidEmber
+                    intensity={0.55}
+                    fuchsia={false}
+                    blur={36}
+                    borderRadius={22}
                   />
-                  <Text
-                    variant="body"
-                    tone="primary"
-                    style={{ marginTop: theme.spacing[2] }}
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => handleSend(q)}
+                    style={({ pressed }) => [
+                      {
+                        flex: 1,
+                        backgroundColor: pressed
+                          ? 'rgba(255, 245, 238, 0.10)'
+                          : 'rgba(255, 245, 238, 0.05)',
+                        borderWidth: 1,
+                        borderColor: 'rgba(255, 245, 238, 0.09)',
+                        borderRadius: 22,
+                        paddingVertical: theme.spacing[4],
+                        paddingHorizontal: theme.spacing[4],
+                        justifyContent: 'space-between',
+                      },
+                      Platform.OS === 'web'
+                        ? ({
+                            backdropFilter: 'blur(18px) saturate(140%)',
+                            WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+                          } as any)
+                        : null,
+                    ]}
                   >
-                    {q}
-                  </Text>
-                </Pressable>
+                    <Icon
+                      name="Sparkles"
+                      size={14}
+                      color={palette.ember[300]}
+                      strokeWidth={1.8}
+                    />
+                    <Text
+                      variant="h4Italic"
+                      style={{
+                        color: palette.warmWhite[100],
+                        marginTop: theme.spacing[3],
+                        lineHeight: 24,
+                      }}
+                    >
+                      {q}
+                    </Text>
+                  </Pressable>
+                </View>
               ))}
             </View>
           </View>
@@ -518,11 +573,10 @@ export function ChatScreen() {
                   justifyContent: item.role === 'user' ? 'flex-end' : 'flex-start',
                 }}
               >
-                {item.role === 'anoqi' ? <Avatar size={28} /> : null}
                 <View style={{ maxWidth: '85%' }}>
                   <Bubble role={item.role}>
                     <Text
-                      variant="body"
+                      variant={item.role === 'user' ? 'body' : 'h4Italic'}
                       style={{
                         color: item.role === 'user'
                           ? theme.colors.accent.primaryOnText
@@ -531,16 +585,15 @@ export function ChatScreen() {
                     >
                       {item.text}
                       {item.isStreaming ? (
-                        <Text
-                          style={{
-                            color:
-                              item.role === 'user'
-                                ? theme.colors.accent.primaryOnText
-                                : theme.colors.text.accent,
-                          }}
-                        >
-                          {' '}▋
-                        </Text>
+                        <>
+                          <StreamingCursor />
+                          {/* Invisible ghost of the remaining text. Reserves
+                              the final bubble shape so streamed characters
+                              don't cause the layout to jitter line-by-line. */}
+                          <Text style={{ opacity: 0 }}>
+                            {item.fullText.slice(item.text.length)}
+                          </Text>
+                        </>
                       ) : null}
                     </Text>
 
@@ -594,11 +647,9 @@ export function ChatScreen() {
                     style={{
                       flexDirection: 'row',
                       alignItems: 'flex-end',
-                      gap: theme.spacing[2],
                       marginBottom: theme.spacing[3],
                     }}
                   >
-                    <Avatar size={28} />
                     <Bubble role="assistant">
                       <TypingIndicator />
                     </Bubble>
@@ -646,14 +697,17 @@ export function ChatScreen() {
           </Pressable>
         ) : null}
 
-        {/* Input bar */}
+        {/* Input bar — sits above the floating LiquidTabBar. The pill is
+            ~62px tall and floats 14px above the safe-area; 92px of bottom
+            clearance keeps the input fully visible. */}
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'flex-end',
             paddingHorizontal: theme.spacing[4],
             paddingVertical: theme.spacing[3],
-            paddingBottom: Platform.OS === 'ios' ? theme.spacing[4] : theme.spacing[3],
+            paddingBottom: theme.spacing[3],
+            marginBottom: 92,
             borderTopWidth: 1,
             borderTopColor: theme.colors.border.subtle,
             backgroundColor: theme.colors.bg.canvas,
@@ -694,15 +748,15 @@ export function ChatScreen() {
             onSubmitEditing={() => handleSend()}
             style={{
               flex: 1,
-              backgroundColor: theme.colors.bg.surface,
-              borderRadius: theme.radii.xl,
-              borderWidth: 1.5,
-              borderColor: theme.colors.border.default,
+              backgroundColor: 'rgba(255, 245, 238, 0.04)',
+              borderRadius: theme.radii.pill,
+              borderWidth: 1,
+              borderColor: 'rgba(255, 245, 238, 0.10)',
               paddingHorizontal: theme.spacing[4],
               paddingTop: Platform.OS === 'ios' ? 10 : 8,
               paddingBottom: Platform.OS === 'ios' ? 10 : 8,
               fontSize: 15,
-              fontFamily: 'DMSans-Regular',
+              fontFamily: 'Inter-Regular',
               color: theme.colors.text.primary,
               maxHeight: 120,
               lineHeight: 22,
@@ -714,18 +768,30 @@ export function ChatScreen() {
             accessibilityLabel={copy.send}
             onPress={() => handleSend()}
             disabled={!input.trim() || isTyping}
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 19,
-              backgroundColor:
-                !input.trim() || isTyping
-                  ? theme.colors.bg.surfaceWarm
-                  : theme.colors.accent.primary,
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 1,
-            }}
+            style={[
+              {
+                width: 38,
+                height: 38,
+                borderRadius: 19,
+                backgroundColor:
+                  !input.trim() || isTyping
+                    ? theme.colors.bg.surfaceWarm
+                    : theme.colors.accent.primary,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 1,
+              },
+              !input.trim() || isTyping
+                ? null
+                : Platform.OS === 'web'
+                  ? ({ boxShadow: '0 0 20px rgba(255, 4, 114, 0.45)' } as any)
+                  : {
+                      shadowColor: '#FF0472',
+                      shadowOpacity: 0.55,
+                      shadowRadius: 10,
+                      shadowOffset: { width: 0, height: 0 },
+                    },
+            ]}
           >
             <Icon
               name="ArrowUp"
