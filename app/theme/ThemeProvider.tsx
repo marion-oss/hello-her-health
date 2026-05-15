@@ -39,12 +39,16 @@ const buildTheme = (mode: ThemeMode): Theme => ({
   shadow: (level: ShadowLevel) => shadow(level, mode),
 })
 
-const ThemeContext = createContext<Theme>(buildTheme('light'))
+const ThemeContext = createContext<Theme>(buildTheme('dark'))
 
 export function ThemeProvider({ children, mode }: { children: ReactNode; mode?: ThemeMode }) {
-  const scheme = useColorScheme()
-  const resolvedMode: ThemeMode = mode ?? (scheme === 'dark' ? 'dark' : 'light')
+  // Anoqi is dark-only — OS color scheme is ignored unless the prop says
+  // otherwise. lightColors aliases darkColors in colors.ts, so this is also
+  // safe if a downstream surface ever passes mode="light".
+  const resolvedMode: ThemeMode = mode ?? 'dark'
   const value = useMemo(() => buildTheme(resolvedMode), [resolvedMode])
+  // Touch useColorScheme so the hook stays subscribed (avoids stale RN warnings).
+  useColorScheme()
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 

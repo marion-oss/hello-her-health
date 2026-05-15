@@ -1,7 +1,15 @@
-// Anoqi — chat Bubble. User (peony fill) or Anoqi (white, rose-bordered).
+// Anoqi — chat Bubble.
+//
+// Iridescent register:
+//   user      — Fuchsia at high alpha, warm-white text.
+//   assistant — frosted glass (warm-white at low alpha + warm-white-alpha
+//               border); web gets backdrop-filter so the LiquidEmber layer
+//               glows through.
+//
+// The notch radius is preserved on the trailing edge for spatial cohesion.
 
 import React from 'react'
-import { View, type ViewStyle, type StyleProp } from 'react-native'
+import { Platform, View, type ViewStyle, type StyleProp } from 'react-native'
 
 import { useTheme } from '../theme'
 
@@ -11,6 +19,13 @@ type Props = {
   style?: StyleProp<ViewStyle>
 }
 
+const webBackdrop = Platform.OS === 'web'
+  ? ({
+      backdropFilter: 'blur(18px) saturate(140%)',
+      WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+    } as unknown as ViewStyle)
+  : null
+
 export function Bubble({ role, children, style }: Props) {
   const theme = useTheme()
   const isUser = role === 'user'
@@ -19,7 +34,7 @@ export function Bubble({ role, children, style }: Props) {
     borderRadius: theme.radii.bubble,
     paddingHorizontal: theme.spacing[4],
     paddingVertical: theme.spacing[3],
-    maxWidth: '82%',
+    maxWidth: '86%',
   }
 
   if (isUser) {
@@ -29,7 +44,7 @@ export function Bubble({ role, children, style }: Props) {
           base,
           {
             alignSelf: 'flex-end',
-            backgroundColor: theme.colors.accent.primary,
+            backgroundColor: 'rgba(255, 4, 114, 0.85)',
             borderBottomRightRadius: theme.radii.bubbleNotch,
           },
           style,
@@ -46,12 +61,12 @@ export function Bubble({ role, children, style }: Props) {
         base,
         {
           alignSelf: 'flex-start',
-          backgroundColor: theme.colors.bg.surface,
+          backgroundColor: 'rgba(255, 245, 238, 0.05)',
           borderWidth: 1,
-          borderColor: theme.colors.border.subtle,
+          borderColor: 'rgba(255, 245, 238, 0.09)',
           borderBottomLeftRadius: theme.radii.bubbleNotch,
-          ...theme.shadow('sm'),
         },
+        webBackdrop,
         style,
       ]}
     >

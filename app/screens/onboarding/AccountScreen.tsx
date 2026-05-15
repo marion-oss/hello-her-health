@@ -35,7 +35,7 @@ const COPY = {
     title: 'Ton espace sécurisé',
     subtitle:
       "Crée un compte pour retrouver tes résumés depuis n'importe quel appareil.",
-    step: 'Étape 4 sur 4',
+    step: 'Étape 3 sur 3',
     tabs: {
       signup: 'Crée un compte',
       login: 'Connecte-toi',
@@ -65,7 +65,7 @@ const COPY = {
   en: {
     title: 'Your secure space',
     subtitle: 'Create an account to access your summaries from any device.',
-    step: 'Step 4 of 4',
+    step: 'Step 3 of 3',
     tabs: {
       signup: 'Sign up',
       login: 'Log in',

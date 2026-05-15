@@ -66,7 +66,7 @@ const COPY = {
     titleChange: 'Change ton objectif santé',
     subtitle: 'Personnalise ton expérience. Tu pourras changer ça à tout moment.',
     subtitleChange: 'Anoqi adaptera ses réponses.',
-    step: 'Étape 2 sur 4',
+    step: 'Étape 1 sur 3',
     cta: 'Continuer',
     ctaChange: 'Enregistrer',
     skip: 'Je ne sais pas encore',
@@ -77,7 +77,7 @@ const COPY = {
     titleChange: 'Change your focus area',
     subtitle: 'Personalise your experience. You can change this anytime.',
     subtitleChange: 'Anoqi will adapt its answers.',
-    step: 'Step 2 of 4',
+    step: 'Step 1 of 3',
     cta: 'Continue',
     ctaChange: 'Save',
     skip: "I'm not sure yet",
@@ -141,7 +141,7 @@ export function ObjectiveScreen() {
                 {copy.step}
               </Text>
             </View>
-            <ProgressBar progress={2 / 4} />
+            <ProgressBar progress={1 / 3} />
           </View>
         ) : null}
 

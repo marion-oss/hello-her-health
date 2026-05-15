@@ -1,95 +1,90 @@
-// Anoqi — color tokens.
+// Anoqi — Sanctuary Palette
 //
-// Palette is OKLCH-tuned: chroma drops at the lightness extremes so the
-// 50 and 950 shades stay perceptually balanced (no muddy 300, no blown 800).
-// Anchors come from the Sweet Peony brief.
+// Six decisions, locked from the brand deck:
+//   Void         #0D0D12   primary canvas
+//   Surface      #16161E   cards & UI layers
+//   Fuchsia      #FF0472   signal — used as a single dot or a sparse accent
+//   Warm White   #FFF5EE   primary type
+//   Ember        #C4806A   warmth & depth wash
+//   Dusk         #2E2030   ghost borders
+//
+// Anoqi is dark-only. Both lightColors and darkColors map to the same dark
+// values so OS-level light mode does not bleed through into the app.
 
 export const palette = {
-  // Sweet Peony — primary brand accent
-  peony: {
-    50:  '#fbf3f7',
-    100: '#f9e6ef',
-    200: '#f4cadd',
-    300: '#eda5c4',
-    400: '#e588b1',
-    500: '#e06c9f', // anchor
-    600: '#c8508a',
-    700: '#a73e72',
-    800: '#82325b',
-    900: '#5d2542',
-    950: '#371827',
+  // Void — the room. Surface and cards step up from here.
+  void: {
+    50:  '#52525a',
+    100: '#3d3d44',
+    200: '#28282f',
+    300: '#1e1e28',
+    400: '#16161e', // Surface
+    500: '#0d0d12', // anchor — Void canvas
+    600: '#0a0a0e',
+    700: '#070709',
+    800: '#040406',
+    900: '#020203',
   },
-  // Pink Carnation — celebration / focus
-  carnation: {
-    50:  '#fdf2f7',
-    100: '#fbe6f0',
-    200: '#f7ccdf',
-    300: '#f5a8c8',
-    400: '#f283b6', // anchor
-    500: '#e96aa3',
-    600: '#d24f87',
-    700: '#b03d6e',
-    800: '#883157',
-    900: '#5e2640',
-    950: '#371727',
+
+  // Fuchsia — the signal. Ghosted, never structural.
+  fuchsia: {
+    50:  '#fff0f6',
+    100: '#ffdce9',
+    200: '#ffb0ce',
+    300: '#ff7cae',
+    400: '#ff4290',
+    500: '#ff0472', // anchor
+    600: '#d40460',
+    700: '#a8044c',
+    800: '#7c0438',
+    900: '#500323',
+    950: '#2a0212',
   },
-  // Cotton Rose — warm surface tint
-  rose: {
-    50:  '#fdf6f4',
-    100: '#fbede9',
-    200: '#edbfb7', // anchor
-    300: '#ddaba1',
-    400: '#c89589',
-    500: '#b07a6d',
-    600: '#946357',
-    700: '#735045',
-    800: '#573e36',
-    900: '#392922',
-    950: '#1f1612',
+
+  // Ember — the warmth. Dusty rose / terracotta, used for em, source chips,
+  // the slow-moving liquid glow under cards.
+  ember: {
+    50:  '#faf1eb',
+    100: '#f1dcce',
+    200: '#e6bfa8',
+    300: '#d7a082',
+    400: '#cc8e71',
+    500: '#c4806a', // anchor
+    600: '#a56850',
+    700: '#83513e',
+    800: '#623c2d',
+    900: '#3f281f',
+    950: '#231510',
   },
-  // Dry Sage — secondary structure
-  sage: {
-    50:  '#f5f6f0',
-    100: '#ebede2',
-    200: '#d8ddc9',
-    300: '#c4ccae',
-    400: '#b5bfa1', // anchor
-    500: '#9aa685',
-    600: '#7d886a',
-    700: '#636d55',
-    800: '#4d5443',
-    900: '#353a2f',
-    950: '#1d201a',
+
+  // Warm white — primary type. Cream tone, never pure white.
+  warmWhite: {
+    50:  '#fffcf9',
+    100: '#fff5ee', // anchor
+    200: '#f7e5d2',
+    300: '#efd2b7',
+    400: '#e5bd9a',
+    500: '#cda17e',
+    600: '#a98064',
+    700: '#82624d',
+    800: '#5b473a',
+    900: '#382c24',
   },
-  // Muted Teal — secondary text / icon / success
-  teal: {
-    50:  '#f0f5f3',
-    100: '#dde9e3',
-    200: '#c0d4cb',
-    300: '#9bbaad',
-    400: '#80a591',
-    500: '#6e9887', // anchor
-    600: '#547b6c',
-    700: '#426258',
-    800: '#344c44',
-    900: '#233330',
-    950: '#131c1a',
+
+  // Dusk — ghost borders + deep mauve corners.
+  dusk: {
+    100: '#5e4761',
+    200: '#4e3a51',
+    300: '#3f2e41',
+    400: '#352636',
+    500: '#2e2030', // anchor
+    600: '#241825',
+    700: '#1a111b',
+    800: '#100a11',
+    900: '#080308',
   },
-  // Mauve-ink — body text. Deep, peony-tilted, NOT black.
-  ink: {
-    50:  '#f7f3f5',
-    100: '#ece4e8',
-    200: '#d4c5cd',
-    300: '#b09ba6',
-    400: '#866e7b',
-    500: '#634f5b',
-    600: '#4a3a45',
-    700: '#332831',
-    800: '#241a22',
-    900: '#1d1419',
-    950: '#120a0f',
-  },
-  // Burgundy — restrained danger color (not fire-engine red)
+
+  // Burgundy — restrained danger (not fire-engine red).
   burgundy: {
     100: '#f7e2e6',
     400: '#b94a64',
@@ -158,124 +153,67 @@ export type ColorTokens = {
   }
 }
 
-// Light theme role tokens.
-export const lightColors: ColorTokens = {
+// Anoqi's dark mode (the only mode). Surfaces sit just barely above Void so
+// the breathing-form and liquid-ember layers underneath can register.
+export const darkColors: ColorTokens = {
   bg: {
-    canvas:         '#fdfcfc', // near-white, faintly peony-tinted (chroma 0.005)
-    surface:        '#fdfcfc', // single neutral layer — cards lift via border or muted
-    surfaceMuted:   '#faf3f1', // subtle warm card surface — sits 1-2% off canvas
-    surfaceWarm:    palette.rose[200], // Cotton Rose — accent moments only
-    surfaceInverse: palette.ink[900],
-    overlay:        'rgba(237, 191, 183, 0.86)', // Cotton Rose at 86% — not a black scrim
+    canvas:         palette.void[500],
+    surface:        palette.void[400],          // #16161E
+    surfaceMuted:   palette.void[300],          // #1E1E28
+    surfaceWarm:    'rgba(196, 128, 106, 0.10)',// ember at low alpha
+    surfaceInverse: palette.warmWhite[100],
+    overlay:        'rgba(13, 13, 18, 0.85)',
   },
   text: {
-    primary:   palette.ink[900],
-    secondary: palette.teal[700],
-    tertiary:  palette.sage[600],
-    inverse:   '#fbf6f3',
-    accent:    palette.peony[600],
-    danger:    palette.burgundy[500],
-    placeholder: palette.sage[500],
+    primary:     palette.warmWhite[100],
+    secondary:   'rgba(255, 245, 238, 0.72)',
+    tertiary:    'rgba(255, 245, 238, 0.50)',
+    inverse:     palette.void[500],
+    accent:      palette.ember[400],
+    danger:      palette.burgundy[400],
+    placeholder: 'rgba(255, 245, 238, 0.38)',
   },
   border: {
-    subtle:  palette.rose[100],
-    default: palette.sage[300],
-    strong:  palette.teal[500],
-    focus:   palette.peony[500],
+    subtle:  'rgba(255, 245, 238, 0.06)',
+    default: palette.dusk[500],
+    strong:  'rgba(255, 245, 238, 0.16)',
+    focus:   palette.fuchsia[500],
     danger:  palette.burgundy[400],
   },
   accent: {
-    primary:        palette.peony[500],
-    primaryHover:   palette.peony[600],
-    primaryActive:  palette.peony[700],
-    primaryOnText:  '#fefcfb',
-    celebration:    palette.carnation[400],
-    success:        palette.teal[600],
-    successSurface: palette.teal[100],
-    warning:        palette.rose[500],
-    warningSurface: palette.rose[100],
-    danger:         palette.burgundy[500],
-    dangerSurface:  palette.burgundy[100],
-    info:           palette.teal[500],
-    infoSurface:    palette.teal[100],
+    primary:        palette.fuchsia[500],
+    primaryHover:   palette.fuchsia[400],
+    primaryActive:  palette.fuchsia[600],
+    primaryOnText:  palette.warmWhite[100],
+    celebration:    palette.fuchsia[400],
+    success:        palette.ember[400],
+    successSurface: 'rgba(196, 128, 106, 0.16)',
+    warning:        palette.ember[400],
+    warningSurface: 'rgba(196, 128, 106, 0.12)',
+    danger:         palette.burgundy[400],
+    dangerSurface:  'rgba(185, 74, 100, 0.15)',
+    info:           palette.ember[400],
+    infoSurface:    'rgba(196, 128, 106, 0.12)',
   },
-  // Status badges for the physician portal-style states.
   status: {
-    draftBg:        palette.rose[100],
-    draftText:      palette.peony[900],
-    draftRing:      palette.peony[200],
-    inReviewBg:     palette.teal[100],
-    inReviewText:   palette.teal[800],
-    inReviewRing:   palette.teal[300],
-    approvedBg:     palette.sage[100],
-    approvedText:   palette.sage[800],
-    approvedRing:   palette.sage[300],
-    liveBg:         palette.peony[100],
-    liveText:       palette.peony[800],
-    liveRing:       palette.peony[400],
-    archivedBg:     palette.ink[100],
-    archivedText:   palette.ink[700],
-    archivedRing:   palette.ink[200],
+    draftBg:        'rgba(196, 128, 106, 0.14)',
+    draftText:      palette.ember[200],
+    draftRing:      palette.ember[700],
+    inReviewBg:     'rgba(255, 4, 114, 0.14)',
+    inReviewText:   palette.fuchsia[300],
+    inReviewRing:   palette.fuchsia[700],
+    approvedBg:     'rgba(196, 128, 106, 0.22)',
+    approvedText:   palette.ember[200],
+    approvedRing:   palette.ember[600],
+    liveBg:         palette.fuchsia[900],
+    liveText:       palette.fuchsia[200],
+    liveRing:       palette.fuchsia[500],
+    archivedBg:     palette.dusk[600],
+    archivedText:   palette.warmWhite[300],
+    archivedRing:   palette.dusk[300],
   },
 }
 
-// Dark theme role tokens — same shape, flipped values.
-// Scene: 11:40pm in bed, phone glow on her face. Sage deepens to ink, peony whispers.
-export const darkColors: ColorTokens = {
-  bg: {
-    canvas:         palette.ink[900],
-    surface:        palette.ink[900],
-    surfaceMuted:   palette.ink[800],
-    surfaceWarm:    palette.rose[900],
-    surfaceInverse: '#fdfcfc',
-    overlay:        'rgba(29, 20, 25, 0.88)',
-  },
-  text: {
-    primary:     '#fbf6f3',
-    secondary:   palette.teal[300],
-    tertiary:    palette.sage[500],
-    inverse:     palette.ink[900],
-    accent:      palette.peony[300],
-    danger:      palette.carnation[400],
-    placeholder: palette.sage[700],
-  },
-  border: {
-    subtle:  palette.ink[700],
-    default: palette.sage[800],
-    strong:  palette.teal[500],
-    focus:   palette.peony[400],
-    danger:  palette.burgundy[400],
-  },
-  accent: {
-    primary:        palette.peony[500],
-    primaryHover:   palette.peony[400],
-    primaryActive:  palette.peony[300],
-    primaryOnText:  palette.ink[900],
-    celebration:    palette.carnation[400],
-    success:        palette.teal[400],
-    successSurface: palette.teal[900],
-    warning:        palette.rose[400],
-    warningSurface: palette.rose[900],
-    danger:         palette.burgundy[400],
-    dangerSurface:  palette.burgundy[700],
-    info:           palette.teal[400],
-    infoSurface:    palette.teal[900],
-  },
-  status: {
-    draftBg:      palette.peony[900],
-    draftText:    palette.peony[200],
-    draftRing:    palette.peony[700],
-    inReviewBg:   palette.teal[900],
-    inReviewText: palette.teal[200],
-    inReviewRing: palette.teal[700],
-    approvedBg:   palette.sage[900],
-    approvedText: palette.sage[200],
-    approvedRing: palette.sage[700],
-    liveBg:       palette.peony[800],
-    liveText:     palette.peony[200],
-    liveRing:     palette.peony[500],
-    archivedBg:   palette.ink[800],
-    archivedText: palette.ink[300],
-    archivedRing: palette.ink[700],
-  },
-}
+// Locked dark. lightColors is an alias so consumers that expect both
+// continue to work without rewriting downstream.
+export const lightColors: ColorTokens = darkColors
