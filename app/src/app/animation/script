@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FELIX – Dein digitaler Büroassistent</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080808;
+  --bg2: #111111;
+  --bg3: #181818;
+  --orange: #FF5C00;
+  --orange-dim: rgba(255,92,0,0.12);
+  --orange-glow: rgba(255,92,0,0.35);
+  --white: #F2EDE4;
+  --muted: #666;
+  --border: rgba(255,92,0,0.18);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--white);
+  font-family: 'Syne', sans-serif;
+  overflow-x: hidden;
+  cursor: default;
+}
+
+/* ─── NOISE OVERLAY ─── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.6;
+}
+
+/* ─── HERO SECTION ─── */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 40px 20px;
+  overflow: hidden;
+}
+
+.hero-bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,92,0,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,92,0,0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%);
+}
+
+.hero-glow {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(255,92,0,0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: glowPulse 4s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+
+/* ─── FELIX ORB ─── */
+.orb-wrap {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  margin-bottom: 48px;
+  flex-shrink: 0;
+}
+
+.orb {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 38%, #ff8c3a, #ff5c00 40%, #a33000 100%);
+  box-shadow:
+    0 0 0 0 rgba(255,92,0,0),
+    0 0 40px rgba(255,92,0,0.4),
+    0 0 80px rgba(255,92,0,0.15);
+  animation: orbIdle 3s ease-in-out infinite;
+}
+
+.orb.speaking {
+  animation: orbSpeak 0.4s ease-in-out infinite alternate;
+}
+
+@keyframes orbIdle {
+  0%, 100% { box-shadow: 0 0 40px rgba(255,92,0,0.4), 0 0 80px rgba(255,92,0,0.15); transform: scale(1); }
+  50% { box-shadow: 0 0 60px rgba(255,92,0,0.6), 0 0 120px rgba(255,92,0,0.25); transform: scale(1.04); }
+}
+
+@keyframes orbSpeak {
+  from { transform: scale(1); box-shadow: 0 0 50px rgba(255,92,0,0.5), 0 0 100px rgba(255,92,0,0.2); }
+  to { transform: scale(1.1); box-shadow: 0 0 80px rgba(255,92,0,0.8), 0 0 150px rgba(255,92,0,0.4); }
+}
+
+.orb-ring {
+  position: absolute;
+  inset: -18px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,92,0,0.25);
+  animation: ringPulse 3s ease-in-out infinite;
+}
+
+.orb-ring2 {
+  position: absolute;
+  inset: -36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,92,0,0.1);
+  animation: ringPulse 3s ease-in-out infinite 1s;
+}
+
+@keyframes ringPulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.03); }
+}
+
+/* ─── WAVEFORM BARS ─── */
+.waveform {
+  position: absolute;
+  bottom: -32px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  height: 24px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.waveform.active { opacity: 1; }
+
+.wave-bar {
+  width: 3px;
+  background: var(--orange);
+  border-radius: 2px;
+  animation: waveAnim 0.8s ease-in-out infinite;
+}
+
+.wave-bar:nth-child(1) { animation-delay: 0s; height: 8px; }
+.wave-bar:nth-child(2) { animation-delay: 0.1s; height: 14px; }
+.wave-bar:nth-child(3) { animation-delay: 0.2s; height: 20px; }
+.wave-bar:nth-child(4) { animation-delay: 0.3s; height: 24px; }
+.wave-bar:nth-child(5) { animation-delay: 0.4s; height: 18px; }
+.wave-bar:nth-child(6) { animation-delay: 0.5s; height: 12px; }
+.wave-bar:nth-child(7) { animation-delay: 0.6s; height: 20px; }
+.wave-bar:nth-child(8) { animation-delay: 0.7s; height: 10px; }
+.wave-bar:nth-child(9) { animation-delay: 0.8s; height: 16px; }
+
+@keyframes waveAnim {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}
+
+/* ─── FELIX LABEL ─── */
+.felix-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--orange);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  opacity: 0;
+  animation: fadeUp 0.6s ease forwards 0.3s;
+}
+
+/* ─── TYPEWRITER TEXT ─── */
+.speech-box {
+  max-width: 640px;
+  text-align: center;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 56px;
+}
+
+.speech-line {
+  font-size: clamp(22px, 3.5vw, 36px);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.5px;
+  color: var(--white);
+}
+
+.speech-line .orange { color: var(--orange); }
+
+.cursor {
+  display: inline-block;
+  width: 3px;
+  height: 1em;
+  background: var(--orange);
+  margin-left: 4px;
+  vertical-align: text-bottom;
+  animation: blink 0.8s step-end infinite;
+}
+
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+/* ─── CTA BUTTONS ─── */
+.cta-section {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.cta-section.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.cta-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--muted);
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.cta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  max-width: 620px;
+  width: 100%;
+}
+
+.cta-btn {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 20px 24px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--white);
+}
+
+.cta-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--orange-dim);
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+.cta-btn:hover { border-color: var(--orange); transform: translateY(-2px); }
+.cta-btn:hover::before { opacity: 1; }
+
+.cta-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.cta-text-wrap {}
+.cta-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.cta-sub {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.cta-arrow {
+  margin-left: auto;
+  color: var(--orange);
+  font-size: 18px;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.cta-btn:hover .cta-arrow { opacity: 1; transform: translateX(0); }
+
+/* ─── RESULT PANEL ─── */
+.result-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+  padding: 20px;
+  backdrop-filter: blur(8px);
+}
+
+.result-overlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.result-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  transform: translateY(30px) scale(0.97);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  scrollbar-width: none;
+}
+
+.result-overlay.open .result-panel {
+  transform: translateY(0) scale(1);
+}
+
+.result-panel::-webkit-scrollbar { display: none; }
+
+/* ─── PROCESSING STATE ─── */
+.processing {
+  padding: 60px 40px;
+  text-align: center;
+}
+
+.processing-orb {
+  width: 70px;
+  height: 70px;
+  background: radial-gradient(circle at 35% 35%, #ff8c3a, #ff5c00);
+  border-radius: 50%;
+  margin: 0 auto 28px;
+  animation: orbSpeak 0.4s ease-in-out infinite alternate;
+}
+
+.processing-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--orange);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.processing-sub {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.processing-dots span {
+  animation: dotBlink 1.2s ease-in-out infinite;
+  color: var(--orange);
+}
+.processing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.processing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes dotBlink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+
+/* ─── RESULT HEADER ─── */
+.result-header {
+  padding: 24px 28px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.result-felix {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.result-felix-orb {
+  width: 36px;
+  height: 36px;
+  background: radial-gradient(circle at 35% 35%, #ff8c3a, #ff5c00);
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: orbIdle 3s ease-in-out infinite;
+}
+
+.result-felix-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--orange);
+  text-transform: uppercase;
+}
+
+.result-felix-status {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.close-btn {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--muted);
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.close-btn:hover { border-color: var(--orange); color: var(--white); }
+
+/* ─── FELIX SPEECH BUBBLE ─── */
+.felix-speech {
+  margin: 0 28px 28px;
+  background: var(--orange-dim);
+  border: 1px solid rgba(255,92,0,0.2);
+  border-radius: 8px;
+  padding: 16px 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #ddd;
+  font-style: italic;
+}
+
+/* ─── DOCUMENT STYLES ─── */
+.doc-wrap { padding: 0 28px 28px; }
+
+.doc {
+  background: #fff;
+  color: #1a1a1a;
+  border-radius: 8px;
+  overflow: hidden;
+  font-family: 'Syne', sans-serif;
+  animation: docReveal 0.5s ease forwards;
+}
+
+@keyframes docReveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.doc-topbar {
+  background: #0e0e0e;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.doc-topbar-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--orange);
+  text-transform: uppercase;
+}
+
+.doc-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #22c55e;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.doc-status::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  background: #22c55e;
+  border-radius: 50%;
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+@keyframes statusPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+.doc-body { padding: 32px; }
+
+.doc-company { margin-bottom: 32px; }
+.doc-company-name { font-size: 22px; font-weight: 800; color: #0e0e0e; margin-bottom: 4px; }
+.doc-company-detail { font-size: 12px; color: #888; line-height: 1.6; }
+.doc-orange { color: var(--orange); }
+
+.doc-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px; }
+
+.doc-to-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #999; margin-bottom: 6px; font-family: 'JetBrains Mono', monospace; }
+.doc-to-name { font-size: 15px; font-weight: 700; color: #0e0e0e; }
+.doc-to-detail { font-size: 12px; color: #666; line-height: 1.6; margin-top: 4px; }
+
+.doc-divider { height: 1px; background: #eee; margin: 0 0 28px; }
+
+.doc-title { font-size: 20px; font-weight: 800; color: #0e0e0e; margin-bottom: 6px; }
+.doc-number { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #999; letter-spacing: 1px; margin-bottom: 24px; }
+
+/* TABLE */
+.doc-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+.doc-table th { text-align: left; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #999; padding: 0 12px 10px 0; border-bottom: 2px solid #eee; font-family: 'JetBrains Mono', monospace; font-weight: 400; }
+.doc-table th:last-child { text-align: right; padding-right: 0; }
+.doc-table td { padding: 12px 12px 12px 0; border-bottom: 1px solid #f5f5f5; font-size: 13px; color: #333; vertical-align: top; }
+.doc-table td:last-child { text-align: right; padding-right: 0; font-weight: 600; color: #0e0e0e; }
+.doc-table .pos { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #bbb; }
+.doc-table .item-name { font-weight: 600; color: #1a1a1a; margin-bottom: 2px; }
+.doc-table .item-desc { font-size: 11px; color: #999; }
+
+/* TOTALS */
+.doc-totals { margin-left: auto; max-width: 260px; }
+.doc-total-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; color: #555; }
+.doc-total-row.main { border-top: 2px solid #0e0e0e; margin-top: 8px; padding-top: 12px; font-size: 16px; font-weight: 800; color: #0e0e0e; }
+.doc-total-row.main span:last-child { color: var(--orange); }
+
+/* BANK */
+.doc-bank { margin-top: 28px; padding-top: 20px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.doc-bank-item label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #bbb; display: block; margin-bottom: 3px; font-family: 'JetBrains Mono', monospace; }
+.doc-bank-item span { font-size: 13px; color: #333; font-family: 'JetBrains Mono', monospace; }
+
+/* ─── ANGEBOT SPECIFICS ─── */
+.doc-note { background: #fafafa; border-left: 3px solid var(--orange); padding: 14px 16px; border-radius: 0 6px 6px 0; font-size: 13px; color: #555; margin-top: 24px; line-height: 1.6; }
+
+/* ─── CALL TRANSCRIPT ─── */
+.call-meta { display: flex; gap: 24px; margin-bottom: 20px; }
+.call-meta-item { display: flex; flex-direction: column; gap: 3px; }
+.call-meta-item label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #999; }
+.call-meta-item span { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+
+.transcript { display: flex; flex-direction: column; gap: 12px; margin: 20px 0; }
+.t-line { display: flex; gap: 12px; }
+.t-speaker { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; width: 60px; flex-shrink: 0; padding-top: 3px; font-weight: 700; }
+.t-speaker.felix { color: var(--orange); }
+.t-speaker.kunde { color: #3b82f6; }
+.t-text { font-size: 13px; color: #444; line-height: 1.5; background: #f8f8f8; padding: 10px 14px; border-radius: 6px; flex: 1; }
+
+.booking-confirm { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 16px 20px; margin-top: 16px; display: flex; align-items: center; gap: 14px; }
+.booking-icon { font-size: 28px; }
+.booking-text { font-size: 13px; color: #15803d; line-height: 1.6; }
+.booking-text strong { font-size: 15px; display: block; margin-bottom: 2px; color: #166534; }
+
+/* ─── CALENDAR ─── */
+.calendar-confirm { background: #fff; border-radius: 8px; overflow: hidden; }
+.cal-header { background: var(--orange); padding: 16px 20px; color: #fff; }
+.cal-month { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: #e5e5e5; padding: 0; }
+.cal-day-header { background: #f5f5f5; text-align: center; padding: 8px 4px; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #999; font-family: 'JetBrains Mono', monospace; }
+.cal-day { background: #fff; text-align: center; padding: 10px 4px; font-size: 13px; color: #666; }
+.cal-day.active { background: var(--orange); color: #fff; font-weight: 800; }
+.cal-day.other { color: #ddd; }
+.cal-day.today { font-weight: 700; color: #1a1a1a; }
+
+.cal-appt { margin-top: 16px; background: #fff3ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 16px 20px; }
+.cal-appt-time { font-family: 'Bebas Neue', sans-serif; font-size: 28px; color: var(--orange); letter-spacing: 1px; }
+.cal-appt-detail { font-size: 13px; color: #7c3a0a; margin-top: 4px; line-height: 1.6; }
+
+/* ACTIONS BAR */
+.doc-actions {
+  display: flex;
+  gap: 10px;
+  padding: 0 28px 28px;
+}
+
+.doc-action-btn {
+  flex: 1;
+  padding: 13px;
+  border-radius: 6px;
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  transition: all 0.2s;
+  border: none;
+}
+
+.doc-action-btn.primary {
+  background: var(--orange);
+  color: #fff;
+}
+
+.doc-action-btn.primary:hover { background: #e55200; }
+
+.doc-action-btn.secondary {
+  background: var(--bg3);
+  color: var(--white);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.doc-action-btn.secondary:hover { border-color: var(--orange); color: var(--orange); }
+
+/* ─── FOOTER HINT ─── */
+.footer-hint {
+  padding: 60px 20px 40px;
+  text-align: center;
+  opacity: 0;
+  animation: fadeUp 0.6s ease forwards 4s;
+}
+
+.footer-hint p { font-size: 13px; color: var(--muted); }
+.footer-hint span { color: var(--orange); font-weight: 700; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── UTILS ─── */
+.hidden { display: none !important; }
+
+@media (max-width: 600px) {
+  .cta-grid { grid-template-columns: 1fr; }
+  .doc-cols { grid-template-columns: 1fr; }
+  .doc-bank { grid-template-columns: 1fr; }
+  .call-meta { flex-wrap: wrap; gap: 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════ HERO ═══════════════════════════════ -->
+<section class="hero">
+  <div class="hero-bg-grid"></div>
+  <div class="hero-glow"></div>
+
+  <!-- ORB -->
+  <div class="orb-wrap" id="orbWrap">
+    <div class="orb" id="mainOrb"></div>
+    <div class="orb-ring"></div>
+    <div class="orb-ring2"></div>
+    <div class="waveform" id="waveform">
+      <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+      <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+      <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+    </div>
+  </div>
+
+  <!-- LABEL -->
+  <div class="felix-badge">● FELIX ist bereit</div>
+
+  <!-- SPEECH -->
+  <div class="speech-box">
+    <div class="speech-line" id="speechLine">
+      <span id="speechText"></span><span class="cursor" id="cursor"></span>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-section" id="ctaSection">
+    <div class="cta-label">Was soll ich für dich erledigen?</div>
+    <div class="cta-grid">
+      <button class="cta-btn" onclick="handleTask('angebot')">
+        <div class="cta-icon">📋</div>
+        <div class="cta-text-wrap">
+          <div class="cta-title">Angebot schreiben</div>
+          <div class="cta-sub">In 60 Sekunden versandfertig</div>
+        </div>
+        <div class="cta-arrow">→</div>
+      </button>
+      <button class="cta-btn" onclick="handleTask('anruf')">
+        <div class="cta-icon">📞</div>
+        <div class="cta-text-wrap">
+          <div class="cta-title">Anruf annehmen</div>
+          <div class="cta-sub">Ich buche den Termin für dich</div>
+        </div>
+        <div class="cta-arrow">→</div>
+      </button>
+      <button class="cta-btn" onclick="handleTask('rechnung')">
+        <div class="cta-icon">🧾</div>
+        <div class="cta-text-wrap">
+          <div class="cta-title">Rechnung erstellen</div>
+          <div class="cta-sub">GoBD-konform, sofort raus</div>
+        </div>
+        <div class="cta-arrow">→</div>
+      </button>
+      <button class="cta-btn" onclick="handleTask('termin')">
+        <div class="cta-icon">📅</div>
+        <div class="cta-text-wrap">
+          <div class="cta-title">Termin buchen</div>
+          <div class="cta-sub">Ohne Tippen, ohne Nachfragen</div>
+        </div>
+        <div class="cta-arrow">→</div>
+      </button>
+    </div>
+  </div>
+</section>
+
+<div class="footer-hint">
+  <p>Kein Klicken. Kein Tippen. <span>Nur sprechen.</span><br>FELIX ist deine digitale Bürokraft — ab 79€ / Monat.</p>
+</div>
+
+<!-- ═══════════════════════════════ RESULT OVERLAY ═══════════════════════════════ -->
+<div class="result-overlay" id="resultOverlay">
+  <div class="result-panel" id="resultPanel">
+
+    <!-- PROCESSING -->
+    <div id="processingView" class="processing">
+      <div class="processing-orb"></div>
+      <div class="processing-text">FELIX arbeitet<span class="processing-dots"><span>.</span><span>.</span><span>.</span></span></div>
+      <div class="processing-sub" id="processingMsg">Einen Moment bitte...</div>
+    </div>
+
+    <!-- RESULT CONTENT (hidden until ready) -->
+    <div id="resultContent" class="hidden">
+      <div class="result-header">
+        <div class="result-felix">
+          <div class="result-felix-orb"></div>
+          <div>
+            <div class="result-felix-name">FELIX</div>
+            <div class="result-felix-status" id="resultStatus">Erledigt ✓</div>
+          </div>
+        </div>
+        <button class="close-btn" onclick="closeResult()">✕</button>
+      </div>
+      <div class="felix-speech" id="felixSpeech"></div>
+      <div class="doc-wrap" id="docWrap"></div>
+      <div class="doc-actions">
+        <button class="doc-action-btn primary" id="approveBtn" onclick="showApproved()">✓ Freigeben & Senden</button>
+        <button class="doc-action-btn secondary" onclick="closeResult()">Bearbeiten</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── TYPEWRITER ───
+const speeches = [
+  { text: "Guten Tag. Ich bin FELIX.", pause: 900 },
+  { text: "Dein digitaler Büroassistent.", pause: 800 },
+  { text: "Du sprichst. Ich erledige. Du gibst frei.", pause: 1200 },
+  { text: "Was soll ich heute für dich tun?", pause: 0 }
+];
+
+let speechIdx = 0;
+let charIdx = 0;
+let isTyping = false;
+const speechEl = document.getElementById('speechText');
+const cursorEl = document.getElementById('cursor');
+const orbEl = document.getElementById('mainOrb');
+const waveEl = document.getElementById('waveform');
+const ctaEl = document.getElementById('ctaSection');
+
+function typeNext() {
+  if (speechIdx >= speeches.length) {
+    ctaEl.classList.add('visible');
+    cursorEl.style.display = 'none';
+    return;
+  }
+
+  const current = speeches[speechIdx];
+  isTyping = true;
+  orbEl.classList.add('speaking');
+  waveEl.classList.add('active');
+
+  function typeChar() {
+    if (charIdx < current.text.length) {
+      speechEl.textContent = current.text.slice(0, charIdx + 1);
+      charIdx++;
+      setTimeout(typeChar, charIdx < 3 ? 60 : 38 + Math.random() * 30);
+    } else {
+      isTyping = false;
+      orbEl.classList.remove('speaking');
+      waveEl.classList.remove('active');
+      charIdx = 0;
+      speechIdx++;
+
+      if (current.pause > 0) {
+        setTimeout(() => {
+          speechEl.textContent = '';
+          typeNext();
+        }, current.pause);
+      } else {
+        typeNext();
+      }
+    }
+  }
+
+  typeChar();
+}
+
+setTimeout(typeNext, 800);
+
+// ─── TASK HANDLER ───
+function handleTask(type) {
+  const overlay = document.getElementById('resultOverlay');
+  const proc = document.getElementById('processingView');
+  const content = document.getElementById('resultContent');
+  const msg = document.getElementById('processingMsg');
+
+  overlay.classList.add('open');
+  proc.classList.remove('hidden');
+  content.classList.add('hidden');
+  document.getElementById('approveBtn').style.display = 'flex';
+  document.getElementById('approveBtn').textContent = '✓ Freigeben & Senden';
+
+  const messages = {
+    rechnung: 'Rechnung wird erstellt...',
+    angebot: 'Angebot wird ausgearbeitet...',
+    anruf: 'Gespräch wird aufbereitet...',
+    termin: 'Kalender wird geprüft...'
+  };
+  msg.textContent = messages[type];
+
+  setTimeout(() => {
+    proc.classList.add('hidden');
+    content.classList.remove('hidden');
+    renderResult(type);
+  }, 2200);
+}
+
+function closeResult() {
+  document.getElementById('resultOverlay').classList.remove('open');
+}
+
+function showApproved() {
+  const btn = document.getElementById('approveBtn');
+  btn.textContent = '✅ Gesendet!';
+  btn.style.background = '#16a34a';
+  setTimeout(closeResult, 1400);
+}
+
+// ─── RENDER RESULTS ───
+function renderResult(type) {
+  const speech = document.getElementById('felixSpeech');
+  const doc = document.getElementById('docWrap');
+  const status = document.getElementById('resultStatus');
+
+  if (type === 'rechnung') {
+    status.textContent = 'Rechnung erstellt ✓';
+    speech.textContent = '„Ich hab die Rechnung für Thomas Müller fertig – 1.960 Euro brutto, GoBD-konform, dein Logo drauf. Willst du sie direkt rausschicken?"';
+    doc.innerHTML = invoiceHTML();
+  } else if (type === 'angebot') {
+    status.textContent = 'Angebot erstellt ✓';
+    speech.textContent = '„Das Angebot für Familie Schreiber ist fertig – Badezimmer-Sanierung, drei Optionen, 4.200 bis 6.800 Euro. Soll ich es per E-Mail verschicken?"';
+    doc.innerHTML = angebotHTML();
+  } else if (type === 'anruf') {
+    status.textContent = 'Anruf bearbeitet ✓';
+    speech.textContent = '„Ich hab den Anruf von Frau Wagner angenommen – sie braucht einen neuen Hahn im Bad. Termin ist vorgemerkt für Mittwoch 14 Uhr. Passt dir das?"';
+    doc.innerHTML = anrufHTML();
+  } else if (type === 'termin') {
+    status.textContent = 'Termin gebucht ✓';
+    speech.textContent = '„Termin für Herrn Becker ist eingetragen – Donnerstag, 19. März, 9 Uhr. Bestätigung geht automatisch raus. Erinnerung 24h vorher auch."';
+    doc.innerHTML = terminHTML();
+  }
+}
+
+// ─── INVOICE HTML ───
+function invoiceHTML() {
+  return `
+  <div class="doc">
+    <div class="doc-topbar">
+      <div class="doc-topbar-label">Rechnung · Automatisch erstellt von FELIX</div>
+      <div class="doc-status">GoBD-konform</div>
+    </div>
+    <div class="doc-body">
+      <div class="doc-company">
+        <div class="doc-company-name">Elektro <span class="doc-orange">Bauer</span> GmbH</div>
+        <div class="doc-company-detail">
+          Hauptstraße 14 · 80331 München<br>
+          Tel: 089 123456 · info@elektro-bauer.de<br>
+          USt-IdNr.: DE123456789 · Steuernr.: 143/456/78900
+        </div>
+      </div>
+
+      <div class="doc-cols">
+        <div>
+          <div class="doc-to-label">Rechnungsempfänger</div>
+          <div class="doc-to-name">Thomas Müller</div>
+          <div class="doc-to-detail">Rosenstraße 7<br>80333 München</div>
+        </div>
+        <div>
+          <div class="doc-to-label">Rechnungsdetails</div>
+          <div class="doc-to-detail">
+            <strong>Rechnungsnr.:</strong> RE-2025-0089<br>
+            <strong>Datum:</strong> 12.03.2025<br>
+            <strong>Fällig:</strong> 26.03.2025<br>
+            <strong>Zahlungsziel:</strong> 14 Tage
+          </div>
+        </div>
+      </div>
+
+      <div class="doc-divider"></div>
+      <div class="doc-title">Rechnung</div>
+      <div class="doc-number">RE-2025-0089 · Leistungszeitraum: 10.03.2025</div>
+
+      <table class="doc-table">
+        <thead>
+          <tr>
+            <th style="width:40px">Pos.</th>
+            <th>Leistung / Material</th>
+            <th style="width:50px; text-align:right">Mge.</th>
+            <th style="width:80px; text-align:right">Einzel €</th>
+            <th style="width:90px; text-align:right">Gesamt €</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="pos">01</td>
+            <td><div class="item-name">Austausch Sicherungskasten</div><div class="item-desc">Inkl. Demontage Altanlage, Entsorgung</div></td>
+            <td style="text-align:right; font-family:'JetBrains Mono',monospace">1</td>
+            <td style="text-align:right; font-family:'JetBrains Mono',monospace">680,00</td>
+            <td>680,00</td>
+          </tr>
+          <tr>
+            <td class="pos">02</td>
+            <td><div class="item-name">Erdleitungen erneuern</div><div class="item-desc">15m NYM-J 3x2,5, inkl. Verlegung</div></td>
+            <td style="text-align:right; font-family:'JetBrains Mono',monospace">15</td>
+            <td style="text-align:right; font-family:'JetBrains Mono',monospace">12,00</td>
+            <td>180,00</td>
+          </tr>
+          <tr>
+            <td class="pos">03</td>
+            <td><div class="item-name">Steckdosen erneuern</div><div class="item-desc">5x Schuko-Steckdose, UP, inkl. Einbau</div></td>
+            <td style="text-align:right; font-family:'JetBrains Mono',monospace">5</td>
+            <td style="text-align:right; font-family:'JetBrains Mono',monospace">48,00</td>
+            <td>240,00</td>
+          </tr>
+          <tr>
+            <td class="pos">04</td>
+            <td><div class="item-name">Arbeitsstunden Elektriker</div><div class="item-desc">Meisterbetrieb, inkl. Dokumentation</div></td>
+            <td style="text-align:right; font-family:'JetBrains Mono',monospace">5</td>
+            <td style="text-align:right; font-family:'JetBrains Mono',monospace">95,00</td>
+            <td>475,00</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="doc-totals">
+        <div class="doc-total-row"><span>Nettobetrag</span><span>1.575,00 €</span></div>
+        <div class="doc-total-row"><span>USt. 19%</span><span>299,25 €</span></div>
+        <div class="doc-total-row main"><span>Gesamtbetrag</span><span>1.874,25 €</span></div>
+      </div>
+
+      <div class="doc-bank">
+        <div class="doc-bank-item"><label>Bank</label><span>Sparkasse München</span></div>
+        <div class="doc-bank-item"><label>IBAN</label><span>DE12 3456 7890 1234 5678 90</span></div>
+        <div class="doc-bank-item"><label>BIC</label><span>SSKMDEMMXXX</span></div>
+        <div class="doc-bank-item"><label>Verwendungszweck</label><span>RE-2025-0089</span></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ─── ANGEBOT HTML ───
+function angebotHTML() {
+  return `
+  <div class="doc">
+    <div class="doc-topbar">
+      <div class="doc-topbar-label">Angebot · Automatisch erstellt von FELIX</div>
+      <div class="doc-status">Versandfertig</div>
+    </div>
+    <div class="doc-body">
+      <div class="doc-company">
+        <div class="doc-company-name">Sanitär <span class="doc-orange">Richter</span></div>
+        <div class="doc-company-detail">Parkstraße 3 · 50667 Köln · Tel: 0221 987654</div>
+      </div>
+      <div class="doc-cols">
+        <div>
+          <div class="doc-to-label">Angebot für</div>
+          <div class="doc-to-name">Familie Schreiber</div>
+          <div class="doc-to-detail">Lindenweg 22 · 50668 Köln</div>
+        </div>
+        <div>
+          <div class="doc-to-label">Details</div>
+          <div class="doc-to-detail">
+            <strong>Angebot-Nr.:</strong> AN-2025-0034<br>
+            <strong>Datum:</strong> 12.03.2025<br>
+            <strong>Gültig bis:</strong> 12.04.2025
+          </div>
+        </div>
+      </div>
+      <div class="doc-divider"></div>
+      <div class="doc-title">Angebot – Badezimmer-Sanierung</div>
+      <div class="doc-number">AN-2025-0034</div>
+      <table class="doc-table">
+        <thead>
+          <tr><th>Pos.</th><th>Leistung</th><th style="text-align:right">Einzel €</th><th style="text-align:right">Gesamt €</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="pos">01</td>
+            <td><div class="item-name">Demontage & Entsorgung Altbad</div><div class="item-desc">WC, Wanne, Waschbecken, Fliesen</div></td>
+            <td style="text-align:right; font-family:'JetBrains Mono',monospace">-</td>
+            <td>850,00</td>
+          </tr>
+          <tr>
+            <td class="pos">02</td>
+            <td><div class="item-name">Neue Bodenplatte + Abdichtung</div><div class="item-desc">Verbundabdichtung nach DIN 18195</div></td>
+            <td style="text-align:right; font-family:'JetBrains Mono',monospace">-</td>
+            <td>680,00</td>
+          </tr>
+          <tr>
+            <td class="pos">03</td>
+            <td><div class="item-name">Fliesenarbeiten Wand & Boden</div><div class="item-desc">Ca. 18m² inkl. Material (Kundenauswahl)</div></td>
+            <td style="text-align:right; font-family:'JetBrains Mono',monospace">-</td>
+            <td>1.440,00</td>
+          </tr>
+          <tr>
+            <td class="pos">04</td>
+            <td><div class="item-name">Sanitärinstallation komplett</div><div class="item-desc">Dusche, WC, Waschbecken inkl. Armatur</div></td>
+            <td style="text-align:right; font-family:'JetBrains Mono',monospace">-</td>
+            <td>1.320,00</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="doc-totals">
+        <div class="doc-total-row"><span>Netto</span><span>4.290,00 €</span></div>
+        <div class="doc-total-row"><span>USt. 19%</span><span>815,10 €</span></div>
+        <div class="doc-total-row main"><span>Gesamtangebot</span><span>5.105,10 €</span></div>
+      </div>
+      <div class="doc-note">Ausführungszeitraum ca. 5–7 Werktage. Bindefrist 30 Tage. Alle Preise inkl. Anfahrt und Entsorgung. Bei Auftragserteilung 30% Anzahlung.</div>
+    </div>
+  </div>`;
+}
+
+// ─── ANRUF HTML ───
+function anrufHTML() {
+  return `
+  <div class="doc">
+    <div class="doc-topbar">
+      <div class="doc-topbar-label">Anruf-Protokoll · Automatisch erstellt von FELIX</div>
+      <div class="doc-status">Termin gesichert</div>
+    </div>
+    <div class="doc-body">
+      <div class="call-meta">
+        <div class="call-meta-item"><label>Anrufer</label><span>Petra Wagner</span></div>
+        <div class="call-meta-item"><label>Uhrzeit</label><span>14:23 Uhr</span></div>
+        <div class="call-meta-item"><label>Dauer</label><span>2 Min 14 Sek</span></div>
+        <div class="call-meta-item"><label>Nummer</label><span>0177 3456789</span></div>
+      </div>
+      <div class="doc-divider"></div>
+      <div class="doc-number" style="margin-bottom:12px">Gesprächsprotokoll (automatische Zusammenfassung)</div>
+      <div class="transcript">
+        <div class="t-line">
+          <div class="t-speaker felix">FELIX</div>
+          <div class="t-text">Guten Tag, hier ist der Assistent von Sanitär Richter – wie kann ich Ihnen helfen?</div>
+        </div>
+        <div class="t-line">
+          <div class="t-speaker kunde">Frau Wagner</div>
+          <div class="t-text">Hallo, ich hab ein Problem mit meinem Wasserhahn im Bad. Der tropft schon seit Tagen, das muss dringend repariert werden.</div>
+        </div>
+        <div class="t-line">
+          <div class="t-speaker felix">FELIX</div>
+          <div class="t-text">Verstehe, das klingt nach einem defekten Dichtungsring oder einer abgenutzten Kartusche. Ich schaue in den Kalender – hätten Sie nächste Woche Mittwoch zwischen 13 und 16 Uhr Zeit?</div>
+        </div>
+        <div class="t-line">
+          <div class="t-speaker kunde">Frau Wagner</div>
+          <div class="t-text">Ja, Mittwoch 14 Uhr würde mir sehr gut passen.</div>
+        </div>
+        <div class="t-line">
+          <div class="t-speaker felix">FELIX</div>
+          <div class="t-text">Perfekt, ich trage das ein. Sie bekommen eine Bestätigung per SMS. Ihre Adresse?</div>
+        </div>
+        <div class="t-line">
+          <div class="t-speaker kunde">Frau Wagner</div>
+          <div class="t-text">Birkenweg 11, 50667 Köln.</div>
+        </div>
+      </div>
+      <div class="booking-confirm">
+        <div class="booking-icon">✅</div>
+        <div class="booking-text">
+          <strong>Termin automatisch gebucht</strong>
+          Mittwoch, 19. März · 14:00 Uhr · Petra Wagner · Birkenweg 11, Köln<br>
+          Problem: Tropfender Wasserhahn Bad · SMS-Bestätigung bereits gesendet
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ─── TERMIN HTML ───
+function terminHTML() {
+  return `
+  <div class="doc">
+    <div class="doc-topbar">
+      <div class="doc-topbar-label">Terminbuchung · Automatisch erstellt von FELIX</div>
+      <div class="doc-status">Bestätigung gesendet</div>
+    </div>
+    <div class="doc-body">
+      <div class="calendar-confirm">
+        <div class="cal-header">
+          <div class="cal-month">März 2025</div>
+        </div>
+        <div class="cal-grid">
+          <div class="cal-day-header">Mo</div><div class="cal-day-header">Di</div>
+          <div class="cal-day-header">Mi</div><div class="cal-day-header">Do</div>
+          <div class="cal-day-header">Fr</div><div class="cal-day-header">Sa</div>
+          <div class="cal-day-header">So</div>
+
+          <div class="cal-day other">24</div><div class="cal-day other">25</div>
+          <div class="cal-day other">26</div><div class="cal-day other">27</div>
+          <div class="cal-day other">28</div><div class="cal-day other">1</div>
+          <div class="cal-day other">2</div>
+
+          <div class="cal-day">3</div><div class="cal-day">4</div>
+          <div class="cal-day">5</div><div class="cal-day">6</div>
+          <div class="cal-day">7</div><div class="cal-day">8</div>
+          <div class="cal-day">9</div>
+
+          <div class="cal-day">10</div><div class="cal-day">11</div>
+          <div class="cal-day today">12</div><div class="cal-day">13</div>
+          <div class="cal-day">14</div><div class="cal-day">15</div>
+          <div class="cal-day">16</div>
+
+          <div class="cal-day">17</div><div class="cal-day">18</div>
+          <div class="cal-day">19</div><div class="cal-day active">20</div>
+          <div class="cal-day">21</div><div class="cal-day">22</div>
+          <div class="cal-day">23</div>
+
+          <div class="cal-day">24</div><div class="cal-day">25</div>
+          <div class="cal-day">26</div><div class="cal-day">27</div>
+          <div class="cal-day">28</div><div class="cal-day">29</div>
+          <div class="cal-day">30</div>
+        </div>
+      </div>
+
+      <div class="cal-appt">
+        <div class="cal-appt-time">Do 20.03. · 09:00 Uhr</div>
+        <div class="cal-appt-detail">
+          <strong>Klaus Becker</strong> · Heizungsinspektion & Wartung<br>
+          Waldstraße 45, 80333 München<br><br>
+          📱 Erinnerung an Kunden: Mittwoch 09:00 Uhr (24h vorher) – <strong style="color:#7c3a0a">automatisch gesendet</strong><br>
+          📩 Bestätigung per E-Mail: <strong style="color:#7c3a0a">bereits versendet</strong><br>
+          🗺️ Route: 12 km · ca. 22 Min. Fahrzeit
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// Close on overlay click
+document.getElementById('resultOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeResult();
+});
+</script>
+</body>
+</html>
+

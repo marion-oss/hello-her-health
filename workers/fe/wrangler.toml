@@ -1,0 +1,18 @@
+name = "anoqi-app-staging"
+main = "src/index.ts"
+account_id = "8c0835bd412c69c713ed9eedaaf1ca24"  # Marion@anoqi.health's Account
+compatibility_date = "2026-05-01"
+
+# Static Assets — serves the Expo web build as an SPA.
+#
+# `directory` is what `wrangler dev` and `wrangler deploy` upload.
+# In Phase D the Expo web build (`npx expo export --platform web` → `dist/`)
+# is copied into ./assets before deploy. For Phase A there's a placeholder
+# index.html so `wrangler dev` boots.
+#
+# `not_found_handling = "single-page-application"` makes Static Assets serve
+# /index.html for any path not matching a file — required for client-side routing.
+[assets]
+directory = "./assets"
+not_found_handling = "single-page-application"
+binding = "ASSETS"
