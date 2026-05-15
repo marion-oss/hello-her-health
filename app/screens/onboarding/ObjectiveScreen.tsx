@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useNavigation, useRoute } from '@react-navigation/native'
 
 import { useOnboarding, type HealthObjective } from '../../context/OnboardingContext'
-import { useTheme } from '../../theme'
+import { hover, useTheme } from '../../theme'
 import {
   BackHeader,
   Button,
@@ -176,14 +176,23 @@ export function ObjectiveScreen() {
                 accessibilityState={{ selected: isSelected }}
                 accessibilityLabel={copy.label}
                 onPress={() => setSelected(obj.id)}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingVertical: theme.spacing[4],
-                  paddingHorizontal: theme.spacing[4],
-                  borderRadius: theme.radii.lg,
-                  backgroundColor: isSelected ? theme.colors.bg.surfaceWarm : 'transparent',
-                }}
+                style={({ hovered }: any) => [
+                  {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingVertical: theme.spacing[4],
+                    paddingHorizontal: theme.spacing[4],
+                    borderRadius: theme.radii.lg,
+                    backgroundColor: isSelected
+                      ? theme.colors.bg.surfaceWarm
+                      : 'transparent',
+                  },
+                  hover.transition,
+                  hovered && !isSelected && {
+                    backgroundColor: 'rgba(255, 245, 238, 0.04)',
+                    transform: [{ translateX: 2 }],
+                  },
+                ]}
               >
                 <View
                   style={{

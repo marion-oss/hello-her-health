@@ -34,7 +34,7 @@ import Animated, {
 } from 'react-native-reanimated'
 
 import { useOnboarding, type Language } from '../../context/OnboardingContext'
-import { useTheme, palette } from '../../theme'
+import { hover, useTheme, palette } from '../../theme'
 import { BreathingForm, LiquidEmber, Text, Wordmark } from '../../components'
 
 const COPY = {
@@ -282,21 +282,29 @@ export function WelcomeScreen() {
 
                 <Pressable
                   onPress={goLogin}
-                  style={{
-                    marginTop: isDesktop ? 22 : 18,
-                    alignSelf: 'center',
-                  }}
+                  style={({ hovered }: any) => [
+                    {
+                      marginTop: isDesktop ? 22 : 18,
+                      alignSelf: 'center',
+                    },
+                    hover.transition,
+                    hovered && hover.lift,
+                  ]}
                 >
-                  <Text
-                    variant="label"
-                    style={{
-                      color: 'rgba(255, 245, 238, 0.6)',
-                      textDecorationLine: 'underline',
-                      textDecorationColor: palette.fuchsia[500],
-                    }}
-                  >
-                    {copy.login}
-                  </Text>
+                  {({ hovered }: any) => (
+                    <Text
+                      variant="label"
+                      style={{
+                        color: hovered
+                          ? palette.warmWhite[100]
+                          : 'rgba(255, 245, 238, 0.6)',
+                        textDecorationLine: 'underline',
+                        textDecorationColor: palette.fuchsia[500],
+                      }}
+                    >
+                      {copy.login}
+                    </Text>
+                  )}
                 </Pressable>
               </View>
             </View>
@@ -318,15 +326,25 @@ function LangToggle({
 }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      <Pressable onPress={() => onChange('fr')}>
-        <Text
-          variant="eyebrow"
-          style={{
-            color: language === 'fr' ? palette.warmWhite[100] : 'rgba(255,245,238,0.4)',
-          }}
-        >
-          FR
-        </Text>
+      <Pressable
+        onPress={() => onChange('fr')}
+        style={({ hovered }: any) => [hover.transition, hovered && hover.lift]}
+      >
+        {({ hovered }: any) => (
+          <Text
+            variant="eyebrow"
+            style={{
+              color:
+                language === 'fr'
+                  ? palette.warmWhite[100]
+                  : hovered
+                    ? 'rgba(255,245,238,0.85)'
+                    : 'rgba(255,245,238,0.4)',
+            }}
+          >
+            FR
+          </Text>
+        )}
       </Pressable>
       <Text
         variant="eyebrow"
@@ -334,15 +352,25 @@ function LangToggle({
       >
         ·
       </Text>
-      <Pressable onPress={() => onChange('en')}>
-        <Text
-          variant="eyebrow"
-          style={{
-            color: language === 'en' ? palette.warmWhite[100] : 'rgba(255,245,238,0.4)',
-          }}
-        >
-          EN
-        </Text>
+      <Pressable
+        onPress={() => onChange('en')}
+        style={({ hovered }: any) => [hover.transition, hovered && hover.lift]}
+      >
+        {({ hovered }: any) => (
+          <Text
+            variant="eyebrow"
+            style={{
+              color:
+                language === 'en'
+                  ? palette.warmWhite[100]
+                  : hovered
+                    ? 'rgba(255,245,238,0.85)'
+                    : 'rgba(255,245,238,0.4)',
+            }}
+          >
+            EN
+          </Text>
+        )}
       </Pressable>
     </View>
   )
@@ -379,7 +407,7 @@ function GlassCTA({ label, onPress }: { label: string; onPress: () => void }) {
           scale.value = withTiming(1, { duration: 200, easing: ease })
         }}
         onPress={onPress}
-        style={[
+        style={({ hovered }: any) => [
           {
             flexDirection: 'row',
             alignItems: 'center',
@@ -397,6 +425,13 @@ function GlassCTA({ label, onPress }: { label: string; onPress: () => void }) {
                 WebkitBackdropFilter: 'blur(18px)',
               } as any)
             : null,
+          hover.transition,
+          hovered && hover.lift,
+          hovered && {
+            backgroundColor: 'rgba(255, 245, 238, 0.12)',
+            borderColor: 'rgba(255, 245, 238, 0.30)',
+          },
+          hovered && hover.glow('rgba(255, 4, 114, 0.35)'),
         ]}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>

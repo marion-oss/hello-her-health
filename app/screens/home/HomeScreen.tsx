@@ -22,7 +22,7 @@ import { useNavigation } from '@react-navigation/native'
 
 import { useOnboarding, type HealthObjective } from '../../context/OnboardingContext'
 import { listDocuments } from '../../lib/documentStore'
-import { palette, useTheme } from '../../theme'
+import { hover, palette, useTheme } from '../../theme'
 import {
   Icon,
   type IconName,
@@ -40,12 +40,11 @@ const COPY = {
     greetingAfternoon: 'Bon après-midi',
     greetingEvening:   'Bonsoir',
     todayLabel:        "Aujourd'hui",
-    cycleEyebrow:      'Jour 18 · Lutéale',
     focusAreaLabel:    'Ton focus',
     changeFocus:       'Changer',
     insightEyebrow:    'Votre insight',
-    cycleTitle:        'Cycle · 28 jours',
-    phase:             'Phase lutéale tardive',
+    cycleTitle:        'Cycle',
+    phase:             'Bientôt disponible',
     prepareConsult:    'Préparer une consultation',
     learnMore:         'En savoir plus',
     subhead:           "Pose-moi une question. Sans détour.",
@@ -65,12 +64,11 @@ const COPY = {
     greetingAfternoon: 'Good afternoon',
     greetingEvening:   'Good evening',
     todayLabel:        'Today',
-    cycleEyebrow:      'Day 18 · Luteal',
     focusAreaLabel:    'Your focus',
     changeFocus:       'Change',
     insightEyebrow:    'Your insight',
-    cycleTitle:        'Cycle · 28 days',
-    phase:             'Late luteal phase',
+    cycleTitle:        'Cycle',
+    phase:             'Coming soon',
     prepareConsult:    'Prepare a consultation',
     learnMore:         'Learn more',
     subhead:           "Ask me anything. No detours.",
@@ -178,11 +176,6 @@ export function HomeScreen() {
       .catch((err) => console.warn('Failed to load documents:', err))
   }, [])
 
-  // Simple cycle dot row — fake data, just for the visual; would wire to a
-  // real cycle store later.
-  const cycleDays = [14, 15, 16, 17, 18, 19, 20, 21, 22]
-  const currentDay = 18
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.bg.canvas} />
@@ -222,30 +215,6 @@ export function HomeScreen() {
         }}
       >
         <Wordmark size={20} />
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 6,
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-            borderRadius: 999,
-            borderWidth: 1,
-            borderColor: 'rgba(255, 245, 238, 0.10)',
-          }}
-        >
-          <View
-            style={{
-              width: 5,
-              height: 5,
-              borderRadius: 999,
-              backgroundColor: palette.ember[400],
-            }}
-          />
-          <Text variant="eyebrow" style={{ color: 'rgba(255, 245, 238, 0.7)' }}>
-            {copy.cycleEyebrow}
-          </Text>
-        </View>
       </View>
 
       <ScrollView
@@ -360,17 +329,23 @@ export function HomeScreen() {
               >
                 <Pressable
                   onPress={() => navigation.navigate('Chat')}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 6,
-                    paddingHorizontal: 14,
-                    paddingVertical: 9,
-                    borderRadius: 999,
-                    backgroundColor: 'rgba(255, 4, 114, 0.22)',
-                    borderWidth: 1,
-                    borderColor: 'rgba(255, 4, 114, 0.42)',
-                  }}
+                  style={({ hovered }: any) => [
+                    {
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      paddingHorizontal: 14,
+                      paddingVertical: 9,
+                      borderRadius: 999,
+                      backgroundColor: 'rgba(255, 4, 114, 0.22)',
+                      borderWidth: 1,
+                      borderColor: 'rgba(255, 4, 114, 0.42)',
+                    },
+                    hover.transition,
+                    hovered && hover.lift,
+                    hovered && hover.glow('rgba(255, 4, 114, 0.45)'),
+                    hovered && { borderColor: 'rgba(255, 4, 114, 0.62)' },
+                  ]}
                 >
                   <Text variant="label" style={{ color: palette.warmWhite[100] }}>
                     {copy.prepareConsult}
@@ -379,14 +354,22 @@ export function HomeScreen() {
                 </Pressable>
 
                 <Pressable
-                  style={{
-                    paddingHorizontal: 14,
-                    paddingVertical: 9,
-                    borderRadius: 999,
-                    backgroundColor: 'rgba(255, 245, 238, 0.06)',
-                    borderWidth: 1,
-                    borderColor: 'rgba(255, 245, 238, 0.10)',
-                  }}
+                  style={({ hovered }: any) => [
+                    {
+                      paddingHorizontal: 14,
+                      paddingVertical: 9,
+                      borderRadius: 999,
+                      backgroundColor: 'rgba(255, 245, 238, 0.06)',
+                      borderWidth: 1,
+                      borderColor: 'rgba(255, 245, 238, 0.10)',
+                    },
+                    hover.transition,
+                    hovered && hover.lift,
+                    hovered && {
+                      backgroundColor: 'rgba(255, 245, 238, 0.10)',
+                      borderColor: 'rgba(255, 245, 238, 0.22)',
+                    },
+                  ]}
                 >
                   <Text variant="label" style={{ color: palette.warmWhite[100] }}>
                     {copy.learnMore}
@@ -429,54 +412,11 @@ export function HomeScreen() {
               <Text variant="eyebrow" style={{ color: 'rgba(255, 245, 238, 0.5)', marginBottom: 12 }}>
                 {copy.cycleTitle.toUpperCase()}
               </Text>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: 4,
-                }}
-              >
-                {cycleDays.map((d) => {
-                  const isPast = d < currentDay
-                  const isNow = d === currentDay
-                  return (
-                    <View
-                      key={d}
-                      style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: 999,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: isNow
-                          ? palette.fuchsia[500]
-                          : isPast
-                            ? 'rgba(196, 128, 106, 0.20)'
-                            : 'rgba(255, 245, 238, 0.06)',
-                      }}
-                    >
-                      <Text
-                        variant="caption"
-                        style={{
-                          color: isNow
-                            ? palette.warmWhite[100]
-                            : isPast
-                              ? palette.ember[200]
-                              : 'rgba(255, 245, 238, 0.4)',
-                        }}
-                      >
-                        {d}
-                      </Text>
-                    </View>
-                  )
-                })}
-              </View>
               <Text
                 variant="h4Italic"
                 style={{
                   color: palette.ember[400],
-                  marginTop: 14,
+                  paddingVertical: theme.spacing[3],
                   textAlign: 'center',
                 }}
               >
@@ -534,10 +474,22 @@ export function HomeScreen() {
             <SectionTitle
               label={copy.documentsTitle}
               rightSlot={
-                <Pressable hitSlop={8} accessibilityRole="button">
-                  <Text variant="label" style={{ color: palette.fuchsia[400] }}>
-                    {copy.documentsView} →
-                  </Text>
+                <Pressable
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  style={({ hovered }: any) => [
+                    hover.transition,
+                    hovered && hover.lift,
+                  ]}
+                >
+                  {({ hovered }: any) => (
+                    <Text
+                      variant="label"
+                      style={{ color: hovered ? palette.fuchsia[300] : palette.fuchsia[400] }}
+                    >
+                      {copy.documentsView} →
+                    </Text>
+                  )}
                 </Pressable>
               }
             />

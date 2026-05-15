@@ -3,7 +3,7 @@
 import React from 'react'
 import { View, Pressable, type ViewStyle, type StyleProp } from 'react-native'
 
-import { useTheme } from '../theme'
+import { hover, useTheme } from '../theme'
 import { Text } from './Text'
 
 type Tone = 'rose' | 'sage' | 'teal' | 'peony' | 'celebration'
@@ -72,7 +72,15 @@ export function Pill({ label, tone = 'rose', leftAdornment, onPress, style }: Pr
 
   if (onPress) {
     return (
-      <Pressable accessibilityRole="button" onPress={onPress}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({ hovered }: any) => [
+          hover.transition,
+          hovered && hover.lift,
+          hovered && { opacity: 0.92 },
+        ]}
+      >
         {inner}
       </Pressable>
     )
