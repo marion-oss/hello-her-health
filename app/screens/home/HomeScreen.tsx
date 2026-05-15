@@ -24,6 +24,7 @@ import { useOnboarding, type HealthObjective } from '../../context/OnboardingCon
 import { listDocuments } from '../../lib/documentStore'
 import { hover, palette, useTheme } from '../../theme'
 import {
+  GoalSheet,
   Icon,
   type IconName,
   LiquidEmber,
@@ -149,7 +150,7 @@ function renderWithEmphasis(text: string, emphasis: string | undefined) {
 
 export function HomeScreen() {
   const navigation = useNavigation<any>()
-  const { language, objective } = useOnboarding()
+  const { language, objective, setObjective } = useOnboarding()
   const theme = useTheme()
   const copy = COPY[language]
 
@@ -157,6 +158,7 @@ export function HomeScreen() {
   const objKey = objective ?? 'general'
   const objMeta = OBJECTIVE_LABELS[objKey]
   const objectiveLabel = objMeta[language]
+  const [goalSheetOpen, setGoalSheetOpen] = useState(false)
   const insight = INSIGHTS[objKey][language]
   const summaries = STUB_SUMMARIES
   const [documentCount, setDocumentCount] = useState(0)
@@ -249,28 +251,34 @@ export function HomeScreen() {
             {copy.subhead}
           </Text>
 
-          {/* Focus indicator — static. Change-focus moved out of MainNavigator;
-              a future Settings flow can reopen the picker if needed. */}
-          <View
-            style={{
+          {/* Focus pill — opens the goal sheet so the user can switch what
+              Anoqi is conditioning on. Mirrored in the Chat header. */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${copy.focusAreaLabel}: ${objectiveLabel}`}
+            onPress={() => setGoalSheetOpen(true)}
+            style={({ pressed }) => ({
               marginTop: theme.spacing[5],
               alignSelf: 'flex-start',
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: 'rgba(196, 128, 106, 0.12)',
+              backgroundColor: pressed
+                ? 'rgba(196, 128, 106, 0.20)'
+                : 'rgba(196, 128, 106, 0.12)',
               borderWidth: 1,
               borderColor: 'rgba(196, 128, 106, 0.28)',
               paddingHorizontal: 14,
               paddingVertical: 7,
               borderRadius: theme.radii.pill,
               gap: 8,
-            }}
+            })}
           >
             <Icon name={objMeta.icon} size={14} color={palette.ember[300]} strokeWidth={1.8} />
             <Text variant="label" style={{ color: palette.ember[200] }}>
               {objectiveLabel}
             </Text>
-          </View>
+            <Icon name="ChevronDown" size={12} color={palette.ember[300]} strokeWidth={1.8} />
+          </Pressable>
         </View>
 
         {/* Insight glass card — main daily moment */}
@@ -580,6 +588,14 @@ export function HomeScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <GoalSheet
+        visible={goalSheetOpen}
+        selected={objective}
+        language={language}
+        onSelect={setObjective}
+        onClose={() => setGoalSheetOpen(false)}
+      />
     </SafeAreaView>
   )
 }
