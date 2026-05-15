@@ -1,197 +1,170 @@
-/**
- * anoqi — HomeScreen
- *
- * Main dashboard — shown after onboarding is complete or after login.
- *
- * Sections:
- *   • Header: wordmark + settings icon
- *   • Greeting: time-aware "Good morning / afternoon / evening"
- *   • Focus area: "Your focus area" label + tappable objective pill (C › )
- *   • Hero CTA: large fuchsia card → Chat
- *   • Your summaries: horizontal scroll of cards (or soft empty state)
- *   • Your documents: compact row (hidden if nothing uploaded)
- *   • Health insight: sourced tip relevant to objective, coral left border
- *
- * Brand palette:
- *   Neon Fuchsia  #FF0472  · Hot Coral  #FF6B3D
- *   Midnight Navy #000E28  · Warm Cream #FFF3EE
- *   Off White     #FFF8F5  · Candy Pink #FFB0CC
- *
- * Fonts: BricolageGrotesque-ExtraBold (headlines), DMSans-Regular / DMSans-Medium (body)
- */
+// Anoqi — HomeScreen (iridescent register).
+//
+// Void canvas. A glass insight card with LiquidEmber breathing underneath
+// carries the day's main message ("Votre œstrogène baisse. C'est votre phase
+// lutéale."). Beneath it sits a glass cycle tracker, then editorial lists for
+// summaries and documents (kept lightweight — the insight is the moment).
+//
+// Greeting is set in italic Cormorant Garamond with the user's name in
+// Ember; everything else is Inter for precision.
 
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
+  Platform,
+  Pressable,
   SafeAreaView,
+  ScrollView,
   StatusBar,
+  View,
 } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useNavigation } from '@react-navigation/native'
-import { useOnboarding, type HealthObjective, type Language } from '../../context/OnboardingContext'
+
+import { useOnboarding, type HealthObjective } from '../../context/OnboardingContext'
 import { listDocuments } from '../../lib/documentStore'
+import { palette, useTheme } from '../../theme'
+import {
+  Icon,
+  type IconName,
+  LiquidEmber,
+  SectionTitle,
+  Text,
+  Wordmark,
+} from '../../components'
 
-// Deep-link flag set by the "Let's start chatting →" CTA on the Objective
-// screen. We read + clear it on Home mount so the user lands in Chat
-// without having to tap the hero card.
 const CHAT_INTENT_KEY = 'anoqi_chat_intent'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Copy — all user-facing strings
-// ─────────────────────────────────────────────────────────────────────────────
 
 const COPY = {
   fr: {
     greetingMorning:   'Bonjour',
-    greetingAfternoon: 'Bonjour',
+    greetingAfternoon: 'Bon après-midi',
     greetingEvening:   'Bonsoir',
-    focusAreaLabel:    'Ton objectif santé',
-    heroTitle:         'Qu\'est-ce qui te préoccupe aujourd\'hui ?',
+    todayLabel:        "Aujourd'hui",
+    cycleEyebrow:      'Jour 18 · Lutéale',
+    focusAreaLabel:    'Ton focus',
+    changeFocus:       'Changer',
+    insightEyebrow:    'Votre insight',
+    cycleTitle:        'Cycle · 28 jours',
+    phase:             'Phase lutéale tardive',
+    prepareConsult:    'Préparer une consultation',
+    learnMore:         'En savoir plus',
+    subhead:           "Pose-moi une question. Sans détour.",
+    talkCta:           "Parler à Anoqi",
     summariesTitle:    'Tes résumés',
-    summariesEmpty:    'Après quelques échanges, anoqi rédigera un résumé que tu pourras partager avec ton médecin.',
+    summariesEmpty:    "Tes résumés apparaîtront ici après quelques échanges.",
     documentsTitle:    'Tes documents',
     documentsUnit:     'document',
-    documentsView:     'Voir →',
-    insightTitle:      'Le savoir du jour',
-    settings:          'Paramètres',
+    documentsView:     'Voir',
+    insightSourceLbl:  'Source',
+    knowledgeEyebrow:  'Savoir du jour',
+    knowledgeBody:     'Les fluctuations hormonales tout au long du cycle influencent ton énergie, ton humeur, et ta concentration. Comprendre ton schéma t\'aide à en tirer le meilleur.',
+    knowledgeSource:   'Cochrane',
   },
   en: {
     greetingMorning:   'Good morning',
     greetingAfternoon: 'Good afternoon',
     greetingEvening:   'Good evening',
-    focusAreaLabel:    'Your focus area',
-    heroTitle:         'What\'s on your mind today?',
+    todayLabel:        'Today',
+    cycleEyebrow:      'Day 18 · Luteal',
+    focusAreaLabel:    'Your focus',
+    changeFocus:       'Change',
+    insightEyebrow:    'Your insight',
+    cycleTitle:        'Cycle · 28 days',
+    phase:             'Late luteal phase',
+    prepareConsult:    'Prepare a consultation',
+    learnMore:         'Learn more',
+    subhead:           "Ask me anything. No detours.",
+    talkCta:           "Talk to Anoqi",
     summariesTitle:    'Your summaries',
-    summariesEmpty:    'After a few questions, anoqi will write a summary you can share with your doctor.',
+    summariesEmpty:    "Your summaries will appear here after a few exchanges.",
     documentsTitle:    'Your documents',
     documentsUnit:     'document',
-    documentsView:     'View →',
-    insightTitle:      'Today\'s insight',
-    settings:          'Settings',
+    documentsView:     'View',
+    insightSourceLbl:  'Source',
+    knowledgeEyebrow:  'Knowledge of the day',
+    knowledgeBody:     'Hormonal fluctuations throughout your cycle influence your energy, mood, and concentration. Understanding your pattern helps you make the most of it.',
+    knowledgeSource:   'Cochrane',
   },
+} as const
+
+const OBJECTIVE_LABELS: Record<HealthObjective, { fr: string; en: string; icon: IconName }> = {
+  symptoms:      { fr: 'Mes symptômes',  en: 'My symptoms',      icon: 'Stethoscope' },
+  contraception: { fr: 'Contraception',  en: 'Contraception',    icon: 'Pill' },
+  menopause:     { fr: 'Ménopause',      en: 'Menopause',        icon: 'Sunset' },
+  fertility:     { fr: 'Fertilité',      en: 'Fertility',        icon: 'Sprout' },
+  general:       { fr: 'Santé générale', en: 'General health',   icon: 'MessageCircle' },
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Objective display names — bilingual
-// ─────────────────────────────────────────────────────────────────────────────
-
-const OBJECTIVE_LABELS: Record<HealthObjective, { fr: string; en: string }> = {
-  symptoms:      { fr: 'Mes symptômes',       en: 'My symptoms'       },
-  contraception: { fr: 'Contraception',       en: 'Contraception'     },
-  menopause:     { fr: 'Ménopause',           en: 'Menopause'         },
-  fertility:     { fr: 'Fertilité',           en: 'Fertility'         },
-  general:       { fr: 'Santé générale',      en: 'General health'    },
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Health insights — one per objective, sourced, bilingual
-// ─────────────────────────────────────────────────────────────────────────────
-
-type Insight = { text: string; source: string }
-
+type Insight = { text: string; emphasis?: string; source: string }
 const INSIGHTS: Record<HealthObjective, { fr: Insight; en: Insight }> = {
   symptoms: {
-    en: {
-      text: 'Tracking your symptoms for 2–3 cycles gives your doctor a much clearer picture. Note timing, duration, and intensity.',
-      source: 'NHS',
-    },
-    fr: {
-      text: 'Suivre tes symptômes sur 2 à 3 cycles donne à ton médecin une image beaucoup plus claire. Note le moment, la durée et l\'intensité.',
-      source: 'NHS',
-    },
+    en: { text: 'Tracking your symptoms across 2–3 cycles gives your doctor a much clearer picture.', emphasis: 'much clearer picture', source: 'NHS' },
+    fr: { text: 'Suivre tes symptômes sur 2 à 3 cycles donne à ton médecin une image beaucoup plus claire.', emphasis: 'beaucoup plus claire', source: 'NHS' },
   },
   contraception: {
-    en: {
-      text: 'Taking the pill at the same time every day reduces the failure rate to under 1%. A 3-hour window still counts as consistent.',
-      source: 'FSRH',
-    },
-    fr: {
-      text: 'Prendre la pilule à la même heure chaque jour réduit le taux d\'échec à moins de 1 %. Une fenêtre de 3 heures reste considérée comme régulière.',
-      source: 'FSRH',
-    },
+    en: { text: 'Taking the pill at the same time daily drops the failure rate under 1%.', emphasis: 'under 1%', source: 'FSRH' },
+    fr: { text: 'Prendre la pilule à la même heure réduit le taux d\'échec à moins de 1 %.', emphasis: 'moins de 1 %', source: 'FSRH' },
   },
   menopause: {
-    en: {
-      text: 'Perimenopause can begin up to 10 years before your last period. Changes in cycle length — not hot flashes — are often the first sign.',
-      source: 'BMS',
-    },
-    fr: {
-      text: 'La périménopause peut commencer jusqu\'à 10 ans avant tes dernières règles. Les changements de durée du cycle — pas les bouffées de chaleur — sont souvent le premier signe.',
-      source: 'BMS',
-    },
+    en: { text: 'Perimenopause can begin up to 10 years before your last period — changes in cycle length are often the first sign.', emphasis: 'first sign', source: 'BMS' },
+    fr: { text: 'La périménopause peut commencer 10 ans avant tes dernières règles — les changements de cycle sont souvent le premier signe.', emphasis: 'premier signe', source: 'BMS' },
   },
   fertility: {
-    en: {
-      text: 'Your fertile window spans roughly 6 days — the 5 days before ovulation and the day itself. Cycle length alone doesn\'t tell you when this is.',
-      source: 'NHS',
-    },
-    fr: {
-      text: 'Ta fenêtre de fertilité dure environ 6 jours — les 5 jours avant l\'ovulation et le jour J. La durée du cycle seul ne te dit pas quand c\'est.',
-      source: 'NHS',
-    },
+    en: { text: 'Your fertile window spans roughly six days — the five before ovulation and the day itself.', emphasis: 'six days', source: 'NHS' },
+    fr: { text: 'Ta fenêtre de fertilité dure environ six jours — les cinq avant l\'ovulation et le jour J.', emphasis: 'six jours', source: 'NHS' },
   },
   general: {
-    en: {
-      text: 'Hormonal fluctuations across your cycle affect energy, mood, and focus. Understanding your pattern helps you work with it — not against it.',
-      source: 'Cochrane',
-    },
-    fr: {
-      text: 'Les fluctuations hormonales tout au long de ton cycle influencent ton énergie, ton humeur et ta concentration. Connaître ton schéma t\'aide à en tirer parti.',
-      source: 'Cochrane',
-    },
+    en: { text: 'Your œstrogen drops in the late luteal phase — energy shifts this week are expected, not fatigue.', emphasis: 'not fatigue', source: 'NHS · HAS' },
+    fr: { text: "Ton œstrogène baisse — c'est ta phase lutéale, pas de la fatigue.", emphasis: 'pas de la fatigue', source: 'NHS · HAS' },
   },
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Stub data — replace with real Supabase queries
-// ─────────────────────────────────────────────────────────────────────────────
-
-type Summary = {
-  id: string
-  topic: string
-  date: string   // display string e.g. "10 May"
-}
-
-// WIRE DATA — fetch from Supabase summaries table
+type Summary = { id: string; topic: string; date: string }
 const STUB_SUMMARIES: Summary[] = []
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-function getGreeting(copy: typeof COPY['en']): string {
+function getGreeting(copy: {
+  greetingMorning: string
+  greetingAfternoon: string
+  greetingEvening: string
+}): string {
   const hour = new Date().getHours()
   if (hour >= 5 && hour < 12)  return copy.greetingMorning
   if (hour >= 12 && hour < 18) return copy.greetingAfternoon
   return copy.greetingEvening
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HomeScreen
-// ─────────────────────────────────────────────────────────────────────────────
+// Render an Inter italic-style accent inside a Cormorant body, by splitting
+// on the configured emphasis substring.
+function renderWithEmphasis(text: string, emphasis: string | undefined) {
+  if (!emphasis || !text.includes(emphasis)) {
+    return <Text variant="h3Italic" style={{ color: palette.warmWhite[100] }}>{text}</Text>
+  }
+  const [before, after] = text.split(emphasis)
+  return (
+    <Text variant="h3Italic" style={{ color: palette.warmWhite[100] }}>
+      {before}
+      <Text variant="h3" style={{ color: palette.ember[400] }}>{emphasis}</Text>
+      {after}
+    </Text>
+  )
+}
 
 export function HomeScreen() {
   const navigation = useNavigation<any>()
   const { language, objective } = useOnboarding()
+  const theme = useTheme()
   const copy = COPY[language]
 
   const greeting = useMemo(() => getGreeting(copy), [copy])
-  const objectiveLabel = objective
-    ? OBJECTIVE_LABELS[objective][language]
-    : (language === 'fr' ? 'Santé générale' : 'General health')
-  const insight = INSIGHTS[objective ?? 'general'][language]
-
-  const summaries: Summary[] = STUB_SUMMARIES
+  const objKey = objective ?? 'general'
+  const objMeta = OBJECTIVE_LABELS[objKey]
+  const objectiveLabel = objMeta[language]
+  const insight = INSIGHTS[objKey][language]
+  const summaries = STUB_SUMMARIES
   const [documentCount, setDocumentCount] = useState(0)
 
-  // If the user reached Home from the Objective "Let's start chatting" CTA,
-  // deep-link them straight to Chat and clear the flag.
   useEffect(() => {
-    AsyncStorage.getItem(CHAT_INTENT_KEY).then(v => {
+    AsyncStorage.getItem(CHAT_INTENT_KEY).then((v) => {
       if (v === 'true') {
         AsyncStorage.removeItem(CHAT_INTENT_KEY)
         navigation.navigate('Chat')
@@ -201,384 +174,460 @@ export function HomeScreen() {
 
   useEffect(() => {
     listDocuments()
-      .then(docs => setDocumentCount(docs.length))
-      .catch(err => console.warn('Failed to load documents:', err))
+      .then((docs) => setDocumentCount(docs.length))
+      .catch((err) => console.warn('Failed to load documents:', err))
   }, [])
 
-  return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFF8F5" />
+  // Simple cycle dot row — fake data, just for the visual; would wire to a
+  // real cycle store later.
+  const cycleDays = [14, 15, 16, 17, 18, 19, 20, 21, 22]
+  const currentDay = 18
 
-      {/* ── Header ──────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <Text style={styles.wordmark}>anoqi</Text>
-        <TouchableOpacity
-          style={styles.settingsButton}
-          onPress={() => { /* navigation.navigate('Settings') */ }}
-          accessibilityRole="button"
-          accessibilityLabel={copy.settings}
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
+      <StatusBar barStyle="light-content" backgroundColor={theme.colors.bg.canvas} />
+
+      {/* Faint Ember corner glow opposite the breathing form — gives the top
+          of the screen warmth without a card chrome */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          right: -120,
+          top: -80,
+          width: 360,
+          height: 360,
+          opacity: 0.7,
+        }}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(196, 128, 106, 0.32)',
+            borderRadius: 9999,
+            ...(Platform.OS === 'web' ? ({ filter: 'blur(80px)' } as any) : null),
+          }}
+        />
+      </View>
+
+      {/* Header */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: theme.spacing[6],
+          paddingTop: theme.spacing[3],
+          paddingBottom: theme.spacing[2],
+        }}
+      >
+        <Wordmark size={20} />
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: 'rgba(255, 245, 238, 0.10)',
+          }}
         >
-          <Text style={styles.settingsIcon}>⚙</Text>
-        </TouchableOpacity>
+          <View
+            style={{
+              width: 5,
+              height: 5,
+              borderRadius: 999,
+              backgroundColor: palette.ember[400],
+            }}
+          />
+          <Text variant="eyebrow" style={{ color: 'rgba(255, 245, 238, 0.7)' }}>
+            {copy.cycleEyebrow}
+          </Text>
+        </View>
       </View>
 
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={{ paddingBottom: theme.spacing[24] }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Greeting ────────────────────────────────────── */}
-        <Text style={styles.greeting}>{greeting}</Text>
-
-        {/* ── Focus area ──────────────────────────────────── */}
-        <View style={styles.focusArea}>
-          <Text style={styles.focusLabel}>{copy.focusAreaLabel}</Text>
-          <TouchableOpacity
-            style={styles.focusPill}
-            onPress={() => navigation.navigate('Objective', { mode: 'change' })}
-            accessibilityRole="button"
-            accessibilityLabel={objectiveLabel}
-          >
-            <Text style={styles.focusPillText}>{objectiveLabel}</Text>
-            <Text style={styles.focusPillChevron}>›</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ── Hero CTA ────────────────────────────────────── */}
-        <TouchableOpacity
-          style={styles.heroCard}
-          onPress={() => navigation.navigate('Chat')}
-          accessibilityRole="button"
-          accessibilityLabel={copy.heroTitle}
+        {/* Greeting */}
+        <View
+          style={{
+            paddingHorizontal: theme.spacing[6],
+            paddingTop: theme.spacing[8],
+            paddingBottom: theme.spacing[6],
+          }}
         >
-          <Text style={styles.heroTitle}>{copy.heroTitle}</Text>
-          <View style={styles.heroArrow}>
-            <Text style={styles.heroArrowText}>→</Text>
+          <Text variant="eyebrow" style={{ color: 'rgba(255, 245, 238, 0.5)', marginBottom: 8 }}>
+            {copy.todayLabel.toUpperCase()}
+          </Text>
+          <Text variant="h1Italic" style={{ color: palette.warmWhite[100] }}>
+            {greeting},
+          </Text>
+          <Text variant="h1Italic" style={{ color: palette.ember[400], marginTop: -4 }}>
+            Marie.
+          </Text>
+          <Text
+            variant="bodyLight"
+            style={{
+              color: 'rgba(255, 245, 238, 0.65)',
+              marginTop: theme.spacing[3],
+              maxWidth: 420,
+            }}
+          >
+            {copy.subhead}
+          </Text>
+
+          {/* Focus indicator — static. Change-focus moved out of MainNavigator;
+              a future Settings flow can reopen the picker if needed. */}
+          <View
+            style={{
+              marginTop: theme.spacing[5],
+              alignSelf: 'flex-start',
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: 'rgba(196, 128, 106, 0.12)',
+              borderWidth: 1,
+              borderColor: 'rgba(196, 128, 106, 0.28)',
+              paddingHorizontal: 14,
+              paddingVertical: 7,
+              borderRadius: theme.radii.pill,
+              gap: 8,
+            }}
+          >
+            <Icon name={objMeta.icon} size={14} color={palette.ember[300]} strokeWidth={1.8} />
+            <Text variant="label" style={{ color: palette.ember[200] }}>
+              {objectiveLabel}
+            </Text>
           </View>
-        </TouchableOpacity>
-
-        {/* ── Summaries ───────────────────────────────────── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{copy.summariesTitle}</Text>
-
-          {summaries.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyCardText}>{copy.summariesEmpty}</Text>
-            </View>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.summaryScroll}
-            >
-              {summaries.map(s => (
-                <TouchableOpacity
-                  key={s.id}
-                  style={styles.summaryCard}
-                  onPress={() => { /* navigation.navigate('Summary', { id: s.id }) */ }}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.summaryTopic}>{s.topic}</Text>
-                  <Text style={styles.summaryDate}>{s.date}</Text>
-                  <View style={styles.summaryTag}>
-                    <Text style={styles.summaryTagText}>
-                      {language === 'fr' ? 'Prêt pour ton médecin' : 'Ready for your doctor'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
         </View>
 
-        {/* ── Documents ───────────────────────────────────── */}
-        {documentCount > 0 && (
-          <View style={styles.section}>
-            <View style={styles.documentsRow}>
-              <Text style={styles.sectionTitle}>{copy.documentsTitle}</Text>
-              <TouchableOpacity
-                onPress={() => { /* navigation.navigate('Documents') */ }}
-                accessibilityRole="button"
+        {/* Insight glass card — main daily moment */}
+        <View style={{ paddingHorizontal: theme.spacing[6], marginBottom: theme.spacing[5] }}>
+          <View
+            style={{
+              borderRadius: 24,
+              overflow: 'hidden',
+              position: 'relative',
+            }}
+          >
+            <LiquidEmber intensity={1.2} blur={52} borderRadius={24} />
+
+            <View
+              style={[
+                {
+                  backgroundColor: 'rgba(255, 245, 238, 0.05)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(255, 245, 238, 0.09)',
+                  borderRadius: 24,
+                  padding: theme.spacing[6],
+                },
+                Platform.OS === 'web'
+                  ? ({
+                      backdropFilter: 'blur(22px) saturate(140%)',
+                      WebkitBackdropFilter: 'blur(22px) saturate(140%)',
+                    } as any)
+                  : null,
+              ]}
+            >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: theme.spacing[3],
+                }}
               >
-                <Text style={styles.documentsViewLink}>{copy.documentsView}</Text>
-              </TouchableOpacity>
+                <Text variant="eyebrow" style={{ color: palette.fuchsia[400] }}>
+                  {copy.insightEyebrow.toUpperCase()}
+                </Text>
+                <Text variant="eyebrow" style={{ color: 'rgba(255, 245, 238, 0.4)' }}>
+                  {insight.source}
+                </Text>
+              </View>
+
+              {renderWithEmphasis(insight.text, insight.emphasis)}
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  marginTop: theme.spacing[5],
+                }}
+              >
+                <Pressable
+                  onPress={() => navigation.navigate('Chat')}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    paddingHorizontal: 14,
+                    paddingVertical: 9,
+                    borderRadius: 999,
+                    backgroundColor: 'rgba(255, 4, 114, 0.22)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(255, 4, 114, 0.42)',
+                  }}
+                >
+                  <Text variant="label" style={{ color: palette.warmWhite[100] }}>
+                    {copy.prepareConsult}
+                  </Text>
+                  <Icon name="ArrowRight" size={13} color={palette.warmWhite[100]} strokeWidth={2} />
+                </Pressable>
+
+                <Pressable
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 9,
+                    borderRadius: 999,
+                    backgroundColor: 'rgba(255, 245, 238, 0.06)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(255, 245, 238, 0.10)',
+                  }}
+                >
+                  <Text variant="label" style={{ color: palette.warmWhite[100] }}>
+                    {copy.learnMore}
+                  </Text>
+                </Pressable>
+              </View>
             </View>
-            <View style={styles.documentsCard}>
-              <Text style={styles.documentsCount}>
-                {documentCount} {copy.documentsUnit}{documentCount > 1 ? 's' : ''}
+          </View>
+        </View>
+
+        {/* Cycle tracker glass card */}
+        <View style={{ paddingHorizontal: theme.spacing[6], marginBottom: theme.spacing[6] }}>
+          <View
+            style={{
+              borderRadius: 22,
+              overflow: 'hidden',
+              position: 'relative',
+            }}
+          >
+            <LiquidEmber intensity={0.7} fuchsia={false} blur={48} borderRadius={22} />
+
+            <View
+              style={[
+                {
+                  backgroundColor: 'rgba(255, 245, 238, 0.04)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(255, 245, 238, 0.08)',
+                  borderRadius: 22,
+                  paddingHorizontal: theme.spacing[6],
+                  paddingVertical: theme.spacing[5],
+                },
+                Platform.OS === 'web'
+                  ? ({
+                      backdropFilter: 'blur(18px) saturate(140%)',
+                      WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+                    } as any)
+                  : null,
+              ]}
+            >
+              <Text variant="eyebrow" style={{ color: 'rgba(255, 245, 238, 0.5)', marginBottom: 12 }}>
+                {copy.cycleTitle.toUpperCase()}
+              </Text>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                {cycleDays.map((d) => {
+                  const isPast = d < currentDay
+                  const isNow = d === currentDay
+                  return (
+                    <View
+                      key={d}
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: 999,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: isNow
+                          ? palette.fuchsia[500]
+                          : isPast
+                            ? 'rgba(196, 128, 106, 0.20)'
+                            : 'rgba(255, 245, 238, 0.06)',
+                      }}
+                    >
+                      <Text
+                        variant="caption"
+                        style={{
+                          color: isNow
+                            ? palette.warmWhite[100]
+                            : isPast
+                              ? palette.ember[200]
+                              : 'rgba(255, 245, 238, 0.4)',
+                        }}
+                      >
+                        {d}
+                      </Text>
+                    </View>
+                  )
+                })}
+              </View>
+              <Text
+                variant="h4Italic"
+                style={{
+                  color: palette.ember[400],
+                  marginTop: 14,
+                  textAlign: 'center',
+                }}
+              >
+                {copy.phase}
               </Text>
             </View>
           </View>
-        )}
+        </View>
 
-        {/* ── Health insight ──────────────────────────────── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{copy.insightTitle}</Text>
-          <View style={styles.insightCard}>
-            <View style={styles.insightBorder} />
-            <View style={styles.insightContent}>
-              <Text style={styles.insightText}>{insight.text}</Text>
-              <Text style={styles.insightSource}>{insight.source}</Text>
+        {/* Summaries — editorial list */}
+        <View style={{ paddingHorizontal: theme.spacing[6], marginTop: theme.spacing[6] }}>
+          <SectionTitle label={copy.summariesTitle} />
+          {summaries.length === 0 ? (
+            <Text
+              variant="bodyLight"
+              style={{ color: 'rgba(255, 245, 238, 0.5)', maxWidth: 420 }}
+            >
+              {copy.summariesEmpty}
+            </Text>
+          ) : (
+            summaries.map((s, i) => (
+              <View
+                key={s.id}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: theme.spacing[3],
+                  borderTopWidth: i === 0 ? 0 : 1,
+                  borderTopColor: theme.colors.border.subtle,
+                }}
+              >
+                <View
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 4,
+                    backgroundColor: palette.ember[400],
+                    marginRight: theme.spacing[3],
+                  }}
+                />
+                <Text variant="bodyMed" style={{ color: palette.warmWhite[100], flex: 1 }}>
+                  {s.topic}
+                </Text>
+                <Text variant="caption" style={{ color: 'rgba(255, 245, 238, 0.5)' }}>
+                  {s.date}
+                </Text>
+              </View>
+            ))
+          )}
+        </View>
+
+        {/* Documents */}
+        {documentCount > 0 ? (
+          <View style={{ paddingHorizontal: theme.spacing[6], marginTop: theme.spacing[10] }}>
+            <SectionTitle
+              label={copy.documentsTitle}
+              rightSlot={
+                <Pressable hitSlop={8} accessibilityRole="button">
+                  <Text variant="label" style={{ color: palette.fuchsia[400] }}>
+                    {copy.documentsView} →
+                  </Text>
+                </Pressable>
+              }
+            />
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: theme.spacing[3],
+              }}
+            >
+              <Icon
+                name="FileText"
+                size={18}
+                color={palette.ember[300]}
+                strokeWidth={1.6}
+              />
+              <Text variant="bodyMed" style={{ color: palette.warmWhite[100], marginLeft: theme.spacing[3] }}>
+                {documentCount} {copy.documentsUnit}
+                {documentCount > 1 ? 's' : ''}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {/* Knowledge of the day — quieter glass card at the foot of the
+            scroll. Lower LiquidEmber intensity so it doesn't compete with
+            the main insight up top. */}
+        <View style={{ paddingHorizontal: theme.spacing[6], marginTop: theme.spacing[10] }}>
+          <View
+            style={{
+              borderRadius: 22,
+              overflow: 'hidden',
+              position: 'relative',
+            }}
+          >
+            <LiquidEmber intensity={0.55} fuchsia={false} blur={44} borderRadius={22} />
+
+            <View
+              style={[
+                {
+                  backgroundColor: 'rgba(255, 245, 238, 0.04)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(255, 245, 238, 0.08)',
+                  borderRadius: 22,
+                  padding: theme.spacing[6],
+                },
+                Platform.OS === 'web'
+                  ? ({
+                      backdropFilter: 'blur(18px) saturate(140%)',
+                      WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+                    } as any)
+                  : null,
+              ]}
+            >
+              <Text variant="eyebrow" style={{ color: palette.ember[400], marginBottom: 12 }}>
+                {copy.knowledgeEyebrow.toUpperCase()}
+              </Text>
+              <Text
+                variant="h3Italic"
+                style={{
+                  color: palette.warmWhite[100],
+                  lineHeight: 32,
+                }}
+              >
+                {copy.knowledgeBody}
+              </Text>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginTop: theme.spacing[4],
+                  gap: 8,
+                }}
+              >
+                <View
+                  style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 999,
+                    backgroundColor: palette.ember[400],
+                  }}
+                />
+                <Text variant="eyebrow" style={{ color: palette.ember[400] }}>
+                  {copy.insightSourceLbl} · {copy.knowledgeSource}
+                </Text>
+              </View>
             </View>
           </View>
         </View>
-
       </ScrollView>
     </SafeAreaView>
   )
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Styles
-// ─────────────────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#FFF8F5',
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#FFE8E0',
-  },
-  wordmark: {
-    fontSize: 18,
-    fontFamily: 'BricolageGrotesque-ExtraBold',
-    color: '#FF0472',
-    letterSpacing: -0.5,
-  },
-  settingsButton: {
-    padding: 4,
-  },
-  settingsIcon: {
-    fontSize: 20,
-    color: '#BBBBBB',
-  },
-
-  // Scroll
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 28,
-    paddingBottom: 48,
-    gap: 28,
-  },
-
-  // Greeting
-  greeting: {
-    fontSize: 34,
-    fontFamily: 'BricolageGrotesque-ExtraBold',
-    color: '#000E28',
-    letterSpacing: -1,
-  },
-
-  // Focus area
-  focusArea: {
-    gap: 6,
-    marginTop: -8,
-  },
-  focusLabel: {
-    fontSize: 12,
-    fontFamily: 'DMSans-Regular',
-    color: '#AAAAAA',
-    letterSpacing: 0.3,
-  },
-  focusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: '#FFF3EE',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: '#FFB0CC',
-  },
-  focusPillText: {
-    fontSize: 13,
-    fontFamily: 'DMSans-Medium',
-    color: '#FF6B3D',
-    fontWeight: '600',
-  },
-  focusPillChevron: {
-    fontSize: 15,
-    color: '#FF6B3D',
-    lineHeight: 19,
-  },
-
-  // Hero CTA
-  heroCard: {
-    backgroundColor: '#FF0472',
-    borderRadius: 20,
-    paddingVertical: 28,
-    paddingHorizontal: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#FF0472',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  heroTitle: {
-    fontSize: 20,
-    fontFamily: 'BricolageGrotesque-ExtraBold',
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
-    flex: 1,
-    lineHeight: 27,
-  },
-  heroArrow: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 12,
-    flexShrink: 0,
-  },
-  heroArrowText: {
-    fontSize: 20,
-    color: '#FFFFFF',
-    lineHeight: 24,
-  },
-
-  // Sections
-  section: {
-    gap: 12,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontFamily: 'DMSans-Medium',
-    color: '#AAAAAA',
-    fontWeight: '600',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-
-  // Summaries — empty state
-  emptyCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#EDE5E0',
-  },
-  emptyCardText: {
-    fontSize: 14,
-    fontFamily: 'DMSans-Regular',
-    color: '#AAAAAA',
-    lineHeight: 21,
-  },
-
-  // Summaries — horizontal scroll
-  summaryScroll: {
-    gap: 12,
-    paddingRight: 24,
-  },
-  summaryCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
-    width: 200,
-    borderWidth: 1,
-    borderColor: '#EDE5E0',
-    gap: 6,
-  },
-  summaryTopic: {
-    fontSize: 15,
-    fontFamily: 'DMSans-Medium',
-    color: '#000E28',
-    fontWeight: '600',
-    lineHeight: 21,
-  },
-  summaryDate: {
-    fontSize: 12,
-    fontFamily: 'DMSans-Regular',
-    color: '#AAAAAA',
-  },
-  summaryTag: {
-    backgroundColor: '#FFF3EE',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    alignSelf: 'flex-start',
-    marginTop: 4,
-  },
-  summaryTagText: {
-    fontSize: 11,
-    fontFamily: 'DMSans-Medium',
-    color: '#FF6B3D',
-    fontWeight: '600',
-  },
-
-  // Documents
-  documentsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  documentsCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#EDE5E0',
-  },
-  documentsCount: {
-    fontSize: 15,
-    fontFamily: 'DMSans-Medium',
-    color: '#000E28',
-    fontWeight: '600',
-  },
-  documentsViewLink: {
-    fontSize: 13,
-    fontFamily: 'DMSans-Medium',
-    color: '#FF6B3D',
-    fontWeight: '600',
-  },
-
-  // Insight
-  insightCard: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#EDE5E0',
-  },
-  insightBorder: {
-    width: 4,
-    backgroundColor: '#FF6B3D',
-  },
-  insightContent: {
-    flex: 1,
-    padding: 16,
-    gap: 8,
-  },
-  insightText: {
-    fontSize: 14,
-    fontFamily: 'DMSans-Regular',
-    color: '#000E28',
-    lineHeight: 22,
-  },
-  insightSource: {
-    fontSize: 12,
-    fontFamily: 'DMSans-Medium',
-    color: '#FF6B3D',
-    fontWeight: '600',
-  },
-})

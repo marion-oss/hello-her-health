@@ -1,26 +1,305 @@
 @import "tailwindcss";
 
+/* ---------- Palette ---------- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  /* Peony */
+  --peony-50: #fbf3f7;
+  --peony-100: #f9e6ef;
+  --peony-200: #f4cadd;
+  --peony-300: #eda5c4;
+  --peony-400: #e588b1;
+  --peony-500: #e06c9f;
+  --peony-600: #c8508a;
+  --peony-700: #a73e72;
+  --peony-800: #82325b;
+  --peony-900: #5d2542;
+  --peony-950: #371827;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Carnation */
+  --carnation-50: #fdf2f7;
+  --carnation-100: #fbe6f0;
+  --carnation-200: #f7ccdf;
+  --carnation-300: #f5a8c8;
+  --carnation-400: #f283b6;
+  --carnation-500: #e96aa3;
+  --carnation-600: #d24f87;
+  --carnation-700: #b03d6e;
+  --carnation-800: #883157;
+  --carnation-900: #5e2640;
+  --carnation-950: #371727;
+
+  /* Rose */
+  --rose-50: #fdf6f4;
+  --rose-100: #fbede9;
+  --rose-200: #edbfb7;
+  --rose-300: #ddaba1;
+  --rose-400: #c89589;
+  --rose-500: #b07a6d;
+  --rose-600: #946357;
+  --rose-700: #735045;
+  --rose-800: #573e36;
+  --rose-900: #392922;
+  --rose-950: #1f1612;
+
+  /* Sage */
+  --sage-50: #f5f6f0;
+  --sage-100: #ebede2;
+  --sage-200: #d8ddc9;
+  --sage-300: #c4ccae;
+  --sage-400: #b5bfa1;
+  --sage-500: #9aa685;
+  --sage-600: #7d886a;
+  --sage-700: #636d55;
+  --sage-800: #4d5443;
+  --sage-900: #353a2f;
+  --sage-950: #1d201a;
+
+  /* Teal */
+  --teal-50: #f0f5f3;
+  --teal-100: #dde9e3;
+  --teal-200: #c0d4cb;
+  --teal-300: #9bbaad;
+  --teal-400: #80a591;
+  --teal-500: #6e9887;
+  --teal-600: #547b6c;
+  --teal-700: #426258;
+  --teal-800: #344c44;
+  --teal-900: #233330;
+  --teal-950: #131c1a;
+
+  /* Ink */
+  --ink-50: #f7f3f5;
+  --ink-100: #ece4e8;
+  --ink-200: #d4c5cd;
+  --ink-300: #b09ba6;
+  --ink-400: #866e7b;
+  --ink-500: #634f5b;
+  --ink-600: #4a3a45;
+  --ink-700: #332831;
+  --ink-800: #241a22;
+  --ink-900: #1d1419;
+  --ink-950: #120a0f;
+
+  /* Burgundy */
+  --burgundy-100: #f7e2e6;
+  --burgundy-400: #b94a64;
+  --burgundy-500: #9c3654;
+  --burgundy-700: #6e2238;
+
+  /* ---------- Semantic role tokens (light) ---------- */
+  --bg-canvas: var(--rose-50);
+  --bg-surface: var(--peony-50);
+  --bg-surface-muted: var(--sage-50);
+  --bg-surface-warm: var(--rose-100);
+
+  --text-primary: var(--ink-900);
+  --text-secondary: var(--teal-700);
+  --text-tertiary: var(--ink-400);
+  --text-accent: var(--peony-600);
+  --text-danger: var(--burgundy-500);
+
+  --border-subtle: var(--sage-200);
+  --border-default: var(--sage-300);
+  --border-strong: var(--teal-500);
+  --border-focus: var(--peony-500);
+
+  --accent-primary: var(--peony-500);
+  --accent-success: var(--teal-500);
+  --accent-warning: var(--carnation-400);
+  --accent-danger: var(--burgundy-500);
+
+  /* Sage-tinted shadows (teal-600 with low alpha) */
+  --shadow-sm: 0 1px 2px 0 rgba(84, 123, 108, 0.06);
+  --shadow-md: 0 4px 12px -2px rgba(84, 123, 108, 0.12), 0 2px 4px -1px rgba(84, 123, 108, 0.06);
+  --shadow-lg: 0 12px 32px -6px rgba(84, 123, 108, 0.18), 0 4px 8px -2px rgba(84, 123, 108, 0.08);
+
+  /* ---------- Status role tokens ---------- */
+  --status-draft-bg: var(--rose-100);
+  --status-draft-text: var(--peony-900);
+  --status-draft-ring: var(--peony-200);
+
+  --status-in-review-bg: var(--teal-100);
+  --status-in-review-text: var(--teal-800);
+  --status-in-review-ring: var(--teal-300);
+
+  --status-approved-bg: var(--sage-100);
+  --status-approved-text: var(--sage-800);
+  --status-approved-ring: var(--sage-300);
+
+  --status-live-bg: var(--peony-100);
+  --status-live-text: var(--peony-800);
+  --status-live-ring: var(--peony-400);
+
+  --status-archived-bg: var(--ink-100);
+  --status-archived-text: var(--ink-700);
+  --status-archived-ring: var(--ink-200);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg-canvas: var(--ink-950);
+    --bg-surface: var(--ink-900);
+    --bg-surface-muted: var(--ink-800);
+    --bg-surface-warm: var(--ink-800);
+
+    --text-primary: var(--rose-100);
+    --text-secondary: var(--teal-300);
+    --text-tertiary: var(--ink-300);
+    --text-accent: var(--peony-300);
+    --text-danger: var(--burgundy-400);
+
+    --border-subtle: var(--ink-800);
+    --border-default: var(--ink-700);
+    --border-strong: var(--teal-600);
+    --border-focus: var(--peony-400);
+
+    --accent-primary: var(--peony-400);
+    --accent-success: var(--teal-400);
+    --accent-warning: var(--carnation-300);
+    --accent-danger: var(--burgundy-400);
+
+    --shadow-sm: 0 1px 2px 0 rgba(19, 28, 26, 0.5);
+    --shadow-md: 0 4px 12px -2px rgba(19, 28, 26, 0.55), 0 2px 4px -1px rgba(19, 28, 26, 0.35);
+    --shadow-lg: 0 12px 32px -6px rgba(19, 28, 26, 0.65), 0 4px 8px -2px rgba(19, 28, 26, 0.4);
+
+    --status-draft-bg: rgba(237, 191, 183, 0.12);
+    --status-draft-text: var(--peony-200);
+    --status-draft-ring: rgba(244, 202, 221, 0.25);
+
+    --status-in-review-bg: rgba(110, 152, 135, 0.16);
+    --status-in-review-text: var(--teal-200);
+    --status-in-review-ring: rgba(155, 186, 173, 0.3);
+
+    --status-approved-bg: rgba(181, 191, 161, 0.14);
+    --status-approved-text: var(--sage-200);
+    --status-approved-ring: rgba(196, 204, 174, 0.3);
+
+    --status-live-bg: rgba(224, 108, 159, 0.16);
+    --status-live-text: var(--peony-200);
+    --status-live-ring: rgba(229, 136, 177, 0.4);
+
+    --status-archived-bg: rgba(212, 197, 205, 0.1);
+    --status-archived-text: var(--ink-200);
+    --status-archived-ring: rgba(212, 197, 205, 0.22);
   }
 }
 
+/* ---------- Tailwind v4 theme bridge ---------- */
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-display: var(--font-bricolage);
+
+  --color-background: var(--bg-canvas);
+  --color-foreground: var(--text-primary);
+
+  /* Peony */
+  --color-peony-50: var(--peony-50);
+  --color-peony-100: var(--peony-100);
+  --color-peony-200: var(--peony-200);
+  --color-peony-300: var(--peony-300);
+  --color-peony-400: var(--peony-400);
+  --color-peony-500: var(--peony-500);
+  --color-peony-600: var(--peony-600);
+  --color-peony-700: var(--peony-700);
+  --color-peony-800: var(--peony-800);
+  --color-peony-900: var(--peony-900);
+  --color-peony-950: var(--peony-950);
+
+  /* Carnation */
+  --color-carnation-50: var(--carnation-50);
+  --color-carnation-100: var(--carnation-100);
+  --color-carnation-200: var(--carnation-200);
+  --color-carnation-300: var(--carnation-300);
+  --color-carnation-400: var(--carnation-400);
+  --color-carnation-500: var(--carnation-500);
+  --color-carnation-600: var(--carnation-600);
+  --color-carnation-700: var(--carnation-700);
+  --color-carnation-800: var(--carnation-800);
+  --color-carnation-900: var(--carnation-900);
+  --color-carnation-950: var(--carnation-950);
+
+  /* Rose */
+  --color-rose-50: var(--rose-50);
+  --color-rose-100: var(--rose-100);
+  --color-rose-200: var(--rose-200);
+  --color-rose-300: var(--rose-300);
+  --color-rose-400: var(--rose-400);
+  --color-rose-500: var(--rose-500);
+  --color-rose-600: var(--rose-600);
+  --color-rose-700: var(--rose-700);
+  --color-rose-800: var(--rose-800);
+  --color-rose-900: var(--rose-900);
+  --color-rose-950: var(--rose-950);
+
+  /* Sage */
+  --color-sage-50: var(--sage-50);
+  --color-sage-100: var(--sage-100);
+  --color-sage-200: var(--sage-200);
+  --color-sage-300: var(--sage-300);
+  --color-sage-400: var(--sage-400);
+  --color-sage-500: var(--sage-500);
+  --color-sage-600: var(--sage-600);
+  --color-sage-700: var(--sage-700);
+  --color-sage-800: var(--sage-800);
+  --color-sage-900: var(--sage-900);
+  --color-sage-950: var(--sage-950);
+
+  /* Teal */
+  --color-teal-50: var(--teal-50);
+  --color-teal-100: var(--teal-100);
+  --color-teal-200: var(--teal-200);
+  --color-teal-300: var(--teal-300);
+  --color-teal-400: var(--teal-400);
+  --color-teal-500: var(--teal-500);
+  --color-teal-600: var(--teal-600);
+  --color-teal-700: var(--teal-700);
+  --color-teal-800: var(--teal-800);
+  --color-teal-900: var(--teal-900);
+  --color-teal-950: var(--teal-950);
+
+  /* Ink */
+  --color-ink-50: var(--ink-50);
+  --color-ink-100: var(--ink-100);
+  --color-ink-200: var(--ink-200);
+  --color-ink-300: var(--ink-300);
+  --color-ink-400: var(--ink-400);
+  --color-ink-500: var(--ink-500);
+  --color-ink-600: var(--ink-600);
+  --color-ink-700: var(--ink-700);
+  --color-ink-800: var(--ink-800);
+  --color-ink-900: var(--ink-900);
+  --color-ink-950: var(--ink-950);
+
+  /* Burgundy */
+  --color-burgundy-100: var(--burgundy-100);
+  --color-burgundy-400: var(--burgundy-400);
+  --color-burgundy-500: var(--burgundy-500);
+  --color-burgundy-700: var(--burgundy-700);
+}
+
+/* ---------- Base ---------- */
+html {
+  font-size: 15.5px;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Focus-visible: peony ring, 2px offset */
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Typography utility: eyebrow */
+.eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
