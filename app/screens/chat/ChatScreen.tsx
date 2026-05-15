@@ -75,7 +75,6 @@ const COPY = {
       points: [
         { icon: 'BookOpen' as IconName, text: 'Anoqi t\'informe, elle ne pose pas de diagnostic.' },
         { icon: 'ShieldCheck' as IconName, text: 'Tes données sont pseudonymisées avant tout traitement.' },
-        { icon: 'Globe' as IconName, text: 'Tes données sont hébergées en Europe (UE).' },
         { icon: 'Trash2' as IconName, text: 'Tu peux demander la suppression à tout moment.' },
       ],
       cta: 'Je comprends et j\'accepte',
@@ -98,7 +97,6 @@ const COPY = {
       points: [
         { icon: 'BookOpen' as IconName, text: 'Anoqi informs you — it does not diagnose.' },
         { icon: 'ShieldCheck' as IconName, text: 'Your data is pseudonymised before any processing.' },
-        { icon: 'Globe' as IconName, text: 'Your data is hosted in Europe (EU).' },
         { icon: 'Trash2' as IconName, text: 'You can request deletion at any time.' },
       ],
       cta: 'I understand and agree',

@@ -11,7 +11,7 @@ import { Text } from './Text'
 type Option<V extends string> = { value: V; label: string }
 
 type Props<V extends string> = {
-  value: V
+  value: V | null
   onChange: (next: V) => void
   options: Option<V>[]
 }
@@ -23,7 +23,7 @@ export function SegmentedControl<V extends string>({ value, onChange, options }:
   const indicatorW = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
-    const rect = layouts[value]
+    const rect = value ? layouts[value] : null
     if (!rect) return
     Animated.parallel([
       Animated.timing(indicatorX, {
