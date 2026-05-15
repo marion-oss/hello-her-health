@@ -1,0 +1,17 @@
+name = "anoqi-api-staging"
+main = "src/index.ts"
+account_id = "8c0835bd412c69c713ed9eedaaf1ca24"  # Marion@anoqi.health's Account
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Public, non-secret config. Flip ANOQI_RAG_ENABLED via dashboard or `wrangler secret put`
+# when you want runtime control without a redeploy.
+[vars]
+ANOQI_RAG_ENABLED = "false"
+
+# Secrets — set via `wrangler secret put <name> --name anoqi-api-staging`:
+#   GEMINI_API_KEY                — same value as the Supabase Edge Function uses
+#   SUPABASE_URL                  — https://xulemxvfufwvewvtwwcv.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY     — bypasses RLS; required by chat / documents / summaries
+#   SUPABASE_JWT_JWKS_URL         — https://xulemxvfufwvewvtwwcv.supabase.co/auth/v1/keys
+#                                   (used by auth.ts to verify mobile-app JWTs)
