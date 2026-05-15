@@ -15,6 +15,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { chat } from '../lib/gemini.ts'
 import { classifyInput } from '../policy/policyChecker.ts'
+import { retrieve, renderSnippetsForPrompt, type Snippet } from '../lib/retrieval.ts'
+import { parseCitations, type MessageSource } from '../lib/citationParser.ts'
 
 // ─────────────────────────────────────────────────────────────
 // CORS headers — required for browser clients
@@ -33,16 +35,32 @@ interface ChatRequest {
   conversationId?: string           // Existing conversation UUID (null for new)
   sessionId?: string                // Anonymous session UUID (unauthenticated users)
   journeyType?: string              // 'symptoms' | 'contraception' | 'appointment_prep' | 'documents' | 'free_chat'
+  language?: 'fr' | 'en'            // User's interface language; drives retrieval-side language filter. Defaults to 'fr'.
+}
+
+/**
+ * Display-side enrichment for cited sources. Joined server-side from
+ * source_library / clinical_pathways / pathway_red_flags so the mobile
+ * client never needs follow-up queries. Not persisted; recomputed per turn.
+ */
+interface SourceDisplay {
+  label:       string
+  source_kind: 'pathway' | 'source' | 'pathway_red_flag'
+  source_ref:  string
+  name:        string
+  topic:       string
+  url?:        string
 }
 
 interface ChatResponse {
   message: {
-    id: string
-    content: string
-    role: 'assistant'
-    sources: unknown[]
-    policyFlags: unknown[]
-    createdAt: string
+    id:              string
+    content:         string
+    role:            'assistant'
+    sources:         MessageSource[]   // canonical refs (matches messages.sources)
+    sources_display: SourceDisplay[]   // server-enriched display data
+    policyFlags:     unknown[]
+    createdAt:       string
   }
   conversationId: string
   blocked: boolean                  // true if policy layer blocked the response
@@ -79,6 +97,7 @@ serve(async (req: Request) => {
     }
 
     const { message, conversationId, sessionId, journeyType } = body
+    const language: 'fr' | 'en' = body.language === 'en' ? 'en' : 'fr'
 
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
       return errorResponse(400, 'message is required and must be a non-empty string')
@@ -213,8 +232,36 @@ serve(async (req: Request) => {
       { role: 'user' as const, content: message.trim() },
     ]
 
+    // ── 6.5 Retrieval (RAG) ──────────────────────────────────
+    // Pull supporting snippets from the embedded clinical corpus
+    // (clinical_pathways + source_library + pathway_red_flags). Snippets
+    // are rendered into the system prompt addendum with strict citation
+    // rules. A retrieval failure MUST NOT block the chat: log it and
+    // continue with no snippets (the LLM falls back to its base behaviour).
+    //
+    // Feature gate: ANOQI_RAG_ENABLED must be 'true' for retrieval to run.
+    // This is intentional — RAG-grounded chat is closer to the EU-MDR /
+    // medical-device threshold than free conversation (see ROADMAP.md →
+    // "Clinical governance angle"). Default OFF until regulatory sign-off
+    // is recorded.
+    const ragEnabled = (Deno.env.get('ANOQI_RAG_ENABLED') ?? '').toLowerCase() === 'true'
+    let snippets: Snippet[] = []
+    if (ragEnabled) {
+      try {
+        snippets = await retrieve(supabase, {
+          message: message.trim(),
+          journeyType,
+          language,
+          topK: 5,
+        })
+      } catch (e) {
+        console.error('[chat] retrieval failed (non-fatal):', e)
+      }
+    }
+    const systemAddendum = renderSnippetsForPrompt(snippets, language) ?? undefined
+
     // ── 7. Call Gemini (policy check runs inside gemini.ts) ───
-    const aiResponse = await chat(messageHistory, journeyType)
+    const aiResponse = await chat(messageHistory, journeyType, systemAddendum)
 
     if (aiResponse.error === 'api_error') {
       // API error — return safe message without saving a broken response
@@ -224,14 +271,38 @@ serve(async (req: Request) => {
       })
     }
 
+    // ── 7.5 Parse citations & detect hallucinated source IDs ─
+    // The LLM was instructed to cite [Sn] only from the provided snippet
+    // set. Strip any tokens that fall outside that set and surface the
+    // event as a non-blocking policy flag (Critic phase will gate later).
+    const { cleanContent, citedSources, hallucinatedLabels } = parseCitations(
+      aiResponse.content,
+      snippets,
+    )
+    const citationFlags = hallucinatedLabels.length > 0
+      ? [{
+          rule: 'hallucinated_citation',
+          severity: 'warn' as const,
+          message: `Model cited unknown labels: ${hallucinatedLabels.join(', ')}`,
+        }]
+      : []
+    const combinedFlags = [...aiResponse.policyResult.flags, ...citationFlags]
+
+    // ── 7.6 Enrich citations with display data ───────────────
+    // Join cited rows against source_library / clinical_pathways /
+    // pathway_red_flags to produce sources_display for the mobile client.
+    // Never persisted — recomputed each turn so display reflects current
+    // source names / categories / URLs.
+    const sourcesDisplay = await enrichSources(supabase, citedSources, language)
+
     // ── 8. Persist both messages to DB ────────────────────────
     await persistMessages(supabase, {
       conversationId: activeConversationId,
       userId,
       userMessage: message.trim(),
-      assistantContent: aiResponse.content,
-      policyFlags: aiResponse.policyResult.flags,
-      sources: [],  // TODO: extract cited sources from Gemini response in Phase 2
+      assistantContent: cleanContent,
+      policyFlags: combinedFlags,
+      sources: citedSources,
       tokensUsed: aiResponse.tokensUsed,
       modelUsed: aiResponse.modelUsed,
     })
@@ -248,12 +319,13 @@ serve(async (req: Request) => {
     // ── 10. Return response ───────────────────────────────────
     const responsePayload: ChatResponse = {
       message: {
-        id: crypto.randomUUID(),
-        content: aiResponse.content,
-        role: 'assistant',
-        sources: [],
-        policyFlags: aiResponse.policyResult.flags,
-        createdAt: new Date().toISOString(),
+        id:              crypto.randomUUID(),
+        content:         cleanContent,
+        role:            'assistant',
+        sources:         citedSources,
+        sources_display: sourcesDisplay,
+        policyFlags:     combinedFlags,
+        createdAt:       new Date().toISOString(),
       },
       conversationId: activeConversationId,
       blocked: !aiResponse.policyResult.safe,
@@ -349,4 +421,84 @@ function jsonResponse(status: number, data: unknown): Response {
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     }
   )
+}
+
+/**
+ * Enrich cited sources with display data joined from the originating
+ * tables (source_library, clinical_pathways, pathway_red_flags). The
+ * mobile client renders these as citation chips.
+ *
+ * One batched query per source kind; bounded by `citedSources.length`
+ * which is at most topK (5). Total: ≤ 3 small `where id in (...)` reads.
+ */
+async function enrichSources(
+  supabase:     ReturnType<typeof createClient>,
+  citedSources: MessageSource[],
+  language:     'fr' | 'en',
+): Promise<Array<{
+  label:       string
+  source_kind: 'pathway' | 'source' | 'pathway_red_flag'
+  source_ref:  string
+  name:        string
+  topic:       string
+  url?:        string
+}>> {
+  if (citedSources.length === 0) return []
+
+  const sourceIds  = citedSources.filter(s => s.source_kind === 'source')           .map(s => s.source_ref)
+  const pathwayIds = citedSources.filter(s => s.source_kind === 'pathway')          .map(s => s.source_ref)
+  const redFlagIds = citedSources.filter(s => s.source_kind === 'pathway_red_flag') .map(s => s.source_ref)
+
+  const [srcRes, pthRes, rfRes] = await Promise.all([
+    sourceIds.length
+      ? supabase.from('source_library').select('id, name, url, category').in('id', sourceIds)
+      : Promise.resolve({ data: [], error: null }),
+    pathwayIds.length
+      ? supabase.from('clinical_pathways').select('id, title, pathway_key').in('id', pathwayIds)
+      : Promise.resolve({ data: [], error: null }),
+    redFlagIds.length
+      ? supabase.from('pathway_red_flags').select('id, pathway_key, escalation_type').in('id', redFlagIds)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+
+  const srcMap = new Map((srcRes.data ?? []).map((r: any) => [r.id, r]))
+  const pthMap = new Map((pthRes.data ?? []).map((r: any) => [r.id, r]))
+  const rfMap  = new Map((rfRes.data ?? []).map((r: any) => [r.id, r]))
+
+  const RED_FLAG_LABEL = language === 'fr' ? 'Drapeau rouge' : 'Red flag'
+  const SOURCE_FALLBACK = language === 'fr' ? 'Source'       : 'Source'
+  const PATH_FALLBACK   = language === 'fr' ? 'Parcours'     : 'Pathway'
+
+  return citedSources.map(s => {
+    if (s.source_kind === 'source') {
+      const row: any = srcMap.get(s.source_ref)
+      return {
+        label:       s.label,
+        source_kind: s.source_kind,
+        source_ref:  s.source_ref,
+        name:        row?.name     ?? SOURCE_FALLBACK,
+        topic:       row?.category ?? '',
+        url:         row?.url      ?? undefined,
+      }
+    }
+    if (s.source_kind === 'pathway') {
+      const row: any = pthMap.get(s.source_ref)
+      return {
+        label:       s.label,
+        source_kind: s.source_kind,
+        source_ref:  s.source_ref,
+        name:        row?.title       ?? PATH_FALLBACK,
+        topic:       row?.pathway_key ?? '',
+      }
+    }
+    // pathway_red_flag
+    const row: any = rfMap.get(s.source_ref)
+    return {
+      label:       s.label,
+      source_kind: s.source_kind,
+      source_ref:  s.source_ref,
+      name:        RED_FLAG_LABEL,
+      topic:       row?.pathway_key ?? '',
+    }
+  })
 }

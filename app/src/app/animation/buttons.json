@@ -1,0 +1,8 @@
+{
+  "main": [
+    { "label": "📋 Angebot schreiben",  "color": "#FF5A5A", "goto": "task-speaking", "modal": "angebot"  },
+    { "label": "📞 Anruf annehmen",     "color": "#FF8B5A", "goto": "task-speaking", "modal": "anruf"    },
+    { "label": "🧾 Rechnung erstellen", "color": "#FFA95A", "goto": "task-speaking", "modal": "rechnung" },
+    { "label": "📅 Termin buchen",      "color": "#FFD45A", "goto": "task-speaking", "modal": "termin"   }
+  ]
+}

@@ -1,14 +1,19 @@
 /**
- * anoqi — Gemini AI client
+ * anoqi — Gemini AI client (Workers port)
  *
  * Wraps Google's Gemini API (AI Studio / Generative Language API) for use
- * in Supabase Edge Functions (Deno). Uses native fetch — no npm package required.
+ * in Cloudflare Workers. Uses native fetch — no npm package required.
+ *
+ * Differs from api/lib/gemini.ts in one place: the API key is passed in
+ * via the `env` argument rather than read from `Deno.env`. Workers don't
+ * have a `Deno` global; env arrives via the Hono context (`c.env`) and
+ * gets threaded down to the lib functions explicitly.
  *
  * Exports:
  *   chat()            — conversational messages, runs policy check on output
  *   generateSummary() — structured JSON summary generation (higher-capability model)
  *
- * Required secret (set in Supabase Dashboard → Edge Functions → Secrets):
+ * Required secret (set via `wrangler secret put GEMINI_API_KEY`):
  *   GEMINI_API_KEY=AIza...
  *   Issued from: https://aistudio.google.com/apikey
  *
@@ -17,19 +22,15 @@
  *   gemini-2.5-pro    — summaries (higher quality structured output)
  */
 
-import { checkPolicy, type PolicyResult } from '../policy/policyChecker.ts'
+import { checkPolicy, type PolicyResult } from '../policy/policyChecker'
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 
-// gemini-2.5-flash is the right model for real-time chat: sub-second latency,
-// cheap, capable enough for conversational health guidance.
-// Summaries use gemini-2.5-pro for higher-quality structured JSON output.
 const CHAT_MODEL    = 'gemini-2.5-flash'
 const SUMMARY_MODEL = 'gemini-2.5-pro'
 
 // ─────────────────────────────────────────────────────────────
 // SYSTEM PROMPT — anoqi's clinical persona and guardrails
-// Injected as systemInstruction on every chat request.
 // ─────────────────────────────────────────────────────────────
 const BASE_SYSTEM_PROMPT = `Tu es Anoqi, une assistante en santé féminine bienveillante et experte. Tu aides les femmes à comprendre leurs symptômes, à se préparer pour leurs consultations médicales, et à naviguer dans le système de santé.
 
@@ -47,9 +48,6 @@ Ton rôle :
 
 Langue : Réponds dans la langue de l'utilisatrice. Par défaut, réponds en français.`
 
-// ─────────────────────────────────────────────────────────────
-// JOURNEY CONTEXTS — appended to the system prompt per journey type
-// ─────────────────────────────────────────────────────────────
 const JOURNEY_CONTEXTS: Record<string, string> = {
   symptoms: "Contexte : L'utilisatrice cherche à comprendre ses symptômes gynécologiques. Aide-la à les décrire précisément (durée, fréquence, intensité, déclencheurs) et à préparer sa consultation.",
   contraception: "Contexte : L'utilisatrice a des questions sur la contraception. Fournis des informations factuelles équilibrées sans recommander une méthode spécifique — c'est le rôle du médecin.",
@@ -75,25 +73,24 @@ export interface ChatResult {
   modelUsed: string
 }
 
+/** Just the slice of `env` this module needs. Handlers pass `c.env` directly. */
+export interface GeminiEnv {
+  GEMINI_API_KEY: string
+}
+
 // ─────────────────────────────────────────────────────────────
 // CHAT
-// Sends a conversation to Gemini, runs policy check on output.
-// Called by api/functions/chat.ts for every user message.
-//
-// `systemAddendum` is appended to the system prompt verbatim. chat.ts uses
-// it to inject the rendered retrieval snippets (see api/lib/retrieval.ts
-// → renderSnippetsForPrompt). Kept as an opaque string so retrieval
-// concerns stay out of this file.
 // ─────────────────────────────────────────────────────────────
 export async function chat(
   messages: ChatMessage[],
-  journeyType?: string,
-  systemAddendum?: string,
+  journeyType: string | undefined,
+  systemAddendum: string | undefined,
+  env: GeminiEnv,
 ): Promise<ChatResult> {
-  const apiKey = Deno.env.get('GEMINI_API_KEY')
+  const apiKey = env.GEMINI_API_KEY
 
   if (!apiKey) {
-    console.error('[gemini] GEMINI_API_KEY secret not set in Edge Functions')
+    console.error('[gemini] GEMINI_API_KEY secret not set')
     return apiError(CHAT_MODEL)
   }
 
@@ -105,7 +102,6 @@ export async function chat(
     ? `${baseWithJourney}\n\n${systemAddendum}`
     : baseWithJourney
 
-  // Gemini uses 'model' for assistant turns and a parts[] wrapper around text.
   const contents = messages.map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.content }],
@@ -117,17 +113,15 @@ export async function chat(
       {
         method: 'POST',
         headers: {
-          'Content-Type':    'application/json',
-          'x-goog-api-key':   apiKey,
+          'Content-Type':   'application/json',
+          'x-goog-api-key':  apiKey,
         },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemPrompt }] },
           contents,
-          generationConfig: {
-            maxOutputTokens: 1024,
-          },
+          generationConfig: { maxOutputTokens: 1024 },
         }),
-      }
+      },
     )
 
     if (!response.ok) {
@@ -136,12 +130,10 @@ export async function chat(
       return apiError(CHAT_MODEL)
     }
 
-    const data = await response.json()
+    const data: any = await response.json()
     const rawContent: string  = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
     const tokensUsed: number | null = data.usageMetadata?.candidatesTokenCount ?? null
 
-    // Every AI response is checked by the deterministic policy layer
-    // before being returned. The policy layer can block, modify, or pass through.
     const policyResult = checkPolicy(rawContent)
 
     return {
@@ -161,15 +153,15 @@ export async function chat(
 
 // ─────────────────────────────────────────────────────────────
 // GENERATE SUMMARY
-// Higher-capability model with JSON response mode enforced.
-// Called by api/functions/summaries.ts.
-// Returns the raw text response — parsing is handled by summaryParser.ts.
 // ─────────────────────────────────────────────────────────────
-export async function generateSummary(prompt: string): Promise<string | null> {
-  const apiKey = Deno.env.get('GEMINI_API_KEY')
+export async function generateSummary(
+  prompt: string,
+  env: GeminiEnv,
+): Promise<string | null> {
+  const apiKey = env.GEMINI_API_KEY
 
   if (!apiKey) {
-    console.error('[gemini] GEMINI_API_KEY secret not set in Edge Functions')
+    console.error('[gemini] GEMINI_API_KEY secret not set')
     return null
   }
 
@@ -179,18 +171,17 @@ export async function generateSummary(prompt: string): Promise<string | null> {
       {
         method: 'POST',
         headers: {
-          'Content-Type':    'application/json',
-          'x-goog-api-key':   apiKey,
+          'Content-Type':   'application/json',
+          'x-goog-api-key':  apiKey,
         },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: {
             maxOutputTokens:  2000,
-            // Enforce strict JSON output — no markdown wrapper, no preamble.
             responseMimeType: 'application/json',
           },
         }),
-      }
+      },
     )
 
     if (!response.ok) {
@@ -199,7 +190,7 @@ export async function generateSummary(prompt: string): Promise<string | null> {
       return null
     }
 
-    const data = await response.json()
+    const data: any = await response.json()
     return data.candidates?.[0]?.content?.parts?.[0]?.text ?? null
 
   } catch (e) {
