@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useNavigation, useRoute } from '@react-navigation/native'
 
 import { useOnboarding, type HealthObjective } from '../../context/OnboardingContext'
-import { useTheme } from '../../theme'
+import { hover, useTheme } from '../../theme'
 import {
   BackHeader,
   Button,
@@ -19,6 +19,7 @@ import {
   ProgressBar,
   Text,
 } from '../../components'
+import { STARTERS } from '../chat/starters'
 
 type ObjectiveOption = {
   id: HealthObjective
@@ -69,8 +70,7 @@ const COPY = {
     step: 'Étape 1 sur 3',
     cta: 'Continuer',
     ctaChange: 'Enregistrer',
-    skip: 'Je ne sais pas encore',
-    startChat: 'Commencer la conversation',
+    ctaSkipChat: 'Passer et commencer la conversation',
   },
   en: {
     title: 'What brings you here?',
@@ -80,12 +80,13 @@ const COPY = {
     step: 'Step 1 of 3',
     cta: 'Continue',
     ctaChange: 'Save',
-    skip: "I'm not sure yet",
-    startChat: "Let's start chatting",
+    ctaSkipChat: 'Skip and start chatting',
   },
 } as const
 
 const CHAT_INTENT_KEY = 'anoqi_chat_intent'
+const PENDING_CONSENT_KEY = 'anoqi_pending_consent'
+const CHAT_PREFILL_KEY = 'anoqi_chat_prefill'
 
 export function ObjectiveScreen() {
   const navigation = useNavigation<any>()
@@ -102,14 +103,22 @@ export function ObjectiveScreen() {
     else navigation.navigate('Consent')
   }
 
-  function handleSkip() {
-    setObjective('general')
-    navigation.navigate('Consent')
-  }
-
-  async function handleStartChatting() {
-    setObjective(selected ?? 'general')
-    await AsyncStorage.setItem(CHAT_INTENT_KEY, 'true')
+  async function handleSkipAndChat() {
+    const obj: HealthObjective = selected ?? 'general'
+    setObjective(obj)
+    // Mark this entry as the skip-and-chat path so ChatScreen knows to defer
+    // the AI response until the consent bottom-sheet has been accepted.
+    await AsyncStorage.multiSet([
+      [CHAT_INTENT_KEY, 'true'],
+      [PENDING_CONSENT_KEY, 'true'],
+    ])
+    // Prefill the chat composer with the first starter for the chosen
+    // objective so the user just has to press send. Only set when the user
+    // actually picked an objective — otherwise leave the input empty.
+    if (selected) {
+      const prefill = STARTERS[obj][language][0]
+      if (prefill) await AsyncStorage.setItem(CHAT_PREFILL_KEY, prefill)
+    }
     markDone()
   }
 
@@ -167,14 +176,23 @@ export function ObjectiveScreen() {
                 accessibilityState={{ selected: isSelected }}
                 accessibilityLabel={copy.label}
                 onPress={() => setSelected(obj.id)}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingVertical: theme.spacing[4],
-                  paddingHorizontal: theme.spacing[4],
-                  borderRadius: theme.radii.lg,
-                  backgroundColor: isSelected ? theme.colors.bg.surfaceWarm : 'transparent',
-                }}
+                style={({ hovered }: any) => [
+                  {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingVertical: theme.spacing[4],
+                    paddingHorizontal: theme.spacing[4],
+                    borderRadius: theme.radii.lg,
+                    backgroundColor: isSelected
+                      ? theme.colors.bg.surfaceWarm
+                      : 'transparent',
+                  },
+                  hover.transition,
+                  hovered && !isSelected && {
+                    backgroundColor: 'rgba(255, 245, 238, 0.04)',
+                    transform: [{ translateX: 2 }],
+                  },
+                ]}
               >
                 <View
                   style={{
@@ -229,28 +247,13 @@ export function ObjectiveScreen() {
           />
 
           {!isChangeMode ? (
-            <>
-              <Pressable
-                accessibilityRole="button"
-                onPress={handleStartChatting}
-                style={{ alignSelf: 'center', paddingVertical: theme.spacing[2] }}
-                hitSlop={10}
-              >
-                <Text variant="bodyMed" tone="accent">
-                  {copy.startChat} →
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={handleSkip}
-                style={{ alignSelf: 'center', paddingVertical: theme.spacing[1] }}
-                hitSlop={10}
-              >
-                <Text variant="body" tone="tertiary">
-                  {copy.skip}
-                </Text>
-              </Pressable>
-            </>
+            <Button
+              label={copy.ctaSkipChat}
+              variant="secondary"
+              size="lg"
+              fullWidth
+              onPress={handleSkipAndChat}
+            />
           ) : null}
         </View>
       </View>

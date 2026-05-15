@@ -4,7 +4,7 @@
 import React from 'react'
 import { Pressable, View } from 'react-native'
 
-import { useTheme } from '../theme'
+import { hover, useTheme } from '../theme'
 import { Icon } from './Icon'
 import { Wordmark } from './Wordmark'
 
@@ -34,7 +34,11 @@ export function BackHeader({ onBack, rightSlot, showWordmark = true }: Props) {
             accessibilityLabel="Back"
             onPress={onBack}
             hitSlop={12}
-            style={{ marginRight: theme.spacing[3] }}
+            style={({ hovered }: any) => [
+              { marginRight: theme.spacing[3] },
+              hover.transition,
+              hovered && { opacity: 0.75, transform: [{ translateX: -1 }] },
+            ]}
           >
             <Icon name="ChevronLeft" size={22} color={theme.colors.text.secondary} />
           </Pressable>

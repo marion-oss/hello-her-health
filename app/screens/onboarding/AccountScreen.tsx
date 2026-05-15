@@ -41,11 +41,11 @@ const COPY = {
       login: 'Connecte-toi',
       anon: 'Anonyme',
     },
-    email: 'Email',
+    email: 'Email *',
     emailPlaceholder: 'toi@exemple.fr',
-    password: 'Mot de passe',
+    password: 'Mot de passe *',
     passwordPlaceholder: '8 caractères minimum',
-    passwordConfirm: 'Confirme le mot de passe',
+    passwordConfirm: 'Confirme le mot de passe *',
     birthYear: 'Année de naissance',
     birthYearPlaceholder: 'ex. 1985',
     country: 'Pays',
@@ -56,7 +56,10 @@ const COPY = {
     anonBody:
       "Tes données restent sur cet appareil et ne sont jamais liées à ton nom. Tu pourras créer un compte plus tard si tu changes d'avis.",
     anonCta: 'Continuer en anonyme',
-    privacy: 'Tes données sont hébergées en Europe (UE) et ne sont jamais vendues.',
+    neutralTitle: 'Choisis une option ci-dessus',
+    neutralBody:
+      "Crée un compte pour retrouver tes résumés sur tous tes appareils et accéder à plus de fonctionnalités. Connecte-toi si tu en as déjà un. Ou continue en anonyme — tes données restent sur cet appareil.",
+    neutralCta: 'Continuer',
     errorPasswordMatch: 'Les mots de passe ne correspondent pas',
     errorPasswordLength: 'Le mot de passe doit contenir au moins 8 caractères',
     errorEmailInvalid: 'Adresse email invalide',
@@ -71,11 +74,11 @@ const COPY = {
       login: 'Log in',
       anon: 'Anonymous',
     },
-    email: 'Email',
+    email: 'Email *',
     emailPlaceholder: 'you@example.com',
-    password: 'Password',
+    password: 'Password *',
     passwordPlaceholder: 'Minimum 8 characters',
-    passwordConfirm: 'Confirm password',
+    passwordConfirm: 'Confirm password *',
     birthYear: 'Birth year',
     birthYearPlaceholder: 'e.g. 1985',
     country: 'Country',
@@ -86,7 +89,10 @@ const COPY = {
     anonBody:
       "Your data stays on this device and is never linked to your name. You can create an account later if you change your mind.",
     anonCta: 'Continue anonymously',
-    privacy: 'Your data is hosted in Europe (EU) and never sold.',
+    neutralTitle: 'Pick one of the options above',
+    neutralBody:
+      "Create an account to access your summaries across devices and unlock more features. Log in if you already have one. Or continue anonymously — your data stays on this device.",
+    neutralCta: 'Continue',
     errorPasswordMatch: 'Passwords do not match',
     errorPasswordLength: 'Password must be at least 8 characters',
     errorEmailInvalid: 'Invalid email address',
@@ -109,11 +115,11 @@ export function AccountScreen() {
   const theme = useTheme()
   const copy = COPY[language]
 
-  const initialMode: AuthMode =
-    (route.params?.mode as AuthMode | undefined) === 'login' ? 'login' : 'signup'
+  const initialMode: AuthMode | null =
+    (route.params?.mode as AuthMode | undefined) === 'login' ? 'login' : null
   const isDirectLogin = route.params?.mode === 'login'
 
-  const [mode, setMode] = useState<AuthMode>(initialMode)
+  const [mode, setMode] = useState<AuthMode | null>(initialMode)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
@@ -238,7 +244,36 @@ export function AccountScreen() {
             />
           </View>
 
-          {mode === 'anon' ? (
+          {mode === null ? (
+            <View
+              style={{
+                backgroundColor: theme.colors.bg.surfaceMuted,
+                borderRadius: theme.radii.lg,
+                borderWidth: 1,
+                borderColor: theme.colors.border.subtle,
+                padding: theme.spacing[5],
+              }}
+            >
+              <Text
+                variant="h4"
+                tone="primary"
+                style={{ marginBottom: theme.spacing[3] }}
+              >
+                {copy.neutralTitle}
+              </Text>
+              <Text variant="body" tone="secondary" style={{ marginBottom: theme.spacing[5] }}>
+                {copy.neutralBody}
+              </Text>
+              <Button
+                label={copy.neutralCta}
+                size="md"
+                fullWidth
+                variant="primary"
+                disabled
+                onPress={() => {}}
+              />
+            </View>
+          ) : mode === 'anon' ? (
             <View
               style={{
                 backgroundColor: theme.colors.bg.surfaceMuted,
@@ -346,15 +381,6 @@ export function AccountScreen() {
               />
             </View>
           )}
-
-          <Text
-            variant="caption"
-            tone="tertiary"
-            align="center"
-            style={{ marginTop: theme.spacing[8] }}
-          >
-            {copy.privacy}
-          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
