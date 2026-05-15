@@ -15,7 +15,7 @@ import {
   type ViewStyle,
 } from 'react-native'
 
-import { useTheme } from '../theme'
+import { hover, useTheme } from '../theme'
 import { Text } from './Text'
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'ghostDanger'
@@ -118,17 +118,32 @@ export function Button({
         onPressOut={handlePressOut}
         disabled={isDisabled}
         {...rest}
-        style={{
-          backgroundColor: styles.bg,
-          borderColor:     styles.border,
-          borderWidth:     variant === 'secondary' ? 1.5 : 0,
-          paddingVertical:   padding.vertical,
-          paddingHorizontal: padding.horizontal,
-          borderRadius: theme.radii.pill,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          opacity: isDisabled ? 0.7 : 1,
+        style={({ hovered }: any) => {
+          const lift = hovered && !isDisabled
+          return [
+            {
+              backgroundColor: styles.bg,
+              borderColor:     styles.border,
+              borderWidth:     variant === 'secondary' ? 1.5 : 0,
+              paddingVertical:   padding.vertical,
+              paddingHorizontal: padding.horizontal,
+              borderRadius: theme.radii.pill,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: isDisabled ? 0.7 : 1,
+            },
+            hover.transition,
+            lift && hover.lift,
+            lift && variant === 'primary' && hover.glow('rgba(255, 4, 114, 0.55)'),
+            lift && variant === 'secondary' && {
+              borderColor: theme.colors.border.strong ?? 'rgba(255, 245, 238, 0.22)',
+              backgroundColor: 'rgba(255, 245, 238, 0.04)',
+            },
+            lift && (variant === 'ghost' || variant === 'ghostDanger') && {
+              backgroundColor: 'rgba(255, 245, 238, 0.05)',
+            },
+          ]
         }}
       >
         {leftAdornment ? <View style={{ marginRight: 8 }}>{leftAdornment}</View> : null}

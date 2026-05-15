@@ -5,7 +5,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Animated, LayoutRectangle, Pressable, View } from 'react-native'
 
-import { useTheme } from '../theme'
+import { hover, useTheme } from '../theme'
 import { Text } from './Text'
 
 type Option<V extends string> = { value: V; label: string }
@@ -73,25 +73,34 @@ export function SegmentedControl<V extends string>({ value, onChange, options }:
             onLayout={(e) =>
               setLayouts((prev) => ({ ...prev, [opt.value]: e.nativeEvent.layout }))
             }
-            style={{
-              flex: 1,
-              paddingVertical: theme.spacing[3],
-              paddingHorizontal: theme.spacing[3],
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: theme.radii.pill,
-            }}
+            style={({ hovered }: any) => [
+              {
+                flex: 1,
+                paddingVertical: theme.spacing[3],
+                paddingHorizontal: theme.spacing[3],
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: theme.radii.pill,
+              },
+              hover.transition,
+            ]}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
           >
-            <Text
-              variant="bodyMed"
-              style={{
-                color: active ? theme.colors.text.primary : theme.colors.text.secondary,
-              }}
-            >
-              {opt.label}
-            </Text>
+            {({ hovered }: any) => (
+              <Text
+                variant="bodyMed"
+                style={{
+                  color: active
+                    ? theme.colors.text.primary
+                    : hovered
+                      ? theme.colors.text.primary
+                      : theme.colors.text.secondary,
+                }}
+              >
+                {opt.label}
+              </Text>
+            )}
           </Pressable>
         )
       })}

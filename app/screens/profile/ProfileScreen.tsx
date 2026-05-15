@@ -7,7 +7,7 @@ import React from 'react'
 import { Platform, Pressable, SafeAreaView, StatusBar, View } from 'react-native'
 
 import { useOnboarding, type Language } from '../../context/OnboardingContext'
-import { palette, useTheme } from '../../theme'
+import { hover, palette, useTheme } from '../../theme'
 import { LiquidEmber, Text, Wordmark } from '../../components'
 
 const COPY = {
@@ -146,22 +146,35 @@ function LangPill({
       accessibilityRole="radio"
       accessibilityState={{ selected: active }}
       onPress={onPress}
-      style={{
-        flex: 1,
-        paddingVertical: 14,
-        borderRadius: 999,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'row',
-        gap: 8,
-        backgroundColor: active
-          ? 'rgba(255, 4, 114, 0.22)'
-          : 'rgba(255, 245, 238, 0.05)',
-        borderWidth: 1,
-        borderColor: active
-          ? 'rgba(255, 4, 114, 0.45)'
-          : 'rgba(255, 245, 238, 0.10)',
-      }}
+      style={({ hovered }: any) => [
+        {
+          flex: 1,
+          paddingVertical: 14,
+          borderRadius: 999,
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'row',
+          gap: 8,
+          backgroundColor: active
+            ? 'rgba(255, 4, 114, 0.22)'
+            : 'rgba(255, 245, 238, 0.05)',
+          borderWidth: 1,
+          borderColor: active
+            ? 'rgba(255, 4, 114, 0.45)'
+            : 'rgba(255, 245, 238, 0.10)',
+        },
+        hover.transition,
+        hovered && hover.lift,
+        hovered && active && {
+          borderColor: 'rgba(255, 4, 114, 0.65)',
+          backgroundColor: 'rgba(255, 4, 114, 0.28)',
+        },
+        hovered && active && hover.glow('rgba(255, 4, 114, 0.45)'),
+        hovered && !active && {
+          backgroundColor: 'rgba(255, 245, 238, 0.10)',
+          borderColor: 'rgba(255, 245, 238, 0.22)',
+        },
+      ]}
     >
       {active ? (
         <View

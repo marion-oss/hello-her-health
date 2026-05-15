@@ -19,7 +19,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 
-import { palette, useTheme } from '../theme'
+import { hover, palette, useTheme } from '../theme'
 import { Icon, type IconName } from './Icon'
 import { LiquidEmber } from './LiquidEmber'
 import { Text } from './Text'
@@ -172,16 +172,22 @@ function TabButton({
         onPressIn={() => { scale.value = withTiming(0.94, { duration: 100, easing: ease }) }}
         onPressOut={() => { scale.value = withTiming(1, { duration: 200, easing: ease }) }}
         hitSlop={6}
-        style={{
-          paddingHorizontal: 18,
-          paddingVertical: 12,
-          borderRadius: 999,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: focused ? 'rgba(255, 245, 238, 0.08)' : 'transparent',
-          borderWidth: focused ? 1 : 0,
-          borderColor: 'rgba(255, 245, 238, 0.10)',
-        }}
+        style={({ hovered }: any) => [
+          {
+            paddingHorizontal: 18,
+            paddingVertical: 12,
+            borderRadius: 999,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: focused ? 'rgba(255, 245, 238, 0.08)' : 'transparent',
+            borderWidth: focused ? 1 : 0,
+            borderColor: 'rgba(255, 245, 238, 0.10)',
+          },
+          hover.transition,
+          hovered && !focused && {
+            backgroundColor: 'rgba(255, 245, 238, 0.04)',
+          },
+        ]}
       >
         <Icon name={icon} size={22} color={iconColor} strokeWidth={focused ? 1.8 : 1.6} />
         {/* Indicator dot — only animates when focused; sits below the icon. */}

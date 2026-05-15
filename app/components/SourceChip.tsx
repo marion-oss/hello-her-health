@@ -3,7 +3,7 @@
 import React from 'react'
 import { Pressable, View } from 'react-native'
 
-import { useTheme } from '../theme'
+import { hover, useTheme } from '../theme'
 import { Icon } from './Icon'
 import { Text } from './Text'
 
@@ -39,7 +39,16 @@ export function SourceChip({ label, onPress }: Props) {
 
   if (onPress) {
     return (
-      <Pressable accessibilityRole="link" onPress={onPress} hitSlop={6}>
+      <Pressable
+        accessibilityRole="link"
+        onPress={onPress}
+        hitSlop={6}
+        style={({ hovered }: any) => [
+          hover.transition,
+          hovered && hover.lift,
+          hovered && { opacity: 0.9 },
+        ]}
+      >
         {content}
       </Pressable>
     )

@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useNavigation } from '@react-navigation/native'
 
 import { useOnboarding } from '../../context/OnboardingContext'
-import { useTheme } from '../../theme'
+import { hover, useTheme } from '../../theme'
 import {
   Button,
   Checkbox,
@@ -99,7 +99,17 @@ export function ConsentScreen() {
             accessibilityRole="checkbox"
             accessibilityState={{ checked: consent.terms }}
             onPress={() => toggle('terms')}
-            style={{ flexDirection: 'row', gap: theme.spacing[4] }}
+            style={({ hovered }: any) => [
+              {
+                flexDirection: 'row',
+                gap: theme.spacing[4],
+                padding: theme.spacing[3],
+                marginHorizontal: -theme.spacing[3],
+                borderRadius: theme.radii.md,
+              },
+              hover.transition,
+              hovered && { backgroundColor: 'rgba(255, 245, 238, 0.03)' },
+            ]}
           >
             <View style={{ marginTop: 2 }}>
               <Checkbox
@@ -137,7 +147,17 @@ export function ConsentScreen() {
             accessibilityRole="checkbox"
             accessibilityState={{ checked: consent.health }}
             onPress={() => toggle('health')}
-            style={{ flexDirection: 'row', gap: theme.spacing[4] }}
+            style={({ hovered }: any) => [
+              {
+                flexDirection: 'row',
+                gap: theme.spacing[4],
+                padding: theme.spacing[3],
+                marginHorizontal: -theme.spacing[3],
+                borderRadius: theme.radii.md,
+              },
+              hover.transition,
+              hovered && { backgroundColor: 'rgba(255, 245, 238, 0.03)' },
+            ]}
           >
             <View style={{ marginTop: 2 }}>
               <Checkbox
@@ -161,7 +181,17 @@ export function ConsentScreen() {
             accessibilityRole="checkbox"
             accessibilityState={{ checked: consent.research }}
             onPress={() => toggle('research')}
-            style={{ flexDirection: 'row', gap: theme.spacing[4] }}
+            style={({ hovered }: any) => [
+              {
+                flexDirection: 'row',
+                gap: theme.spacing[4],
+                padding: theme.spacing[3],
+                marginHorizontal: -theme.spacing[3],
+                borderRadius: theme.radii.md,
+              },
+              hover.transition,
+              hovered && { backgroundColor: 'rgba(255, 245, 238, 0.03)' },
+            ]}
           >
             <View style={{ marginTop: 2 }}>
               <Checkbox
