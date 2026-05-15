@@ -197,7 +197,7 @@ export async function chatHandler(c: Context<{ Bindings: Env }>): Promise<Respon
   const systemAddendum = renderSnippetsForPrompt(snippets, language) ?? undefined
 
   // Call Gemini (policy check runs inside)
-  const aiResponse = await geminiChat(messageHistory, journeyType, systemAddendum, c.env)
+  const aiResponse = await geminiChat(messageHistory, journeyType, systemAddendum, c.env, language)
 
   if (aiResponse.error === 'api_error') {
     return c.json(

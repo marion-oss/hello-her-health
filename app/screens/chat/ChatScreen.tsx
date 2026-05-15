@@ -30,19 +30,30 @@ import {
   type Language,
 } from '../../context/OnboardingContext'
 import { palette, useTheme } from '../../theme'
+import { postChat, AnoqiApiError, type SourceDisplay } from '../../lib/anoqiApi'
 import {
   BackHeader,
   BreathingForm,
   Bubble,
   Button,
+  GoalSheet,
   Icon,
   type IconName,
   LiquidEmber,
+  MarkdownText,
   SourceChip,
   StreamingCursor,
   Text,
   TypingIndicator,
 } from '../../components'
+
+const OBJECTIVE_LABELS: Record<HealthObjective, { fr: string; en: string; icon: IconName }> = {
+  symptoms:      { fr: 'Symptômes',     en: 'Symptoms',     icon: 'Stethoscope' },
+  contraception: { fr: 'Contraception', en: 'Contraception', icon: 'Pill' },
+  menopause:     { fr: 'Ménopause',     en: 'Menopause',    icon: 'Sunset' },
+  fertility:     { fr: 'Fertilité',     en: 'Fertility',    icon: 'Sprout' },
+  general:       { fr: 'Santé générale', en: 'General health', icon: 'MessageCircle' },
+}
 
 type Source = { name: string; topic: string; url?: string }
 
@@ -106,123 +117,94 @@ const COPY = {
   },
 } as const
 
-const STARTERS: Record<HealthObjective, { fr: string[]; en: string[] }> = {
+// Starter cards. The short `label` is what the user sees on the card; the
+// full `prompt` is what gets sent to the LLM as the user turn — gives the
+// model enough context to answer well without forcing chatty card copy.
+type Starter = { label: string; prompt: string }
+
+const STARTERS: Record<HealthObjective, { fr: Starter[]; en: Starter[] }> = {
   symptoms: {
     fr: [
-      "J'ai des règles irrégulières depuis 3 mois",
-      "Comment préparer ma consultation gynéco ?",
-      'Qu\'est-ce qui pourrait expliquer ma fatigue ?',
-      'Pelviennes — que dois-je savoir ?',
+      { label: "Règles irrégulières",          prompt: "J'ai des règles irrégulières depuis 3 mois" },
+      { label: "Préparer ma consultation gynéco", prompt: "Comment préparer ma consultation gynécologique ?" },
+      { label: "Pourquoi cette fatigue ?",    prompt: "Qu'est-ce qui pourrait expliquer ma fatigue ?" },
+      { label: "Douleurs pelviennes",         prompt: "J'ai des douleurs pelviennes — que dois-je savoir ?" },
     ],
     en: [
-      "I've had irregular periods for 3 months",
-      'How do I prepare for a gynae appointment?',
-      'What could be causing my fatigue?',
-      'Pelvic pain — what should I know?',
+      { label: "Irregular periods",       prompt: "I've been having irregular periods for 3 months" },
+      { label: "Prepare for my gynae appt", prompt: "How do I prepare for a gynaecology appointment?" },
+      { label: "Why this fatigue?",       prompt: "What could be causing my fatigue?" },
+      { label: "Pelvic pain",             prompt: "I have pelvic pain — what should I know?" },
     ],
   },
   contraception: {
     fr: [
-      'Pilule vs stérilet : la différence ?',
-      "J'arrête la pilule — quoi attendre ?",
-      'Quels effets secondaires possibles ?',
-      'La pilule fait-elle grossir ?',
+      { label: "Pilule vs stérilet",          prompt: "Quelle est la différence entre la pilule et le stérilet ?" },
+      { label: "Arrêter la pilule",           prompt: "Je veux arrêter la pilule — à quoi m'attendre ?" },
+      { label: "Effets secondaires",          prompt: "Quels effets secondaires peuvent avoir les contraceptifs ?" },
+      { label: "Pilule et prise de poids ?",  prompt: "La pilule fait-elle vraiment grossir ?" },
     ],
     en: [
-      'Pill vs coil — what\'s the difference?',
-      "I'm stopping the pill — what to expect?",
-      'What side effects are possible?',
-      'Does the pill cause weight gain?',
+      { label: "Pill vs coil",                prompt: "What's the difference between the pill and the coil?" },
+      { label: "Stopping the pill",           prompt: "I want to stop the pill — what should I expect?" },
+      { label: "Side effects",                prompt: "What side effects can I expect from contraceptives?" },
+      { label: "Pill and weight gain?",       prompt: "Does the pill really cause weight gain?" },
     ],
   },
   menopause: {
     fr: [
-      'Premiers signes de la périménopause ?',
-      'Le THM est-il fait pour moi ?',
-      'Gérer les bouffées de chaleur ?',
-      'Ménopause et mes os ?',
+      { label: "Signes de périménopause",     prompt: "Quels sont les premiers signes de la périménopause ?" },
+      { label: "Le THM est-il pour moi ?",    prompt: "Le THM est-il fait pour moi ?" },
+      { label: "Gérer les bouffées de chaleur", prompt: "Comment gérer les bouffées de chaleur ?" },
+      { label: "Ménopause et mes os ?",       prompt: "Que fait la ménopause à mes os ?" },
     ],
     en: [
-      'First signs of perimenopause?',
-      'Is HRT right for me?',
-      'How do I manage hot flashes?',
-      'What does menopause do to my bones?',
+      { label: "Signs of perimenopause",      prompt: "What are the first signs of perimenopause?" },
+      { label: "Is HRT right for me?",        prompt: "Is HRT right for me?" },
+      { label: "Manage hot flashes",          prompt: "How do I manage hot flashes?" },
+      { label: "Menopause and my bones?",     prompt: "What does menopause do to my bones?" },
     ],
   },
   fertility: {
     fr: [
-      'Repérer ma fenêtre de fertilité ?',
-      'Qualité des ovules — quoi savoir ?',
-      "J'essaie depuis 6 mois — quand consulter ?",
-      'Que dit la longueur de mon cycle ?',
+      { label: "Ma fenêtre de fertilité",     prompt: "Comment repérer ma fenêtre de fertilité ?" },
+      { label: "Qualité des ovules",          prompt: "Qu'est-ce qui influence la qualité des ovules ?" },
+      { label: "Essais depuis 6 mois",        prompt: "J'essaie depuis 6 mois — quand consulter ?" },
+      { label: "Longueur de mon cycle",       prompt: "Que m'indique la longueur de mon cycle ?" },
     ],
     en: [
-      'How do I track my fertile window?',
-      'What affects egg quality?',
-      "I've been trying 6 months — when to consult?",
-      'What does my cycle length say?',
+      { label: "My fertile window",           prompt: "How do I track my fertile window?" },
+      { label: "Egg quality",                 prompt: "What affects egg quality?" },
+      { label: "Trying for 6 months",         prompt: "I've been trying for 6 months — when should I see a doctor?" },
+      { label: "My cycle length",             prompt: "What does my cycle length tell me?" },
     ],
   },
   general: {
     fr: [
-      'Mieux comprendre mes hormones',
-      'Épuisée — est-ce hormonal ?',
-      'Hormones, énergie, performance ?',
-      'Trouver un médecin qui m\'écoute ?',
+      { label: "Mieux comprendre mes hormones",    prompt: "Je veux mieux comprendre mes hormones" },
+      { label: "Épuisée — est-ce hormonal ?",      prompt: "Je me sens épuisée — est-ce hormonal ?" },
+      { label: "Hormones, énergie, performance ?", prompt: "Comment les hormones influencent mon énergie et mes performances ?" },
+      { label: "Trouver un médecin qui m'écoute ?", prompt: "Comment trouver un médecin qui m'écoute vraiment ?" },
     ],
     en: [
-      'Help me understand my hormones',
-      'Exhausted — could it be hormonal?',
-      'Hormones, energy, performance?',
-      'Find a doctor who listens?',
+      { label: "Help me understand my hormones",   prompt: "I want to understand my hormones better" },
+      { label: "Exhausted — could it be hormonal?", prompt: "I've been feeling exhausted — could it be hormonal?" },
+      { label: "Hormones, energy, performance?",   prompt: "How do hormones affect my energy and performance?" },
+      { label: "Find a doctor who listens?",       prompt: "How do I find a doctor who listens?" },
     ],
   },
 }
 
-const SAMPLE_SOURCES: Source[][] = [
-  [
-    { name: 'NHS', topic: 'Menstrual health', url: 'https://www.nhs.uk/conditions/periods/' },
-    { name: 'NICE', topic: 'Gynaecology', url: 'https://www.nice.org.uk/guidance/ng88' },
-  ],
-  [
-    { name: 'FSRH', topic: 'Contraception', url: 'https://www.fsrh.org/standards-and-guidance/' },
-    { name: 'NHS', topic: 'Sexual health', url: 'https://www.nhs.uk/contraception/' },
-  ],
-  [
-    { name: 'BMS', topic: 'Menopause', url: 'https://thebms.org.uk/publications/' },
-    { name: 'NICE', topic: 'Menopause', url: 'https://www.nice.org.uk/guidance/ng23' },
-  ],
-  [
-    { name: 'NHS', topic: 'Women\'s health' },
-    { name: 'HAS', topic: 'Santé féminine' },
-  ],
-  [
-    { name: 'Cochrane', topic: 'Systematic review' },
-    { name: 'FSRH', topic: 'Reproductive health' },
-  ],
-]
-
-const MOCK_RESPONSES: Record<Language, string[]> = {
-  en: [
-    "What you're describing is something many women experience, and it's worth taking seriously. Symptoms like these can have several underlying causes — hormonal fluctuations, thyroid function, nutritional factors, or conditions like PCOS or endometriosis. Tracking the timing, intensity, and any accompanying symptoms will give your doctor a much clearer picture. Would you like help preparing a summary of what you've been experiencing?",
-    "There are important nuances here that often get missed. Research conducted specifically on women's health — rather than extrapolated from male studies — shows that hormonal influences on this are significant and often underestimated. The evidence from NICE and FSRH guidelines suggests that a personalised approach works better than a one-size-fits-all answer.",
-    "This is one of those areas where women are often dismissed, but the evidence is clear. Your symptoms are real, they have a clinical basis, and there are evidence-based options available. Let me break down what the research says.",
-  ],
-  fr: [
-    "Ce que tu décris est vécu par beaucoup de femmes, et ça mérite d'être pris au sérieux. Ces symptômes peuvent avoir plusieurs causes — fluctuations hormonales, thyroïde, facteurs nutritionnels, ou des conditions comme le SOPK ou l'endométriose. Noter le moment, l'intensité et les symptômes associés donnera à ton médecin une image beaucoup plus claire. Tu veux que je t'aide à préparer un résumé ?",
-    'Il y a des nuances importantes ici qui passent souvent inaperçues. Les recherches menées spécifiquement sur la santé des femmes montrent que les influences hormonales sont significatives et souvent sous-estimées. Les recommandations HAS et NICE suggèrent une approche personnalisée.',
-    "C'est un domaine où les femmes sont souvent ignorées, mais les preuves sont claires. Tes symptômes sont réels, ils ont une base clinique, et des options fondées sur des données probantes existent.",
-  ],
-}
-
-function getMockResponse(lang: Language, index: number): string {
-  const responses = MOCK_RESPONSES[lang]
-  return responses[index % responses.length]
+// Map the BE's `sources_display` payload into the UI's compact Source shape.
+// Pathway-typed sources don't have a URL on the BE; we leave it undefined and
+// the SourceChip render handles non-link rendering.
+function toSource(d: SourceDisplay): Source {
+  return { name: d.name, topic: d.topic, url: d.url }
 }
 
 export function ChatScreen() {
   const navigation = useNavigation<any>()
-  const { language, objective } = useOnboarding()
+  const { language, objective, setObjective, sessionId } = useOnboarding()
   const theme = useTheme()
   const copy = COPY[language]
 
@@ -233,6 +215,10 @@ export function ChatScreen() {
   const [userMessageCount, setUserMessageCount] = useState(0)
   const [consentChecked, setConsentChecked] = useState(false)
   const [consentAccepted, setConsentAccepted] = useState(false)
+  const [goalSheetOpen, setGoalSheetOpen] = useState(false)
+
+  const objKey = objective ?? 'general'
+  const objMeta = OBJECTIVE_LABELS[objKey]
 
   const flatListRef = useRef<FlatList>(null)
   const anoqiMessageCount = useRef(0)
@@ -253,6 +239,26 @@ export function ChatScreen() {
     await AsyncStorage.setItem('anoqi_chat_consent_accepted', 'true')
     setConsentAccepted(true)
   }
+
+  // Retranslate the intro message when the user switches language. Chat lives
+  // in a bottom-tab navigator, so tabbing to Profile, flipping FR↔EN, and
+  // coming back finds the screen still mounted with the old-language intro
+  // baked into `messages`. Replace it in place; the streaming cursor for the
+  // intro is already done by the time the user can reach the language toggle.
+  useEffect(() => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id.startsWith('anoqi-intro-')
+          ? {
+              ...m,
+              text:     COPY[language].introMessage,
+              fullText: COPY[language].introMessage,
+              isStreaming: false,
+            }
+          : m,
+      ),
+    )
+  }, [language])
 
   useEffect(() => {
     if (!consentAccepted) return
@@ -327,29 +333,67 @@ export function ChatScreen() {
       setMessages((prev) => [...prev, userMessage])
       setUserMessageCount((prev) => prev + 1)
       setIsTyping(true)
-      // WIRE API — replace with streaming fetch
-      await new Promise((r) => setTimeout(r, 900 + Math.random() * 400))
-      setIsTyping(false)
 
       const isFirstAnoqi = anoqiMessageCount.current === 0
-      anoqiMessageCount.current += 1
-      const responseText = getMockResponse(language, anoqiMessageCount.current - 1)
-      const sources = SAMPLE_SOURCES[anoqiMessageCount.current % SAMPLE_SOURCES.length]
-      const anoqiId = `anoqi-${Date.now()}`
-      const anoqiMessage: Message = {
-        id: anoqiId,
-        role: 'anoqi',
-        text: '',
-        fullText: responseText,
-        isStreaming: true,
-        sources,
-        isFirst: isFirstAnoqi,
-        timestamp: new Date(),
+
+      try {
+        const response = await postChat({
+          message:        content,
+          language,
+          sessionId,
+          objective,
+          conversationId: conversationIdRef.current ?? undefined,
+        })
+
+        // Capture the server-assigned conversation UUID on the first turn so
+        // subsequent calls thread into the same conversation.
+        if (response.conversationId && !conversationIdRef.current) {
+          conversationIdRef.current = response.conversationId
+        }
+
+        setIsTyping(false)
+        anoqiMessageCount.current += 1
+
+        const sources: Source[] = response.message.sources_display.map(toSource)
+        const anoqiId = `anoqi-${response.message.id ?? Date.now()}`
+        const anoqiMessage: Message = {
+          id: anoqiId,
+          role: 'anoqi',
+          text: '',
+          fullText: response.message.content,
+          isStreaming: true,
+          sources,
+          isFirst: isFirstAnoqi,
+          timestamp: new Date(),
+        }
+        setMessages((prev) => [...prev, anoqiMessage])
+        setStreamingId(anoqiId)
+      } catch (err) {
+        setIsTyping(false)
+        const friendly = err instanceof AnoqiApiError
+          ? (language === 'fr'
+              ? `Désolée, je n'arrive pas à répondre pour l'instant (${err.status || 'réseau'}). Réessaie dans un instant.`
+              : `Sorry, I can't answer right now (${err.status || 'network'}). Please try again in a moment.`)
+          : (language === 'fr'
+              ? `Quelque chose n'a pas fonctionné. Réessaie.`
+              : `Something went wrong. Please try again.`)
+        const errId = `anoqi-error-${Date.now()}`
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: errId,
+            role: 'anoqi',
+            text: friendly,
+            fullText: friendly,
+            isStreaming: false,
+            isFirst: isFirstAnoqi,
+            timestamp: new Date(),
+          },
+        ])
+        if (__DEV__) console.warn('[chat] postChat failed:', err)
       }
-      setMessages((prev) => [...prev, anoqiMessage])
-      setStreamingId(anoqiId)
     },
-    [input, language],
+    [input, language, objective, sessionId],
   )
 
   // ── Consent gate (Cotton Rose overlay — not a black scrim) ─────────────
@@ -470,6 +514,32 @@ export function ChatScreen() {
             if (navigation.canGoBack()) navigation.goBack()
             else navigation.navigate('Home')
           }}
+          rightSlot={
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={objMeta[language]}
+              onPress={() => setGoalSheetOpen(true)}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: theme.radii.pill,
+                borderWidth: 1,
+                borderColor: 'rgba(196, 128, 106, 0.28)',
+                backgroundColor: pressed
+                  ? 'rgba(196, 128, 106, 0.20)'
+                  : 'rgba(196, 128, 106, 0.10)',
+              })}
+            >
+              <Icon name={objMeta.icon} size={12} color={palette.ember[300]} strokeWidth={1.8} />
+              <Text variant="label" style={{ color: palette.ember[200] }}>
+                {objMeta[language]}
+              </Text>
+              <Icon name="ChevronDown" size={11} color={palette.ember[300]} strokeWidth={1.8} />
+            </Pressable>
+          }
         />
 
         {messages.length === 0 ? (
@@ -520,7 +590,8 @@ export function ChatScreen() {
                   />
                   <Pressable
                     accessibilityRole="button"
-                    onPress={() => handleSend(q)}
+                    accessibilityLabel={q.label}
+                    onPress={() => handleSend(q.prompt)}
                     style={({ pressed }) => [
                       {
                         flex: 1,
@@ -556,7 +627,7 @@ export function ChatScreen() {
                         lineHeight: 24,
                       }}
                     >
-                      {q}
+                      {q.label}
                     </Text>
                   </Pressable>
                 </View>
@@ -580,27 +651,41 @@ export function ChatScreen() {
               >
                 <View style={{ maxWidth: '85%' }}>
                   <Bubble role={item.role}>
-                    <Text
-                      variant={item.role === 'user' ? 'body' : 'h4Italic'}
-                      style={{
-                        color: item.role === 'user'
-                          ? theme.colors.accent.primaryOnText
-                          : theme.colors.text.primary,
-                      }}
-                    >
-                      {item.text}
-                      {item.isStreaming ? (
-                        <>
-                          <StreamingCursor />
-                          {/* Invisible ghost of the remaining text. Reserves
-                              the final bubble shape so streamed characters
-                              don't cause the layout to jitter line-by-line. */}
-                          <Text style={{ opacity: 0 }}>
-                            {item.fullText.slice(item.text.length)}
-                          </Text>
-                        </>
-                      ) : null}
-                    </Text>
+                    {item.role === 'anoqi' && !item.isStreaming ? (
+                      // Done streaming — re-render the same text through the
+                      // markdown formatter so **bold** and `*  bullets` from
+                      // the BE pick up real styling.
+                      <MarkdownText
+                        style={{
+                          ...theme.typography.h4Italic,
+                          color: theme.colors.text.primary,
+                        }}
+                      >
+                        {item.text}
+                      </MarkdownText>
+                    ) : (
+                      <Text
+                        variant={item.role === 'user' ? 'body' : 'h4Italic'}
+                        style={{
+                          color: item.role === 'user'
+                            ? theme.colors.accent.primaryOnText
+                            : theme.colors.text.primary,
+                        }}
+                      >
+                        {item.text}
+                        {item.isStreaming ? (
+                          <>
+                            <StreamingCursor />
+                            {/* Invisible ghost of the remaining text. Reserves
+                                the final bubble shape so streamed characters
+                                don't cause the layout to jitter line-by-line. */}
+                            <Text style={{ opacity: 0 }}>
+                              {item.fullText.slice(item.text.length)}
+                            </Text>
+                          </>
+                        ) : null}
+                      </Text>
+                    )}
 
                     {!item.isStreaming && item.isFirst ? (
                       <View
@@ -658,6 +743,84 @@ export function ChatScreen() {
                     <Bubble role="assistant">
                       <TypingIndicator />
                     </Bubble>
+                  </View>
+                ) : null}
+
+                {userMessageCount === 0 && !streamingId ? (
+                  // Mirror the empty-state grid below the intro so the cards
+                  // are reachable on the very first visit (when the auto-intro
+                  // has populated `messages` and the pure empty state path
+                  // would never fire). Cards disappear after the first turn.
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      gap: theme.spacing[3],
+                      marginTop: theme.spacing[6],
+                    }}
+                  >
+                    {starters.map((q, i) => (
+                      <View
+                        key={i}
+                        style={{
+                          flexGrow: 1,
+                          flexBasis: '47%',
+                          borderRadius: 22,
+                          overflow: 'hidden',
+                          position: 'relative',
+                          minHeight: 110,
+                        }}
+                      >
+                        <LiquidEmber
+                          intensity={0.55}
+                          fuchsia={false}
+                          blur={36}
+                          borderRadius={22}
+                        />
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={q.label}
+                          onPress={() => handleSend(q.prompt)}
+                          style={({ pressed }) => [
+                            {
+                              flex: 1,
+                              backgroundColor: pressed
+                                ? 'rgba(255, 245, 238, 0.10)'
+                                : 'rgba(255, 245, 238, 0.05)',
+                              borderWidth: 1,
+                              borderColor: 'rgba(255, 245, 238, 0.09)',
+                              borderRadius: 22,
+                              paddingVertical: theme.spacing[4],
+                              paddingHorizontal: theme.spacing[4],
+                              justifyContent: 'space-between',
+                            },
+                            Platform.OS === 'web'
+                              ? ({
+                                  backdropFilter: 'blur(18px) saturate(140%)',
+                                  WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+                                } as any)
+                              : null,
+                          ]}
+                        >
+                          <Icon
+                            name="Sparkles"
+                            size={14}
+                            color={palette.ember[300]}
+                            strokeWidth={1.8}
+                          />
+                          <Text
+                            variant="h4Italic"
+                            style={{
+                              color: palette.warmWhite[100],
+                              marginTop: theme.spacing[3],
+                              lineHeight: 24,
+                            }}
+                          >
+                            {q.label}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ))}
                   </View>
                 ) : null}
               </>
@@ -811,6 +974,14 @@ export function ChatScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      <GoalSheet
+        visible={goalSheetOpen}
+        selected={objective}
+        language={language}
+        onSelect={setObjective}
+        onClose={() => setGoalSheetOpen(false)}
+      />
     </SafeAreaView>
   )
 }

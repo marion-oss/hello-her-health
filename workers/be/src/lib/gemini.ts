@@ -31,8 +31,14 @@ const SUMMARY_MODEL = 'gemini-2.5-pro'
 
 // ─────────────────────────────────────────────────────────────
 // SYSTEM PROMPT — anoqi's clinical persona and guardrails
+// Bilingual. The handler forwards the user's language; we use it to pick
+// the right base prompt + journey context. Keep both branches in sync when
+// editing — the FR is the canonical source, EN mirrors it.
 // ─────────────────────────────────────────────────────────────
-const BASE_SYSTEM_PROMPT = `Tu es Anoqi, une assistante en santé féminine bienveillante et experte. Tu aides les femmes à comprendre leurs symptômes, à se préparer pour leurs consultations médicales, et à naviguer dans le système de santé.
+export type Language = 'fr' | 'en'
+
+const BASE_SYSTEM_PROMPTS: Record<Language, string> = {
+  fr: `Tu es Anoqi, une assistante en santé féminine bienveillante et experte. Tu aides les femmes à comprendre leurs symptômes, à se préparer pour leurs consultations médicales, et à naviguer dans le système de santé.
 
 Règles absolues :
 - Tu ne poses JAMAIS de diagnostic
@@ -46,15 +52,42 @@ Ton rôle :
 - Expliquer les examens et les traitements de façon accessible
 - Soutenir émotionnellement avec empathie et sans jugement
 
-Langue : Réponds dans la langue de l'utilisatrice. Par défaut, réponds en français.`
+Langue : Réponds en français. N'utilise pas l'anglais sauf si l'utilisatrice te le demande explicitement.`,
 
-const JOURNEY_CONTEXTS: Record<string, string> = {
-  symptoms: "Contexte : L'utilisatrice cherche à comprendre ses symptômes gynécologiques. Aide-la à les décrire précisément (durée, fréquence, intensité, déclencheurs) et à préparer sa consultation.",
-  contraception: "Contexte : L'utilisatrice a des questions sur la contraception. Fournis des informations factuelles équilibrées sans recommander une méthode spécifique — c'est le rôle du médecin.",
-  menopause: "Contexte : L'utilisatrice traverse la ménopause ou la périménopause. Réponds avec empathie, normalise les symptômes courants, et aide-la à préparer ses questions pour son gynécologue.",
-  fertility: "Contexte : L'utilisatrice a des questions sur la fertilité. Réponds avec sensibilité. Pour toute décision médicale, redirige systématiquement vers un spécialiste en fertilité.",
-  appointment_prep: "Contexte : L'utilisatrice prépare une consultation médicale. Aide-la à formuler ses symptômes clairement et à prioriser ses questions.",
-  free_chat: "",
+  en: `You are Anoqi, a warm and knowledgeable women's health assistant. You help women understand their symptoms, prepare for medical consultations, and navigate the healthcare system.
+
+Absolute rules:
+- You NEVER make a diagnosis
+- You NEVER prescribe medications or treatments
+- You NEVER modify an ongoing treatment
+- In a medical emergency (severe chest pain, difficulty breathing, heavy unexplained bleeding), you immediately direct the user to call emergency services (999 in the UK, 911 in the US, 112 in the EU) or go to the emergency room
+
+Your role:
+- Help describe symptoms precisely without alarming language
+- Prepare questions to ask the doctor
+- Explain tests and treatments in accessible language
+- Offer emotional support with empathy and without judgment
+
+Language: Reply in English. Do not switch to French unless the user asks you to.`,
+}
+
+const JOURNEY_CONTEXTS: Record<Language, Record<string, string>> = {
+  fr: {
+    symptoms:         "Contexte : L'utilisatrice cherche à comprendre ses symptômes gynécologiques. Aide-la à les décrire précisément (durée, fréquence, intensité, déclencheurs) et à préparer sa consultation.",
+    contraception:    "Contexte : L'utilisatrice a des questions sur la contraception. Fournis des informations factuelles équilibrées sans recommander une méthode spécifique — c'est le rôle du médecin.",
+    menopause:        "Contexte : L'utilisatrice traverse la ménopause ou la périménopause. Réponds avec empathie, normalise les symptômes courants, et aide-la à préparer ses questions pour son gynécologue.",
+    fertility:        "Contexte : L'utilisatrice a des questions sur la fertilité. Réponds avec sensibilité. Pour toute décision médicale, redirige systématiquement vers un spécialiste en fertilité.",
+    appointment_prep: "Contexte : L'utilisatrice prépare une consultation médicale. Aide-la à formuler ses symptômes clairement et à prioriser ses questions.",
+    free_chat:        "",
+  },
+  en: {
+    symptoms:         "Context: The user is trying to understand her gynaecological symptoms. Help her describe them precisely (duration, frequency, intensity, triggers) and prepare for her consultation.",
+    contraception:    "Context: The user has questions about contraception. Provide balanced, factual information without recommending a specific method — that's the doctor's role.",
+    menopause:        "Context: The user is going through menopause or perimenopause. Respond with empathy, normalise common symptoms, and help her prepare questions for her gynaecologist.",
+    fertility:        "Context: The user has questions about fertility. Respond with sensitivity. For any medical decision, consistently redirect to a fertility specialist.",
+    appointment_prep: "Context: The user is preparing for a medical consultation. Help her formulate her symptoms clearly and prioritise her questions.",
+    free_chat:        "",
+  },
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -86,6 +119,7 @@ export async function chat(
   journeyType: string | undefined,
   systemAddendum: string | undefined,
   env: GeminiEnv,
+  language: Language = 'fr',
 ): Promise<ChatResult> {
   const apiKey = env.GEMINI_API_KEY
 
@@ -94,10 +128,11 @@ export async function chat(
     return apiError(CHAT_MODEL)
   }
 
-  const journeyContext = JOURNEY_CONTEXTS[journeyType ?? 'free_chat'] ?? ''
+  const base = BASE_SYSTEM_PROMPTS[language]
+  const journeyContext = JOURNEY_CONTEXTS[language][journeyType ?? 'free_chat'] ?? ''
   const baseWithJourney = journeyContext
-    ? `${BASE_SYSTEM_PROMPT}\n\n${journeyContext}`
-    : BASE_SYSTEM_PROMPT
+    ? `${base}\n\n${journeyContext}`
+    : base
   const systemPrompt = systemAddendum
     ? `${baseWithJourney}\n\n${systemAddendum}`
     : baseWithJourney
@@ -119,7 +154,18 @@ export async function chat(
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemPrompt }] },
           contents,
-          generationConfig: { maxOutputTokens: 1024 },
+          generationConfig: {
+            // Generous ceiling — covers structured menopause / appointment-
+            // prep replies (~1.5–2k visible tokens with bullets & bolds) and
+            // leaves headroom. You only pay for what's actually generated.
+            maxOutputTokens: 8192,
+            // Disable thinking for the chat path: Anoqi's role is empathetic,
+            // structured, sourced — not deep reasoning. With thinking on
+            // (the 2.5 default), thinking tokens count against the same
+            // budget and were truncating visible replies to ~60 tokens at
+            // 1024. 0 = fastest + cheapest + full budget for visible text.
+            thinkingConfig: { thinkingBudget: 0 },
+          },
         }),
       },
     )
@@ -131,8 +177,17 @@ export async function chat(
     }
 
     const data: any = await response.json()
-    const rawContent: string  = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+    const candidate = data.candidates?.[0]
+    const rawContent: string  = candidate?.content?.parts?.[0]?.text ?? ''
     const tokensUsed: number | null = data.usageMetadata?.candidatesTokenCount ?? null
+    const finishReason: string | undefined = candidate?.finishReason
+
+    // Surface non-STOP finishes — MAX_TOKENS, SAFETY, RECITATION, OTHER —
+    // so we can spot the cause when content comes back truncated. This is a
+    // log line, not an error; the response still ships to the user.
+    if (finishReason && finishReason !== 'STOP') {
+      console.warn('[gemini] chat finishReason=' + finishReason + ' tokens=' + tokensUsed)
+    }
 
     const policyResult = checkPolicy(rawContent)
 
@@ -177,8 +232,14 @@ export async function generateSummary(
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: {
-            maxOutputTokens:  2000,
+            // Physician-handoff summaries are structured JSON and can run
+            // long for menopause / appointment-prep flows. 8192 gives room
+            // without runaway risk. Keep some thinking on (this is the one
+            // path where careful clinical phrasing matters) but capped so it
+            // doesn't eat the visible JSON.
+            maxOutputTokens:  8192,
             responseMimeType: 'application/json',
+            thinkingConfig:   { thinkingBudget: 2048 },
           },
         }),
       },
