@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>anoqi — BreathingForm playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Inter:wght@200;300;400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --void:        #0D0D12;
+    --warm-white:  #FFF5EE;
+    --fuchsia:     #FF0472;
+    --ember:       #C4806A;
+    --dusk:        #2E2030;
+
+    /* Form colours per spec */
+    --c-middle:    #171317;   /* Middle ellipse — barely-not-void */
+    --c-inner:     #242023;   /* Inner circle  — medium-dark warm grey */
+    --c-centre:    #9A9690;   /* Centre dot    — warm medium grey */
+
+    --font-display: 'Cormorant Garamond', Georgia, serif;
+    --font-body:    'Inter', -apple-system, sans-serif;
+
+    --ease-breath: cubic-bezier(0.45, 0, 0.55, 1);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--void);
+    color: var(--warm-white);
+    font-family: var(--font-body);
+    font-weight: 300;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  /* Stage layout ────────────────────────────────────────── */
+  .scene {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    padding: clamp(40px, 6vw, 96px);
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 48px;
+  }
+
+  /* Wordmark ────────────────────────────────────────────── */
+  .wordmark {
+    font-family: var(--font-body);
+    font-weight: 200;
+    font-size: clamp(56px, 7vw, 96px);
+    color: var(--warm-white);
+    letter-spacing: -0.04em;
+    line-height: 1;
+    display: inline-flex;
+    align-items: flex-start;
+    position: relative;
+  }
+  .wordmark .dot {
+    width: 0.18em; height: 0.18em;
+    border-radius: 50%;
+    background: var(--fuchsia);
+    opacity: 0.92;
+    margin-left: 0.04em;
+    margin-top: 0.05em;
+    flex-shrink: 0;
+    animation: dot-pulse 4s var(--ease-breath) infinite;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 0.92; transform: scale(1); }
+    50%      { opacity: 0.55; transform: scale(0.78); }
+  }
+
+  /* Centre row ──────────────────────────────────────────── */
+  .centre {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: 48px;
+    min-height: 0;
+  }
+  .copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05em;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(40px, 5.5vw, 72px);
+    line-height: 1.18;
+    letter-spacing: -0.01em;
+  }
+  .copy .l1 { color: var(--warm-white); }
+  .copy .l2 { color: var(--ember); }
+
+  .form-wrap {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    width: 100%;
+    max-width: 900px;
+    justify-self: end;
+  }
+  .form-wrap svg { width: 100%; height: 100%; overflow: visible; display: block; }
+
+  /* Trust pillars ───────────────────────────────────────── */
+  .pillars {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+    color: rgba(255, 245, 238, 0.30);
+    font-size: 14px;
+  }
+  .pillars .sep { color: rgba(255, 245, 238, 0.18); }
+
+  /* Breathing — one unified animation on the whole SVG.
+     Everything pulses in lockstep as one organism.
+     scale 1 → 1.05, opacity 1 → 0.78, sinusoidal ease. */
+  .form-wrap svg {
+    animation: form-breath var(--bf-duration, 6s) var(--ease-breath) infinite;
+    transform-origin: center center;
+  }
+  @keyframes form-breath {
+    0%, 100% { transform: scale(1);    }
+    50%      { transform: scale(1.05); }
+  }
+
+  /* Per-layer static transforms (no animation — sliders feed these).
+     Each layer has its own translate (offset from default position) and,
+     where applicable, scale. The unified SVG breath multiplies through. */
+  .layer-ring1 {
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: translate(var(--ring1-tx, 0px), var(--ring1-ty, 0px))
+               scale(var(--ring1-sx, 1), var(--ring1-sy, 1));
+    opacity: var(--ring1-op, 1);
+  }
+  .layer-ring2 {
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: translate(var(--ring2-tx, 0px), var(--ring2-ty, 0px))
+               scale(var(--ring2-sx, 1), var(--ring2-sy, 1));
+    opacity: var(--ring2-op, 1);
+  }
+  .layer-middle {
+    transform: translate(var(--middle-tx, 0px), var(--middle-ty, 0px));
+    opacity: var(--middle-op, 1);
+  }
+  .layer-inner {
+    transform: translate(var(--inner-tx, 0px), var(--inner-ty, 0px));
+    opacity: var(--inner-op, 1);
+  }
+  .layer-centre {
+    transform: translate(var(--centre-tx, 0px), var(--centre-ty, 0px));
+    opacity: var(--centre-op, 1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .form-wrap svg, .wordmark .dot { animation: none; }
+  }
+
+  /* Controls ────────────────────────────────────────────── */
+  .controls {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: rgba(22, 22, 30, 0.85);
+    border: 1px solid rgba(255, 245, 238, 0.08);
+    border-radius: 14px;
+    padding: 16px 18px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    font-size: 11px;
+    min-width: 280px;
+    max-width: 310px;
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+  }
+  .controls h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--warm-white);
+    letter-spacing: -0.01em;
+  }
+  .group {
+    display: flex; flex-direction: column;
+    gap: 9px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 245, 238, 0.06);
+  }
+  .group:first-of-type { border-top: none; padding-top: 0; }
+  .group-title {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: rgba(255, 245, 238, 0.55);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .swatch {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+  .swatch.ring   { border: 1px solid var(--fuchsia); opacity: 0.5; }
+  .swatch.middle { background: var(--c-middle); border: 1px solid rgba(255,245,238,0.06); }
+  .swatch.inner  { background: var(--c-inner); }
+  .swatch.centre { background: var(--c-centre); }
+
+  .row { display: flex; flex-direction: column; gap: 5px; }
+  label {
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 9px;
+    color: rgba(255, 245, 238, 0.45);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  input[type="range"] { width: 100%; accent-color: var(--fuchsia); margin: 0; }
+  .value {
+    font-variant-numeric: tabular-nums;
+    color: rgba(255, 245, 238, 0.78);
+    font-size: 11px;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .preset-btn {
+    background: transparent;
+    color: rgba(255, 245, 238, 0.7);
+    border: 1px solid rgba(255, 245, 238, 0.15);
+    border-radius: 999px;
+    font-family: var(--font-body);
+    font-size: 10px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: all 160ms var(--ease-breath);
+  }
+  .preset-btn:hover { color: var(--warm-white); border-color: rgba(255, 245, 238, 0.4); }
+  .preset-btn:active { transform: scale(0.97); }
+</style>
+</head>
+<body>
+
+<!-- ─── Scene ──────────────────────────────────────────── -->
+<div class="scene">
+
+  <div>
+    <span class="wordmark"><span>anoqi</span><span class="dot" aria-hidden="true"></span></span>
+  </div>
+
+  <div class="centre">
+    <div class="copy">
+      <span class="l1">Mieux informée.</span>
+      <span class="l2">Mieux entendue.</span>
+    </div>
+
+    <div class="form-wrap">
+      <svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+
+        <!-- Render order (bottom → top):
+             2. Middle dusk ellipse (background body)
+             1A + 1B. Outer fuchsia rings (drawn over the dusk so they read)
+             3. Inner darker disc (sits on top of the rings)
+             4. Centre warm-grey dot (always topmost) -->
+
+        <!-- 2. Middle dusk filled ellipse. -->
+        <g class="layer-middle">
+          <ellipse id="middle"
+            cx="410" cy="320"
+            rx="260" ry="170"
+            fill="#171317"
+          />
+        </g>
+
+        <!-- 1A. Outer fuchsia ring — imperfect circle (organic bezier path). -->
+        <g class="layer-ring1">
+          <path id="ring1"
+            d="M 400,60
+               C 580,58 770,135 778,300
+               C 778,470 580,545 400,540
+               C 230,538 22,470 22,295
+               C 22,130 240,62 400,60 Z"
+            fill="none"
+            stroke="#FF0472"
+            stroke-width="1"
+            stroke-opacity="0.32"
+          />
+        </g>
+
+        <!-- 1B. Second outer ring — slightly different organic shape, offset.
+             The two-ring overlap is what makes the form feel asymmetric and
+             alive rather than a single perfect oval. -->
+        <g class="layer-ring2">
+          <path id="ring2"
+            d="M 410,72
+               C 595,70 762,148 770,308
+               C 772,478 565,553 410,548
+               C 245,545 38,478 32,310
+               C 30,150 235,73 410,72 Z"
+            fill="none"
+            stroke="#FF0472"
+            stroke-width="0.85"
+            stroke-opacity="0.22"
+          />
+        </g>
+
+        <!-- 3. Inner lighter dusk circle, offset within middle. -->
+        <g class="layer-inner">
+          <circle id="inner"
+            cx="470" cy="280"
+            r="78"
+            fill="#242023"
+          />
+        </g>
+
+        <!-- 4. Warm-grey centre dot. -->
+        <g class="layer-centre">
+          <circle id="centre"
+            cx="470" cy="280"
+            r="8"
+            fill="#9A9690"
+          />
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <div class="pillars">
+    <span>Studied on women health</span>
+    <span class="sep">·</span>
+    <span>Full lifecycle platform</span>
+    <span class="sep">·</span>
+    <span>Biology-first</span>
+  </div>
+</div>
+
+<!-- ─── Controls ───────────────────────────────────────── -->
+<aside class="controls">
+  <h2>BreathingForm</h2>
+
+  <div class="group">
+    <div class="row">
+      <label>Total scale <span class="value" id="scaleVal">1.00</span>×</label>
+      <input type="range" id="scale" min="0.5" max="1.4" step="0.02" value="1.0" />
+    </div>
+    <div class="row">
+      <label>Breath cycle <span class="value" id="dVal">6.0</span>s</label>
+      <input type="range" id="duration" min="3000" max="9000" step="100" value="6000" />
+    </div>
+  </div>
+
+  <!-- Ring 1 -->
+  <div class="group">
+    <div class="group-title"><span class="swatch ring"></span>1A · Outer ring (larger)</div>
+    <div class="row">
+      <label>Width <span class="value" id="r1sxVal">1.00</span>×</label>
+      <input type="range" id="r1sx" min="0.5" max="1.5" step="0.02" value="1.0" />
+    </div>
+    <div class="row">
+      <label>Height <span class="value" id="r1syVal">1.00</span>×</label>
+      <input type="range" id="r1sy" min="0.5" max="1.5" step="0.02" value="1.0" />
+    </div>
+    <div class="row">
+      <label>Stroke <span class="value" id="r1swVal">1.0</span></label>
+      <input type="range" id="r1sw" min="0.4" max="3" step="0.1" value="1.0" />
+    </div>
+    <div class="row">
+      <label>Opacity <span class="value" id="r1oVal">0.32</span></label>
+      <input type="range" id="r1o" min="0" max="1" step="0.02" value="0.32" />
+    </div>
+    <div class="row">
+      <label>Offset X <span class="value" id="r1txVal">0</span></label>
+      <input type="range" id="r1tx" min="-200" max="200" step="2" value="0" />
+    </div>
+    <div class="row">
+      <label>Offset Y <span class="value" id="r1tyVal">0</span></label>
+      <input type="range" id="r1ty" min="-200" max="200" step="2" value="0" />
+    </div>
+  </div>
+
+  <!-- Ring 2 -->
+  <div class="group">
+    <div class="group-title"><span class="swatch ring"></span>1B · Outer ring (offset)</div>
+    <div class="row">
+      <label>Width <span class="value" id="r2sxVal">1.00</span>×</label>
+      <input type="range" id="r2sx" min="0.5" max="1.5" step="0.02" value="1.0" />
+    </div>
+    <div class="row">
+      <label>Height <span class="value" id="r2syVal">1.00</span>×</label>
+      <input type="range" id="r2sy" min="0.5" max="1.5" step="0.02" value="1.0" />
+    </div>
+    <div class="row">
+      <label>Stroke <span class="value" id="r2swVal">0.85</span></label>
+      <input type="range" id="r2sw" min="0.4" max="3" step="0.1" value="0.85" />
+    </div>
+    <div class="row">
+      <label>Opacity <span class="value" id="r2oVal">0.22</span></label>
+      <input type="range" id="r2o" min="0" max="1" step="0.02" value="0.22" />
+    </div>
+    <div class="row">
+      <label>Offset X <span class="value" id="r2txVal">0</span></label>
+      <input type="range" id="r2tx" min="-200" max="200" step="2" value="0" />
+    </div>
+    <div class="row">
+      <label>Offset Y <span class="value" id="r2tyVal">0</span></label>
+      <input type="range" id="r2ty" min="-200" max="200" step="2" value="0" />
+    </div>
+  </div>
+
+  <!-- Middle -->
+  <div class="group">
+    <div class="group-title"><span class="swatch middle"></span>2 · Middle ellipse · #171317</div>
+    <div class="row">
+      <label>rx (width) <span class="value" id="midRxVal">260</span></label>
+      <input type="range" id="midRx" min="100" max="400" step="2" value="260" />
+    </div>
+    <div class="row">
+      <label>ry (height) <span class="value" id="midRyVal">170</span></label>
+      <input type="range" id="midRy" min="60" max="300" step="2" value="170" />
+    </div>
+    <div class="row">
+      <label>Opacity <span class="value" id="midOVal">1.00</span></label>
+      <input type="range" id="midO" min="0" max="1.5" step="0.05" value="1.0" />
+    </div>
+    <div class="row">
+      <label>Offset X <span class="value" id="midTxVal">0</span></label>
+      <input type="range" id="midTx" min="-200" max="200" step="2" value="0" />
+    </div>
+    <div class="row">
+      <label>Offset Y <span class="value" id="midTyVal">0</span></label>
+      <input type="range" id="midTy" min="-200" max="200" step="2" value="0" />
+    </div>
+  </div>
+
+  <!-- Inner -->
+  <div class="group">
+    <div class="group-title"><span class="swatch inner"></span>3 · Inner circle · #242023</div>
+    <div class="row">
+      <label>Radius <span class="value" id="innerRVal">78</span></label>
+      <input type="range" id="innerR" min="20" max="180" step="2" value="78" />
+    </div>
+    <div class="row">
+      <label>Opacity <span class="value" id="innerOVal">1.00</span></label>
+      <input type="range" id="innerO" min="0" max="1.5" step="0.05" value="1.0" />
+    </div>
+    <div class="row">
+      <label>Offset X <span class="value" id="innerTxVal">0</span></label>
+      <input type="range" id="innerTx" min="-200" max="200" step="2" value="0" />
+    </div>
+    <div class="row">
+      <label>Offset Y <span class="value" id="innerTyVal">0</span></label>
+      <input type="range" id="innerTy" min="-200" max="200" step="2" value="0" />
+    </div>
+  </div>
+
+  <!-- Centre -->
+  <div class="group">
+    <div class="group-title"><span class="swatch centre"></span>4 · Centre dot · #9A9690</div>
+    <div class="row">
+      <label>Radius <span class="value" id="centreRVal">8</span></label>
+      <input type="range" id="centreR" min="2" max="30" step="1" value="8" />
+    </div>
+    <div class="row">
+      <label>Opacity <span class="value" id="centreOVal">1.00</span></label>
+      <input type="range" id="centreO" min="0" max="1" step="0.05" value="1.0" />
+    </div>
+    <div class="row">
+      <label>Offset X <span class="value" id="centreTxVal">0</span></label>
+      <input type="range" id="centreTx" min="-200" max="200" step="2" value="0" />
+    </div>
+    <div class="row">
+      <label>Offset Y <span class="value" id="centreTyVal">0</span></label>
+      <input type="range" id="centreTy" min="-200" max="200" step="2" value="0" />
+    </div>
+  </div>
+
+  <div class="group">
+    <button class="preset-btn" id="copyBtn"  type="button">Copy spec for Claude</button>
+    <button class="preset-btn" id="resetBtn" type="button">Reset to defaults</button>
+    <p class="hint" id="copyHint" style="opacity:0; transition: opacity 200ms;">Copied!</p>
+  </div>
+</aside>
+
+<script>
+  const els = {
+    ring1:    document.getElementById('ring1'),
+    ring2:    document.getElementById('ring2'),
+    middle:   document.getElementById('middle'),
+    inner:    document.getElementById('inner'),
+    centre:   document.getElementById('centre'),
+    formWrap: document.querySelector('.form-wrap'),
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function setText(id, v) { $(id).textContent = v; }
+  function setVar(name, v) { document.documentElement.style.setProperty(name, v); }
+
+  // Ring 1
+  function setR1Sx(v) { setVar('--ring1-sx', v); setText('r1sxVal', v.toFixed(2)); }
+  function setR1Sy(v) { setVar('--ring1-sy', v); setText('r1syVal', v.toFixed(2)); }
+  function setR1Sw(v) { els.ring1.setAttribute('stroke-width', v); setText('r1swVal', v.toFixed(1)); }
+  function setR1Op(v) { els.ring1.setAttribute('stroke-opacity', v); setVar('--ring1-op', 1); setText('r1oVal', v.toFixed(2)); }
+  function setR1Tx(v) { setVar('--ring1-tx', v + 'px'); setText('r1txVal', v); }
+  function setR1Ty(v) { setVar('--ring1-ty', v + 'px'); setText('r1tyVal', v); }
+
+  // Ring 2
+  function setR2Sx(v) { setVar('--ring2-sx', v); setText('r2sxVal', v.toFixed(2)); }
+  function setR2Sy(v) { setVar('--ring2-sy', v); setText('r2syVal', v.toFixed(2)); }
+  function setR2Sw(v) { els.ring2.setAttribute('stroke-width', v); setText('r2swVal', v.toFixed(1)); }
+  function setR2Op(v) { els.ring2.setAttribute('stroke-opacity', v); setVar('--ring2-op', 1); setText('r2oVal', v.toFixed(2)); }
+  function setR2Tx(v) { setVar('--ring2-tx', v + 'px'); setText('r2txVal', v); }
+  function setR2Ty(v) { setVar('--ring2-ty', v + 'px'); setText('r2tyVal', v); }
+
+  // Middle
+  function setMidRx(v) { els.middle.setAttribute('rx', v); setText('midRxVal', v); }
+  function setMidRy(v) { els.middle.setAttribute('ry', v); setText('midRyVal', v); }
+  function setMidOp(v) { setVar('--middle-op', v); setText('midOVal', v.toFixed(2)); }
+  function setMidTx(v) { setVar('--middle-tx', v + 'px'); setText('midTxVal', v); }
+  function setMidTy(v) { setVar('--middle-ty', v + 'px'); setText('midTyVal', v); }
+
+  // Inner
+  function setInnerR(v)  { els.inner.setAttribute('r', v); setText('innerRVal', v); }
+  function setInnerOp(v) { setVar('--inner-op', v); setText('innerOVal', v.toFixed(2)); }
+  function setInnerTx(v) { setVar('--inner-tx', v + 'px'); setText('innerTxVal', v); }
+  function setInnerTy(v) { setVar('--inner-ty', v + 'px'); setText('innerTyVal', v); }
+
+  // Centre
+  function setCentreR(v)  { els.centre.setAttribute('r', v); setText('centreRVal', v); }
+  function setCentreOp(v) { setVar('--centre-op', v); setText('centreOVal', v.toFixed(2)); }
+  function setCentreTx(v) { setVar('--centre-tx', v + 'px'); setText('centreTxVal', v); }
+  function setCentreTy(v) { setVar('--centre-ty', v + 'px'); setText('centreTyVal', v); }
+
+  // Global
+  function setScale(v) {
+    els.formWrap.style.transform = `scale(${v})`;
+    els.formWrap.style.transformOrigin = 'center';
+    setText('scaleVal', v.toFixed(2));
+  }
+  function setDuration(ms) {
+    setVar('--bf-duration', ms + 'ms');
+    setText('dVal', (ms / 1000).toFixed(1));
+  }
+
+  // Wire
+  $('r1sx'   ).addEventListener('input', e => setR1Sx(+e.target.value));
+  $('r1sy'   ).addEventListener('input', e => setR1Sy(+e.target.value));
+  $('r1sw'   ).addEventListener('input', e => setR1Sw(+e.target.value));
+  $('r1o'    ).addEventListener('input', e => setR1Op(+e.target.value));
+  $('r1tx'   ).addEventListener('input', e => setR1Tx(+e.target.value));
+  $('r1ty'   ).addEventListener('input', e => setR1Ty(+e.target.value));
+  $('r2sx'   ).addEventListener('input', e => setR2Sx(+e.target.value));
+  $('r2sy'   ).addEventListener('input', e => setR2Sy(+e.target.value));
+  $('r2sw'   ).addEventListener('input', e => setR2Sw(+e.target.value));
+  $('r2o'    ).addEventListener('input', e => setR2Op(+e.target.value));
+  $('r2tx'   ).addEventListener('input', e => setR2Tx(+e.target.value));
+  $('r2ty'   ).addEventListener('input', e => setR2Ty(+e.target.value));
+  $('midRx'  ).addEventListener('input', e => setMidRx(+e.target.value));
+  $('midRy'  ).addEventListener('input', e => setMidRy(+e.target.value));
+  $('midO'   ).addEventListener('input', e => setMidOp(+e.target.value));
+  $('midTx'  ).addEventListener('input', e => setMidTx(+e.target.value));
+  $('midTy'  ).addEventListener('input', e => setMidTy(+e.target.value));
+  $('innerR' ).addEventListener('input', e => setInnerR(+e.target.value));
+  $('innerO' ).addEventListener('input', e => setInnerOp(+e.target.value));
+  $('innerTx').addEventListener('input', e => setInnerTx(+e.target.value));
+  $('innerTy').addEventListener('input', e => setInnerTy(+e.target.value));
+  $('centreR').addEventListener('input', e => setCentreR(+e.target.value));
+  $('centreO').addEventListener('input', e => setCentreOp(+e.target.value));
+  $('centreTx').addEventListener('input', e => setCentreTx(+e.target.value));
+  $('centreTy').addEventListener('input', e => setCentreTy(+e.target.value));
+  $('scale'  ).addEventListener('input', e => setScale(+e.target.value));
+  $('duration').addEventListener('input', e => setDuration(+e.target.value));
+
+  const DEFAULTS = {
+    r1sx: 1.0, r1sy: 1.0, r1sw: 1.0, r1o: 0.32, r1tx: 0, r1ty: 0,
+    r2sx: 1.0, r2sy: 1.0, r2sw: 0.85, r2o: 0.22, r2tx: 0, r2ty: 0,
+    midRx: 260, midRy: 170, midO: 1.0, midTx: 0, midTy: 0,
+    innerR: 78, innerO: 1.0, innerTx: 0, innerTy: 0,
+    centreR: 8, centreO: 1.0, centreTx: 0, centreTy: 0,
+    scale: 1.0, duration: 6000,
+  };
+  $('resetBtn').addEventListener('click', () => {
+    Object.entries(DEFAULTS).forEach(([k, v]) => { $(k).value = v; });
+    init();
+  });
+
+  // Copy spec — generates a structured snippet I can paste back so the
+  // assistant has all the current values at once.
+  $('copyBtn').addEventListener('click', async () => {
+    const v = id => +$(id).value;
+    const ringPath1 = els.ring1.getAttribute('d').trim().replace(/\s+/g, ' ');
+    const ringPath2 = els.ring2.getAttribute('d').trim().replace(/\s+/g, ' ');
+    const spec = `BreathingForm spec (from playground):
+
+Global:
+  scale:    ${v('scale').toFixed(2)}×
+  breath:   ${(v('duration')/1000).toFixed(1)}s   (cubic-bezier(0.45, 0, 0.55, 1), scale 1→1.05, opacity 1→0.78)
+
+Layer 1A — Outer ring (fuchsia stroke #FF0472):
+  scale (x, y):   ${v('r1sx').toFixed(2)}, ${v('r1sy').toFixed(2)}
+  stroke-width:   ${v('r1sw').toFixed(1)}
+  stroke-opacity: ${v('r1o').toFixed(2)}
+  offset (tx, ty): ${v('r1tx')}, ${v('r1ty')}
+  path d:         "${ringPath1}"
+
+Layer 1B — Outer ring (fuchsia stroke #FF0472):
+  scale (x, y):   ${v('r2sx').toFixed(2)}, ${v('r2sy').toFixed(2)}
+  stroke-width:   ${v('r2sw').toFixed(1)}
+  stroke-opacity: ${v('r2o').toFixed(2)}
+  offset (tx, ty): ${v('r2tx')}, ${v('r2ty')}
+  path d:         "${ringPath2}"
+
+Layer 2 — Middle ellipse (#171317 radial gradient, soft edge):
+  base position:  cx=410, cy=320
+  rx:             ${v('midRx')}
+  ry:             ${v('midRy')}
+  opacity:        ${v('midO').toFixed(2)}
+  offset (tx, ty): ${v('midTx')}, ${v('midTy')}
+
+Layer 3 — Inner circle (#242023 radial gradient, soft edge):
+  base position:  cx=470, cy=280
+  r:              ${v('innerR')}
+  opacity:        ${v('innerO').toFixed(2)}
+  offset (tx, ty): ${v('innerTx')}, ${v('innerTy')}
+
+Layer 4 — Centre dot (#9A9690 solid):
+  base position:  cx=470, cy=280
+  r:              ${v('centreR')}
+  opacity:        ${v('centreO').toFixed(2)}
+  offset (tx, ty): ${v('centreTx')}, ${v('centreTy')}
+
+SVG viewBox: 0 0 800 600
+`;
+    try {
+      await navigator.clipboard.writeText(spec);
+      const hint = $('copyHint');
+      hint.textContent = 'Copied — paste it to me.';
+      hint.style.opacity = '0.7';
+      clearTimeout($('copyBtn')._t);
+      $('copyBtn')._t = setTimeout(() => { hint.style.opacity = '0'; }, 1800);
+    } catch {
+      const hint = $('copyHint');
+      hint.textContent = 'Clipboard blocked — see console.';
+      hint.style.opacity = '0.7';
+      console.log(spec);
+    }
+  });
+
+  function init() {
+    setR1Sx(+$('r1sx').value);
+    setR1Sy(+$('r1sy').value);
+    setR1Sw(+$('r1sw').value);
+    setR1Op(+$('r1o' ).value);
+    setR1Tx(+$('r1tx').value);
+    setR1Ty(+$('r1ty').value);
+    setR2Sx(+$('r2sx').value);
+    setR2Sy(+$('r2sy').value);
+    setR2Sw(+$('r2sw').value);
+    setR2Op(+$('r2o' ).value);
+    setR2Tx(+$('r2tx').value);
+    setR2Ty(+$('r2ty').value);
+    setMidRx(+$('midRx').value);
+    setMidRy(+$('midRy').value);
+    setMidOp(+$('midO' ).value);
+    setMidTx(+$('midTx').value);
+    setMidTy(+$('midTy').value);
+    setInnerR(+$('innerR').value);
+    setInnerOp(+$('innerO').value);
+    setInnerTx(+$('innerTx').value);
+    setInnerTy(+$('innerTy').value);
+    setCentreR(+$('centreR').value);
+    setCentreOp(+$('centreO').value);
+    setCentreTx(+$('centreTx').value);
+    setCentreTy(+$('centreTy').value);
+    setScale(+$('scale').value);
+    setDuration(+$('duration').value);
+  }
+  init();
+</script>
+
+</body>
+</html>

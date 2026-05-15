@@ -6,6 +6,7 @@
 
 import React from 'react'
 import { Platform, SafeAreaView, StatusBar, View } from 'react-native'
+import { useIsFocused } from '@react-navigation/native'
 
 import { useOnboarding } from '../../context/OnboardingContext'
 import { palette, useTheme } from '../../theme'
@@ -32,24 +33,48 @@ export function DocumentsScreen() {
   const theme = useTheme()
   const { language } = useOnboarding()
   const copy = COPY[language]
+  // Only render the breathing form when this tab is focused — without
+  // this guard, the form's `position: fixed` (web) bleeds into other tabs
+  // because React Navigation keeps tab screens mounted in parallel.
+  const isFocused = useIsFocused()
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
+    <SafeAreaView style={{ flex: 1 }}>
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.bg.canvas} />
 
-      {/* Faint breathing form, lower-right, like the Welcome screen but
-          deeper into the void so it doesn't compete with the copy. */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          right: -160,
-          bottom: 60,
-          opacity: 0.55,
-        }}
-      >
-        <BreathingForm size={520} />
-      </View>
+      {/* Breathing form tucked into the bottom-right corner. Sits behind
+          content (no zIndex — DOM order places it under later siblings) so
+          it never overlaps document cards or buttons. Slight overflow off
+          the corner so the form reads as a quiet anchor, not a foreground
+          decoration. */}
+      {isFocused ? (
+        <View
+          pointerEvents="none"
+          style={
+            Platform.OS === 'web'
+              ? ({
+                  position: 'fixed',
+                  right: -40,
+                  bottom: -40,
+                  width: 585,
+                  height: 585,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                } as any)
+              : {
+                  position: 'absolute',
+                  right: -40,
+                  bottom: -40,
+                  width: 585,
+                  height: 585,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }
+          }
+        >
+          <BreathingForm size={585} />
+        </View>
+      ) : null}
 
       <View
         style={{

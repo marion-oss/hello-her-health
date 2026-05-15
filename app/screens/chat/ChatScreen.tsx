@@ -24,7 +24,7 @@ import {
   View,
 } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useIsFocused } from '@react-navigation/native'
 
 import {
   useOnboarding,
@@ -226,6 +226,9 @@ export function ChatScreen() {
   const { language, objective } = useOnboarding()
   const theme = useTheme()
   const copy = COPY[language]
+  // Without this guard, the form's `position: fixed` (web) bleeds into
+  // sibling tabs because the bottom-tab navigator keeps screens mounted.
+  const isFocused = useIsFocused()
 
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -510,22 +513,41 @@ export function ChatScreen() {
 
   // ── Main render ─────────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
-      {/* Decorative breathing form anchored low-right behind everything. Same
-          composition as the Welcome screen so the brand visual stays present
-          in long conversation sessions. Fades back once messages exist so it
-          doesn't compete with the article reading pane. */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          right: -160,
-          bottom: 80,
-          opacity: messages.length > 0 ? 0.18 : 0.45,
-        }}
-      >
-        <BreathingForm size={520} />
-      </View>
+    <SafeAreaView style={{ flex: 1 }}>
+      {/* Breathing form tucked into the bottom-right corner — exact same
+          placement as DocumentsScreen so the brand visual sits at a
+          consistent anchor across tabs. Behind content via DOM order.
+          Guarded by isFocused so the form's `position: fixed` (web) doesn't
+          bleed into sibling tabs that the bottom-tab navigator keeps
+          mounted in parallel. */}
+      {isFocused ? (
+        <View
+          pointerEvents="none"
+          style={
+            Platform.OS === 'web'
+              ? ({
+                  position: 'fixed',
+                  right: -40,
+                  bottom: -40,
+                  width: 585,
+                  height: 585,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                } as any)
+              : {
+                  position: 'absolute',
+                  right: -40,
+                  bottom: -40,
+                  width: 585,
+                  height: 585,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }
+          }
+        >
+          <BreathingForm size={585} />
+        </View>
+      ) : null}
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -759,7 +781,9 @@ export function ChatScreen() {
 
         {/* Input bar — sits above the floating LiquidTabBar. The pill is
             ~62px tall and floats 14px above the safe-area; 92px of bottom
-            clearance keeps the input fully visible. */}
+            clearance keeps the input fully visible. Background is intentionally
+            transparent — a solid bg here would create a visible "column"
+            rectangle against the position:fixed BreathingForm in the void. */}
         <View
           style={{
             flexDirection: 'row',
@@ -770,7 +794,6 @@ export function ChatScreen() {
             marginBottom: 92,
             borderTopWidth: 1,
             borderTopColor: theme.colors.border.subtle,
-            backgroundColor: theme.colors.bg.canvas,
             gap: theme.spacing[2],
           }}
         >
@@ -796,88 +819,108 @@ export function ChatScreen() {
             />
           </Pressable>
 
-          <TextInput
-            value={input}
-            onChangeText={setInput}
-            placeholder={copy.inputPlaceholder}
-            placeholderTextColor={theme.colors.text.placeholder}
-            multiline
-            maxLength={2000}
-            returnKeyType="send"
-            blurOnSubmit={false}
-            onSubmitEditing={() => handleSend()}
-            // Web: Enter sends, Shift+Enter inserts a newline. multiline
-            // TextInputs don't fire onSubmitEditing on web, so intercept
-            // keypress directly. Native multiline keeps its default
-            // newline-on-Enter behaviour.
-            onKeyPress={
-              Platform.OS === 'web'
-                ? ((e: any) => {
-                    if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
-                      e.preventDefault?.()
-                      handleSend()
-                    }
-                  }) as any
-                : undefined
-            }
+          {/* Input pill — TextInput + send button visually inside one
+              rounded shape. The pill is the styled wrapper; the TextInput
+              sits inside with right padding reserved for the send button. */}
+          <View
             style={{
               flex: 1,
+              position: 'relative',
               backgroundColor: 'rgba(255, 245, 238, 0.04)',
               borderRadius: theme.radii.pill,
               borderWidth: 1,
               borderColor: 'rgba(255, 245, 238, 0.10)',
-              paddingHorizontal: theme.spacing[4],
-              paddingTop: Platform.OS === 'ios' ? 10 : 8,
-              paddingBottom: Platform.OS === 'ios' ? 10 : 8,
-              fontSize: 15,
-              fontFamily: 'Inter-Regular',
-              color: theme.colors.text.primary,
-              maxHeight: 120,
-              lineHeight: 22,
             }}
-          />
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={copy.send}
-            onPress={() => handleSend()}
-            disabled={!input.trim() || isTyping}
-            style={[
-              {
-                width: 38,
-                height: 38,
-                borderRadius: 19,
-                backgroundColor:
-                  !input.trim() || isTyping
-                    ? theme.colors.bg.surfaceWarm
-                    : theme.colors.accent.primary,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 1,
-              },
-              !input.trim() || isTyping
-                ? null
-                : Platform.OS === 'web'
-                  ? ({ boxShadow: '0 0 20px rgba(255, 4, 114, 0.45)' } as any)
-                  : {
-                      shadowColor: '#FF0472',
-                      shadowOpacity: 0.55,
-                      shadowRadius: 10,
-                      shadowOffset: { width: 0, height: 0 },
-                    },
-            ]}
           >
-            <Icon
-              name="ArrowUp"
-              size={18}
-              color={
-                !input.trim() || isTyping
-                  ? theme.colors.text.tertiary
-                  : theme.colors.accent.primaryOnText
+            <TextInput
+              value={input}
+              onChangeText={setInput}
+              placeholder={copy.inputPlaceholder}
+              placeholderTextColor={theme.colors.text.placeholder}
+              multiline
+              maxLength={2000}
+              returnKeyType="send"
+              blurOnSubmit={false}
+              onSubmitEditing={() => handleSend()}
+              // Web: Enter sends, Shift+Enter inserts a newline. multiline
+              // TextInputs don't fire onSubmitEditing on web, so intercept
+              // keypress directly. Native multiline keeps its default
+              // newline-on-Enter behaviour.
+              onKeyPress={
+                Platform.OS === 'web'
+                  ? ((e: any) => {
+                      if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                        e.preventDefault?.()
+                        handleSend()
+                      }
+                    }) as any
+                  : undefined
               }
-              strokeWidth={2.4}
+              textAlignVertical="center"
+              style={{
+                paddingLeft: theme.spacing[4],
+                paddingRight: 48,
+                // Asymmetric padding compensates for font-metric quirk:
+                // most fonts put more visible mass above the baseline, so
+                // geometric centring renders the text slightly above visual
+                // centre. Extra paddingTop pushes glyphs down to look right.
+                paddingTop: 14,
+                paddingBottom: 8,
+                minHeight: 44,
+                fontSize: 15,
+                fontFamily: 'Inter-Regular',
+                color: theme.colors.text.primary,
+                maxHeight: 120,
+                lineHeight: 22,
+                ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null),
+              }}
             />
-          </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={copy.send}
+              onPress={() => handleSend()}
+              disabled={!input.trim() || isTyping}
+              style={[
+                {
+                  position: 'absolute',
+                  right: 10,
+                  top: '50%',
+                  marginTop: -16,
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  backgroundColor:
+                    !input.trim() || isTyping
+                      ? theme.colors.bg.surfaceWarm
+                      : theme.colors.accent.primary,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+                !input.trim() || isTyping
+                  ? null
+                  : Platform.OS === 'web'
+                    ? ({ boxShadow: '0 0 20px rgba(255, 4, 114, 0.45)' } as any)
+                    : {
+                        shadowColor: '#FF0472',
+                        shadowOpacity: 0.55,
+                        shadowRadius: 10,
+                        shadowOffset: { width: 0, height: 0 },
+                      },
+              ]}
+            >
+              <Icon
+                name="ArrowUp"
+                size={16}
+                color={
+                  !input.trim() || isTyping
+                    ? theme.colors.text.tertiary
+                    : theme.colors.accent.primaryOnText
+                }
+                strokeWidth={2.4}
+              />
+            </Pressable>
+          </View>
         </View>
       </KeyboardAvoidingView>
 

@@ -44,6 +44,15 @@ import { OnboardingProvider }  from './app/context/OnboardingContext'
 import { OnboardingNavigator } from './app/screens/onboarding/OnboardingNavigator'
 import { MainNavigator }       from './app/navigation/MainNavigator'
 import { ThemeProvider, darkColors } from './app/theme'
+import { BreathingForm } from './app/components'
+
+// Web-only dev escape hatch: append ?test=breath to the URL to render the
+// BreathingForm in isolation on the void canvas (no glass card, no Liquid
+// Ember, no navigation). Useful for checking the form's composition.
+const isBreathTest =
+  Platform.OS === 'web' &&
+  typeof window !== 'undefined' &&
+  window.location.search.includes('test=breath')
 
 // Keep the splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync()
@@ -124,12 +133,33 @@ export default function App() {
   // center them. The Welcome screen escapes the column on its own via
   // position: 'fixed' so its iridescent background fills the viewport
   // edge to edge. Native is untouched.
+  // ?test=breath — isolated BreathingForm preview, no chrome.
+  if (isBreathTest) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: '#0D0D12',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        onLayout={onLayoutRootView}
+      >
+        <BreathingForm size={900} />
+      </View>
+    )
+  }
+
   return (
     <View
       style={[styles.root, { backgroundColor: colors.bg.canvas }]}
       onLayout={onLayoutRootView}
     >
-      <View style={[styles.appShell, { backgroundColor: colors.bg.canvas }]}>
+      {/* appShell is transparent — the root View already provides the void
+          canvas. A solid background here creates a visible "column"
+          boundary against the position:fixed BreathingForm rendering in
+          the void on each side. */}
+      <View style={styles.appShell}>
         <ThemeProvider mode="dark">
           <NavigationContainer theme={navTheme}>
             <OnboardingProvider onComplete={handleOnboardingComplete}>

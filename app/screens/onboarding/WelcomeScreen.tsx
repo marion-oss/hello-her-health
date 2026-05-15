@@ -95,18 +95,37 @@ export function WelcomeScreen() {
     <View style={[escapeShell, { backgroundColor: palette.void[500] }]}>
       <StatusBar barStyle="light-content" backgroundColor={palette.void[500]} />
 
-      {/* Ambient breathing form behind everything. Sits low-right per the
-          deck composition; pushed even lower on narrow widths. */}
+      {/* Breathing form — the brand's signature visual. On desktop web,
+          sits in the right void area, outside the centred glass card so
+          both stay visible. On mobile/native, fills the canvas centred
+          behind everything. */}
       <View
         pointerEvents="none"
-        style={{
-          position: 'absolute',
-          right: isDesktop ? -120 : -180,
-          bottom: isDesktop ? -40 : 60,
-          opacity: 0.85,
-        }}
+        style={
+          isDesktop
+            ? {
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                bottom: 0,
+                width: 810,
+                alignItems: 'center',
+                justifyContent: 'center',
+                transform: [{ translateX: 80 }],
+              }
+            : {
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                alignItems: 'center',
+                justifyContent: 'center',
+                transform: [{ translateX: 80 }],
+              }
+        }
       >
-        <BreathingForm size={isDesktop ? 720 : 520} />
+        <BreathingForm size={isDesktop ? 765 : 1440} />
       </View>
 
       {/* A faint corner glow opposite the breathing form so the canvas is
@@ -159,7 +178,7 @@ export function WelcomeScreen() {
             <LangToggle language={language} onChange={setLanguage} />
           </View>
 
-          {/* Hero glass card — centered, holds all the copy + CTA */}
+          {/* Hero glass card — centred, holds all the copy + CTA. */}
           <View
             style={{
               flex: 1,
