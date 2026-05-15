@@ -21,15 +21,22 @@ import 'react-native-url-polyfill/auto'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl  = process.env.EXPO_PUBLIC_SUPABASE_URL  ?? ''
-const supabaseKey  = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? ''
+const envUrl = process.env.EXPO_PUBLIC_SUPABASE_URL  ?? ''
+const envKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? ''
 
-if (__DEV__ && (!supabaseUrl || !supabaseKey)) {
+if (__DEV__ && (!envUrl || !envKey)) {
   console.warn(
-    '[anoqi] Supabase env vars missing.\n' +
-    'Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to your .env file.'
+    '[anoqi] Supabase env vars missing — using placeholder client.\n' +
+    'Auth calls will fail. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to your .env file.'
   )
 }
+
+// Fall back to a syntactically-valid placeholder URL so createClient doesn't
+// throw at module load when env vars are missing (e.g. local design preview).
+// Any actual auth call will fail with a network error, which is fine — the
+// UI is what we're previewing here.
+const supabaseUrl = envUrl || 'https://placeholder.supabase.co'
+const supabaseKey = envKey || 'placeholder-anon-key'
 
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
