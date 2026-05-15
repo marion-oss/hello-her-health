@@ -95,3 +95,31 @@ When promoting an item off this list:
 - Check it preserves the policy layer ([feedback-policy-layer-immutable](../../.claude/memory/feedback_policy_layer_immutable.md)) — no AI output bypasses `checkPolicy()`.
 - Confirm the pseudonymisation pipeline still applies if new data leaves the device.
 - Update this file when an item ships (move to a "Shipped" section or delete with a git note).
+
+---
+
+## Pending regulatory decision — RAG (added 2026-05-14)
+
+The RAG retrieval layer (Phase 1 of the LLM quality plan) is **code-complete and DB-deployed** as of 2026-05-14:
+- `scripts/migrations/006_rag_embeddings.sql` + `006a_rag_functions.sql` are live in Supabase.
+- `api/lib/retrieval.ts` and `api/functions/chat.ts` integrate hybrid retrieval over `clinical_pathways` + `source_library` + `pathway_red_flags` with mandatory `[Sn]` citation.
+- Citation parsing flags hallucinated source IDs as `policy_flags: hallucinated_citation`.
+
+**Feature gate:** retrieval is OFF by default. To enable in any environment, set the Edge Function secret:
+
+```
+ANOQI_RAG_ENABLED=true
+```
+
+**Before flipping that flag in production:** RAG-grounded chat is closer to the EU-MDR / software-as-medical-device threshold than free conversation (the AI is now answering with reference to physician-approved content, not just trained-model knowledge). The PR-style governance for `clinical_pathways` and the validation queue for `source_library` are the necessary mitigation, but a deliberate regulatory decision is required before turning the flag on for end users. Decide and document here.
+
+**Operational prerequisite:** the corpus must be populated. Run from a trusted environment:
+
+```bash
+SUPABASE_URL=https://<ref>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<from dashboard> \
+GEMINI_API_KEY=<AI Studio> \
+deno run --allow-env --allow-net api/jobs/embed_rag.ts
+```
+
+Re-run whenever a pathway transitions to/from `live` or a `source_library` row flips `is_active`. (A trigger-based auto-rebuild is on the Phase 2/3 roadmap.)

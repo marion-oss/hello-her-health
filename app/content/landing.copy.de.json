@@ -1,0 +1,229 @@
+{
+  "meta": {
+    "productName": "Takumiro"
+  },
+  "hero": {
+    "headline": "Weniger Büro-Wahnsinn. Mehr Zeit fürs Handwerk.",
+    "subheadline": "Takumiro ist dein KI-Sekretariat. Es überwacht deine E-Mails, WhatsApp-Nachrichten und eingehende Anrufe — organisiert jede Kundenanfrage, holt fehlende Infos ein und legt dir die richtige Aufgabe genau zum richtigen Moment vor. Nichts geht verloren. Du weißt immer, was als Nächstes zu tun ist.",
+    "primaryCta": { "label": "Pilotpartner werden", "href": "#request-access" },
+    "secondaryCta": { "label": "So funktioniert's", "href": "#workflow" }
+  },
+  "problem": {
+    "title": "Kundenanfragen gehen im Tagesgeschäft unter.",
+    "bullets": [
+      "Infos aus WhatsApp-Verläufen zusammensuchen kostet Zeit",
+      "Fehlende Fotos und Angaben verzögern Termine und Angebote",
+      "Kunden-E-Mails gehen im Büroalltag unter",
+      "Anrufe, die ich verpasse, während ich auf der Baustelle bin",
+      "Büroarbeit frisst Zeit, die eigentlich in den Betrieb gehört"
+    ],
+    "consequenceLabel": "Jede verlorene Anfrage ist verlorener Umsatz.",
+    "closingLine": "Takumiro bringt Struktur in Kundenkommunikation, damit keine Anfrage mehr verloren geht."
+  },
+  "solution": {
+    "title": "Ein KI-Agent, der Anfragen in Arbeit übersetzt",
+    "body": "Takumiro nimmt Kundenanfragen an, qualifiziert sie, fordert fehlende Informationen an und bereitet die nächsten Schritte vor. Statt verstreuter Anrufe, WhatsApp-Nachrichten und E-Mails bekommst du einen klaren Überblick darüber, was erledigt wurde und was als Nächstes ansteht."
+  },
+  "coreBenefits": {
+    "title": "Warum Handwerksbetriebe Takumiro nutzen",
+    "items": [
+      {
+        "title": "Keine verlorenen Anfragen mehr",
+        "body": "Anrufe, WhatsApp-Nachrichten und E-Mails werden erfasst, damit keine Umsatzchance im Alltag untergeht."
+      },
+      {
+        "title": "Fehlende Infos werden automatisch eingesammelt",
+        "body": "Takumiro fragt fehlende Fotos, Maße oder Details direkt beim Kunden nach, bevor der Vorgang liegen bleibt."
+      },
+      {
+        "title": "Immer wissen, was als Nächstes ansteht",
+        "body": "Du siehst auf einen Blick, was zuletzt passiert ist und welcher nächste Schritt offen ist."
+      },
+      {
+        "title": "Weniger Büroarbeit, mehr Fokus auf den Betrieb",
+        "body": "Weniger Nachfassen, weniger Suchen, weniger Chaos. Mehr Zeit für Kunden, Team und echtes Handwerk."
+      }
+    ]
+  },
+  "workflow": {
+    "title": "So funktioniert's",
+    "intro": "So arbeitet Takumiro im Hintergrund für deinen Betrieb:",
+    "steps": [
+      {
+        "title": "Ein Kunde meldet sich",
+        "body": "Die Anfrage kommt per Telefon, WhatsApp oder E-Mail in deinen Betrieb."
+      },
+      {
+        "title": "Takumiro nimmt die Anfrage entgegen",
+        "body": "Der KI-Agent erfasst das Anliegen und sammelt die wichtigsten Informationen zum Vorgang."
+      },
+      {
+        "title": "Fehlende Angaben werden nachgefragt",
+        "body": "Wenn etwas fehlt, fragt Takumiro automatisch nach, zum Beispiel nach Fotos, Maßen oder weiteren Details."
+      },
+      {
+        "title": "Der nächste Schritt wird vorbereitet",
+        "body": "Takumiro bereitet je nach Fall einen Termin, eine Rückmeldung oder ein Angebot vor."
+      },
+      {
+        "title": "Du behältst jederzeit den Überblick",
+        "body": "Statt Nachrichtenchaos siehst du klar, was erledigt wurde und was als Nächstes ansteht."
+      }
+    ]
+  },
+  "capabilities": {
+    "title": "Was Takumiro konkret für dich übernimmt",
+    "items": [
+      {
+        "title": "Kundenanfragen annehmen",
+        "body": "Takumiro erfasst neue Anfragen, auch wenn gerade niemand ans Telefon gehen oder sofort antworten kann."
+      },
+      {
+        "title": "Anfragen qualifizieren",
+        "body": "Der KI-Agent erkennt, worum es geht, und strukturiert die Anfrage so, dass direkt damit gearbeitet werden kann."
+      },
+      {
+        "title": "Automatisch Rückfragen stellen",
+        "body": "Fehlende Informationen werden direkt beim Kunden angefragt, bevor Zeit im Büro verloren geht."
+      },
+      {
+        "title": "Termine und Angebote vorbereiten",
+        "body": "Takumiro bringt den Vorgang bis zum nächsten sinnvollen Schritt, statt ihn einfach nur abzulegen."
+      },
+      {
+        "title": "Kommunikation in Klarheit verwandeln",
+        "body": "Aus Anrufen, E-Mails und WhatsApp-Nachrichten wird ein strukturierter Arbeitsablauf."
+      }
+    ]
+  },
+  "useCases": {
+    "title": "Gemacht für Handwerksbetriebe",
+    "items": [
+      {
+        "title": "Elektrobetriebe",
+        "bullets": [
+          "Serviceanfragen strukturiert erfassen",
+          "Fehlende Fotos und Infos automatisch nachfordern",
+          "Anfragen schneller in Termine oder Angebote überführen",
+          "Büroaufwand im Tagesgeschäft reduzieren"
+        ]
+      },
+      {
+        "title": "SHK- und Heizungsbetriebe",
+        "bullets": [
+          "Störungen und Wartungsanfragen sauber aufnehmen",
+          "Kundenanliegen priorisieren",
+          "Rückfragen automatisiert abwickeln",
+          "Den Überblick über offene Vorgänge behalten"
+        ]
+      },
+      {
+        "title": "Dachdecker und Bau-nahe Betriebe",
+        "bullets": [
+          "Projektanfragen zentral erfassen",
+          "Fehlende Informationen vorqualifizieren",
+          "Kommunikation aus mehreren Kanälen bündeln",
+          "Weniger Chaos zwischen Büro und Baustelle"
+        ]
+      }
+    ]
+  },
+  "differentiation": {
+    "title": "Warum Takumiro anders ist",
+    "points": [
+      {
+        "title": "Startet bei der Anfrage, nicht erst beim Auftrag",
+        "body": "Die meisten Tools helfen erst, wenn der Job bereits angelegt wurde. Takumiro setzt früher an: direkt bei der Kundenkommunikation."
+      },
+      {
+        "title": "Nicht nur erfassen, sondern voranbringen",
+        "body": "Takumiro nimmt Anfragen nicht nur entgegen, sondern qualifiziert sie, fordert fehlende Infos an und bereitet den nächsten Schritt vor."
+      },
+      {
+        "title": "Weniger Büro-Wahnsinn im Alltag",
+        "body": "Statt in E-Mails, Anrufen und WhatsApp-Verläufen zu suchen, bekommst du eine klare Struktur für jeden Vorgang."
+      },
+      {
+        "title": "Passt in bestehende Abläufe",
+        "body": "Takumiro soll deinen Betrieb entlasten, ohne dass du sofort deine komplette Software-Landschaft austauschen musst."
+      }
+    ]
+  },
+  "controlSafety": {
+    "title": "Du behältst die Kontrolle",
+    "bullets": [
+      "Jede Anfrage bleibt nachvollziehbar",
+      "Du kannst Inhalte prüfen und anpassen",
+      "Der nächste Schritt ist jederzeit sichtbar",
+      "Takumiro unterstützt, aber entscheidet nicht an dir vorbei"
+    ],
+    "closingLine": "Takumiro arbeitet im Hintergrund, aber dein Betrieb bleibt jederzeit am Steuer."
+  },
+  "faq": {
+    "title": "FAQ",
+    "items": [
+      {
+        "q": "Für wen ist Takumiro gedacht?",
+        "a": "Takumiro ist für Handwerksbetriebe gedacht, die viele Kundenanfragen per Telefon, WhatsApp oder E-Mail erhalten und im Alltag von Büroarbeit entlastet werden wollen."
+      },
+      {
+        "q": "Ersetzt Takumiro meine bestehende Handwerkersoftware?",
+        "a": "Nein. Takumiro setzt früher an und hilft dabei, Kundenanfragen sauber zu erfassen, zu qualifizieren und in klare nächste Schritte zu überführen."
+      },
+      {
+        "q": "Welche Kanäle kann Takumiro verarbeiten?",
+        "a": "Takumiro ist für Anfragen per Telefon, WhatsApp und E-Mail gedacht."
+      },
+      {
+        "q": "Kann ich weiterhin selbst mit meinen Kunden sprechen?",
+        "a": "Ja. Takumiro unterstützt deinen Betrieb im Hintergrund und sorgt dafür, dass nichts verloren geht. Die Kommunikation bleibt weiterhin in deiner Hand."
+      },
+      {
+        "q": "Was ist der größte Vorteil von Takumiro?",
+        "a": "Weniger Bürochaos, weniger verlorene Anfragen und mehr Klarheit darüber, was als Nächstes zu tun ist."
+      }
+    ]
+  },
+  "finalCta": {
+    "title": "Weniger Chaos. Weniger verlorene Anfragen.",
+    "body": "Takumiro hilft Handwerksbetrieben dabei, Kundenkommunikation in strukturierte nächste Schritte zu verwandeln. Wenn du Pilotpartner werden willst, melde dich jetzt an.",
+    "cta": { "label": "Pilotpartner werden", "href": "#request-access" }
+  },
+  "requestAccess": {
+    "endpoint": "https://takumiro-landing-api.mcarvalho-de.workers.dev/api/request-access",
+    "fields": {
+      "email": {
+        "label": "E-Mail",
+        "placeholder": "du@betrieb.de"
+      },
+      "name": {
+        "label": "Name (optional)",
+        "placeholder": "Dein Name"
+      },
+      "companyOrRole": {
+        "label": "Betrieb / Rolle (optional)",
+        "placeholder": "z. B. Elektrobetrieb"
+      }
+    },
+    "submitLabel": "Anfragen",
+    "submittingLabel": "Wird gesendet...",
+    "successTitle": "Anfrage erhalten.",
+    "successBody": "Danke, wir melden uns bald mit weiteren Informationen zur Pilotphase.",
+    "errorBody": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
+  },
+  "nav": {
+    "links": [
+      { "label": "So funktioniert's", "href": "#workflow" },
+      { "label": "Anwendungsfälle", "href": "#use-cases" },
+      { "label": "FAQ", "href": "#faq" }
+    ]
+  },
+  "footer": {
+    "tagline": "KI-Agent für weniger Büro-Wahnsinn im Handwerk",
+    "columns": [
+      { "title": "Unternehmen", "links": ["Über uns", "Blog", "Karriere"] },
+      { "title": "Produkt", "links": ["Funktionen", "Ablauf", "Roadmap"] },
+      { "title": "Rechtliches", "links": ["Datenschutz", "AGB"] }
+    ]
+  }
+}
