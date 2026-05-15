@@ -26,15 +26,16 @@ import { useNavigation } from '@react-navigation/native'
 
 import {
   useOnboarding,
-  type HealthObjective,
   type Language,
 } from '../../context/OnboardingContext'
 import { palette, useTheme } from '../../theme'
+import { STARTERS } from './starters'
 import {
   BackHeader,
   BreathingForm,
   Bubble,
   Button,
+  ConsentSheet,
   Icon,
   type IconName,
   LiquidEmber,
@@ -106,79 +107,6 @@ const COPY = {
   },
 } as const
 
-const STARTERS: Record<HealthObjective, { fr: string[]; en: string[] }> = {
-  symptoms: {
-    fr: [
-      "J'ai des règles irrégulières depuis 3 mois",
-      "Comment préparer ma consultation gynéco ?",
-      'Qu\'est-ce qui pourrait expliquer ma fatigue ?',
-      'Pelviennes — que dois-je savoir ?',
-    ],
-    en: [
-      "I've had irregular periods for 3 months",
-      'How do I prepare for a gynae appointment?',
-      'What could be causing my fatigue?',
-      'Pelvic pain — what should I know?',
-    ],
-  },
-  contraception: {
-    fr: [
-      'Pilule vs stérilet : la différence ?',
-      "J'arrête la pilule — quoi attendre ?",
-      'Quels effets secondaires possibles ?',
-      'La pilule fait-elle grossir ?',
-    ],
-    en: [
-      'Pill vs coil — what\'s the difference?',
-      "I'm stopping the pill — what to expect?",
-      'What side effects are possible?',
-      'Does the pill cause weight gain?',
-    ],
-  },
-  menopause: {
-    fr: [
-      'Premiers signes de la périménopause ?',
-      'Le THM est-il fait pour moi ?',
-      'Gérer les bouffées de chaleur ?',
-      'Ménopause et mes os ?',
-    ],
-    en: [
-      'First signs of perimenopause?',
-      'Is HRT right for me?',
-      'How do I manage hot flashes?',
-      'What does menopause do to my bones?',
-    ],
-  },
-  fertility: {
-    fr: [
-      'Repérer ma fenêtre de fertilité ?',
-      'Qualité des ovules — quoi savoir ?',
-      "J'essaie depuis 6 mois — quand consulter ?",
-      'Que dit la longueur de mon cycle ?',
-    ],
-    en: [
-      'How do I track my fertile window?',
-      'What affects egg quality?',
-      "I've been trying 6 months — when to consult?",
-      'What does my cycle length say?',
-    ],
-  },
-  general: {
-    fr: [
-      'Mieux comprendre mes hormones',
-      'Épuisée — est-ce hormonal ?',
-      'Hormones, énergie, performance ?',
-      'Trouver un médecin qui m\'écoute ?',
-    ],
-    en: [
-      'Help me understand my hormones',
-      'Exhausted — could it be hormonal?',
-      'Hormones, energy, performance?',
-      'Find a doctor who listens?',
-    ],
-  },
-}
-
 const SAMPLE_SOURCES: Source[][] = [
   [
     { name: 'NHS', topic: 'Menstrual health', url: 'https://www.nhs.uk/conditions/periods/' },
@@ -233,9 +161,18 @@ export function ChatScreen() {
   const [userMessageCount, setUserMessageCount] = useState(0)
   const [consentChecked, setConsentChecked] = useState(false)
   const [consentAccepted, setConsentAccepted] = useState(false)
+  // Skip-and-chat path: user entered Chat directly from ObjectiveScreen
+  // without going through ConsentScreen. We let them compose + send their
+  // first message, then show the consent bottom-sheet before generating any
+  // AI response.
+  const [pendingConsent, setPendingConsent] = useState(false)
+  const [showConsentSheet, setShowConsentSheet] = useState(false)
 
   const flatListRef = useRef<FlatList>(null)
   const anoqiMessageCount = useRef(0)
+  // Holds the user's first message content while the consent sheet is open,
+  // so we can fire the AI response once consent is granted.
+  const heldFirstSendRef = useRef<string | null>(null)
   // Server-assigned conversation UUID. Null until the first /chat response
   // creates it; reused on every subsequent turn so the server can rebuild
   // history. Stays in the screen's lifetime — leaving and re-entering Chat
@@ -247,6 +184,28 @@ export function ChatScreen() {
       setConsentAccepted(v === 'true')
       setConsentChecked(true)
     })
+  }, [])
+
+  // Read skip-and-chat handoff state once on mount. The prefill is consumed
+  // immediately so re-entering Chat later starts with an empty composer.
+  useEffect(() => {
+    let cancelled = false
+    async function readHandoff() {
+      const [[, prefill], [, pending]] = await AsyncStorage.multiGet([
+        'anoqi_chat_prefill',
+        'anoqi_pending_consent',
+      ])
+      if (cancelled) return
+      if (prefill) {
+        setInput(prefill)
+        AsyncStorage.removeItem('anoqi_chat_prefill')
+      }
+      if (pending === 'true') setPendingConsent(true)
+    }
+    readHandoff()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   async function handleAcceptConsent() {
@@ -311,6 +270,31 @@ export function ChatScreen() {
     }
   }, [messages.length])
 
+  const runAnoqiResponse = useCallback(async () => {
+    setIsTyping(true)
+    // WIRE API — replace with streaming fetch
+    await new Promise((r) => setTimeout(r, 900 + Math.random() * 400))
+    setIsTyping(false)
+
+    const isFirstAnoqi = anoqiMessageCount.current === 0
+    anoqiMessageCount.current += 1
+    const responseText = getMockResponse(language, anoqiMessageCount.current - 1)
+    const sources = SAMPLE_SOURCES[anoqiMessageCount.current % SAMPLE_SOURCES.length]
+    const anoqiId = `anoqi-${Date.now()}`
+    const anoqiMessage: Message = {
+      id: anoqiId,
+      role: 'anoqi',
+      text: '',
+      fullText: responseText,
+      isStreaming: true,
+      sources,
+      isFirst: isFirstAnoqi,
+      timestamp: new Date(),
+    }
+    setMessages((prev) => [...prev, anoqiMessage])
+    setStreamingId(anoqiId)
+  }, [language])
+
   const handleSend = useCallback(
     async (text?: string) => {
       const content = (text ?? input).trim()
@@ -326,37 +310,48 @@ export function ChatScreen() {
       }
       setMessages((prev) => [...prev, userMessage])
       setUserMessageCount((prev) => prev + 1)
-      setIsTyping(true)
-      // WIRE API — replace with streaming fetch
-      await new Promise((r) => setTimeout(r, 900 + Math.random() * 400))
-      setIsTyping(false)
 
-      const isFirstAnoqi = anoqiMessageCount.current === 0
-      anoqiMessageCount.current += 1
-      const responseText = getMockResponse(language, anoqiMessageCount.current - 1)
-      const sources = SAMPLE_SOURCES[anoqiMessageCount.current % SAMPLE_SOURCES.length]
-      const anoqiId = `anoqi-${Date.now()}`
-      const anoqiMessage: Message = {
-        id: anoqiId,
-        role: 'anoqi',
-        text: '',
-        fullText: responseText,
-        isStreaming: true,
-        sources,
-        isFirst: isFirstAnoqi,
-        timestamp: new Date(),
+      // Skip-and-chat path: hold the AI response until consent is granted via
+      // the bottom-sheet. The user's typed message is already in the transcript
+      // so they see what they sent.
+      if (pendingConsent && anoqiMessageCount.current === 0) {
+        heldFirstSendRef.current = content
+        setShowConsentSheet(true)
+        return
       }
-      setMessages((prev) => [...prev, anoqiMessage])
-      setStreamingId(anoqiId)
+
+      await runAnoqiResponse()
     },
-    [input, language],
+    [input, pendingConsent, runAnoqiResponse],
+  )
+
+  const handleConsentSheetAccept = useCallback(
+    async (_researchOptIn: boolean) => {
+      await AsyncStorage.multiSet([
+        ['anoqi_chat_consent_accepted', 'true'],
+        // Suppress the welcome intro: the user already sent a question, so a
+        // separate "Hi, I'm Anoqi" message before the AI's first reply would
+        // feel out of place.
+        ['anoqi_intro_shown', 'true'],
+      ])
+      await AsyncStorage.removeItem('anoqi_pending_consent')
+      setPendingConsent(false)
+      setShowConsentSheet(false)
+      setConsentAccepted(true)
+      // Replay the held first send into the AI response pipeline.
+      if (heldFirstSendRef.current !== null) {
+        heldFirstSendRef.current = null
+        await runAnoqiResponse()
+      }
+    },
+    [runAnoqiResponse],
   )
 
   // ── Consent gate (Cotton Rose overlay — not a black scrim) ─────────────
   if (!consentChecked) {
     return <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }} />
   }
-  if (!consentAccepted) {
+  if (!consentAccepted && !pendingConsent) {
     const gate = copy.consentGate
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.surfaceMuted }}>
@@ -811,6 +806,12 @@ export function ChatScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      <ConsentSheet
+        visible={showConsentSheet}
+        language={language}
+        onAccept={handleConsentSheetAccept}
+      />
     </SafeAreaView>
   )
 }
