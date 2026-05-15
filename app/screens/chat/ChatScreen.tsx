@@ -30,10 +30,12 @@ import { setPendingFile } from '../../lib/pendingFile'
 
 import {
   useOnboarding,
+  type HealthObjective,
   type Language,
 } from '../../context/OnboardingContext'
 import { palette, useTheme } from '../../theme'
 import { STARTERS } from './starters'
+import { postChat, AnoqiApiError, type SourceDisplay } from '../../lib/anoqiApi'
 import {
   BackHeader,
   BreathingForm,
@@ -41,6 +43,7 @@ import {
   Button,
   type CitationSource,
   ConsentSheet,
+  GoalSheet,
   Icon,
   type IconName,
   LiquidEmber,
@@ -121,123 +124,32 @@ const COPY = {
   },
 } as const
 
-const SAMPLE_SOURCES: Source[][] = [
-  [
-    { label: 'S1', name: 'NHS',  topic: 'Menstrual health', url: 'https://www.nhs.uk/conditions/periods/' },
-    { label: 'S2', name: 'NICE', topic: 'Gynaecology',      url: 'https://www.nice.org.uk/guidance/ng88' },
-    { label: 'S3', name: 'BMS',  topic: 'Endometriosis',    url: 'https://thebms.org.uk/publications/' },
-  ],
-  [
-    { label: 'S1', name: 'FSRH', topic: 'Contraception',  url: 'https://www.fsrh.org/standards-and-guidance/' },
-    { label: 'S2', name: 'NHS',  topic: 'Sexual health',  url: 'https://www.nhs.uk/contraception/' },
-    { label: 'S3', name: 'NICE', topic: 'Contraception',  url: 'https://www.nice.org.uk/guidance/ng3' },
-  ],
-  [
-    { label: 'S1', name: 'BMS',  topic: 'Menopause',  url: 'https://thebms.org.uk/publications/' },
-    { label: 'S2', name: 'NICE', topic: 'Menopause',  url: 'https://www.nice.org.uk/guidance/ng23' },
-    { label: 'S3', name: 'NHS',  topic: 'HRT',       url: 'https://www.nhs.uk/conditions/hormone-replacement-therapy-hrt/' },
-  ],
-]
-
-const MOCK_RESPONSES: Record<Language, string[]> = {
-  en: [
-    `# What irregular periods can really mean
-
-What you're describing is something **many women experience**, and it's worth taking seriously. Symptoms like these can have several underlying causes, and the right next step depends on which pattern fits you. [S1]
-
-## Most likely causes
-
-- **Hormonal fluctuations** — thyroid, prolactin, or perimenopausal shifts
-- **PCOS or endometriosis** — especially if pain or skipped cycles are part of the picture [S2][S3]
-- **Lifestyle factors** — sleep, weight change, intense exercise, or stress
-
-## How to prepare for a consultation
-
-Track the **timing, intensity, and any accompanying symptoms** for at least one full cycle. That gives your doctor a much clearer picture than recall alone. [S1][S2]
-
-Would you like help building a summary you can bring with you?`,
-
-    `# Why women's health research keeps missing the point
-
-There are important nuances here that often get missed. Research conducted **specifically on women** — rather than extrapolated from male studies — shows that hormonal influences are significant and often underestimated. [S2]
-
-## What the evidence actually says
-
-- Recent NICE and FSRH guidelines lean toward a **personalised approach** over one-size-fits-all protocols [S1][S3]
-- Cycle phase changes how the body responds to medication, diet, and training load
-- Symptom clusters are more diagnostic than any single marker
-
-The implication: treatment that works in week one of your cycle may not work in week three, and that's a feature of the biology, not a failure of the patient. [S2]`,
-
-    `# Your symptoms are real — and there are evidence-based options
-
-This is one of those areas where women are often dismissed, but the **evidence is clear**: your symptoms have a clinical basis, and there are paths forward. [S1]
-
-## What the research supports
-
-- First-line HRT for vasomotor symptoms is well-established in NICE NG23 [S2]
-- Non-hormonal options exist for those who can't or prefer not to take HRT [S3]
-- Bone-density monitoring is recommended for anyone with early menopause [S1][S2]
-
-## What to ask your doctor
-
-Bring a **symptom diary** spanning at least 6 weeks. Ask specifically about **bone health, mood, and sleep** — these are the three areas most often under-treated. [S2]`,
-  ],
-  fr: [
-    `# Ce que des règles irrégulières peuvent vraiment signifier
-
-Ce que tu décris est vécu par **beaucoup de femmes**, et ça mérite d'être pris au sérieux. Ces symptômes peuvent avoir plusieurs causes, et la suite dépend du schéma qui te correspond. [S1]
-
-## Causes les plus probables
-
-- **Fluctuations hormonales** — thyroïde, prolactine, ou périménopause
-- **SOPK ou endométriose** — surtout si douleur ou cycles sautés sont présents [S2][S3]
-- **Facteurs de vie** — sommeil, changement de poids, sport intense, stress
-
-## Préparer ta consultation
-
-Note le **moment, l'intensité et les symptômes associés** sur au moins un cycle complet. Ça donne à ton médecin une image bien plus claire que la mémoire seule. [S1][S2]
-
-Tu veux que je t'aide à préparer un résumé à apporter ?`,
-
-    `# Pourquoi la recherche sur la santé des femmes manque le coche
-
-Il y a des nuances importantes ici qui passent souvent inaperçues. Les recherches menées **spécifiquement sur les femmes** — plutôt qu'extrapolées d'études masculines — montrent que les influences hormonales sont significatives et souvent sous-estimées. [S2]
-
-## Ce que dit l'évidence
-
-- Les recommandations NICE et FSRH penchent vers une **approche personnalisée** plutôt qu'un protocole universel [S1][S3]
-- La phase du cycle modifie la réponse aux médicaments, à l'alimentation, à l'entraînement
-- Les grappes de symptômes sont plus diagnostiques qu'un seul marqueur
-
-Conséquence : un traitement qui marche en semaine 1 du cycle peut ne pas marcher en semaine 3 — c'est une caractéristique de la biologie, pas un échec de la patiente. [S2]`,
-
-    `# Tes symptômes sont réels — et il existe des options fondées sur des preuves
-
-C'est un domaine où les femmes sont souvent ignorées, mais les **preuves sont claires** : tes symptômes ont une base clinique, et des pistes existent. [S1]
-
-## Ce que soutient la recherche
-
-- Le THM en première ligne pour les symptômes vasomoteurs est bien établi (NICE NG23) [S2]
-- Des options non hormonales existent pour celles qui ne peuvent ou ne veulent pas du THM [S3]
-- Un suivi de la densité osseuse est recommandé en cas de ménopause précoce [S1][S2]
-
-## Quoi demander à ton médecin
-
-Apporte un **journal des symptômes** sur au moins 6 semaines. Demande spécifiquement à propos de la **santé osseuse, l'humeur, et le sommeil** — ce sont les trois zones les plus sous-traitées. [S2]`,
-  ],
+// Bilingual goal labels mirrored on the Chat header chip. Same icon set as
+// the Home pill so the visual identity stays consistent across surfaces.
+const OBJECTIVE_LABELS: Record<HealthObjective, { fr: string; en: string; icon: IconName }> = {
+  symptoms:      { fr: 'Symptômes',      en: 'Symptoms',        icon: 'Stethoscope' },
+  contraception: { fr: 'Contraception',  en: 'Contraception',   icon: 'Pill' },
+  menopause:     { fr: 'Ménopause',      en: 'Menopause',       icon: 'Sunset' },
+  fertility:     { fr: 'Fertilité',      en: 'Fertility',       icon: 'Sprout' },
+  general:       { fr: 'Santé générale', en: 'General health',  icon: 'MessageCircle' },
 }
 
-function getMockResponse(lang: Language, index: number): string {
-  const responses = MOCK_RESPONSES[lang]
-  return responses[index % responses.length]
+// Map the BE's sources_display payload into the local Source shape (which is
+// CitationSource & { topic: string }). Pathway-typed entries have no URL.
+function toSource(d: SourceDisplay): Source {
+  return { label: d.label, name: d.name, topic: d.topic, url: d.url }
 }
+
 
 export function ChatScreen() {
   const navigation = useNavigation<any>()
-  const { language, objective } = useOnboarding()
+  const { language, objective, setObjective, sessionId } = useOnboarding()
   const theme = useTheme()
   const copy = COPY[language]
+
+  const objKey = objective ?? 'general'
+  const objMeta = OBJECTIVE_LABELS[objKey]
+  const [goalSheetOpen, setGoalSheetOpen] = useState(false)
   // Without this guard, the form's `position: fixed` (web) bleeds into
   // sibling tabs because the bottom-tab navigator keeps screens mounted.
   const isFocused = useIsFocused()
@@ -382,6 +294,26 @@ export function ChatScreen() {
     maybeShowIntro()
   }, [consentAccepted]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Retranslate the intro message when the user switches language. Chat lives
+  // in a bottom-tab navigator, so tabbing to Profile, flipping FR↔EN, and
+  // coming back finds the screen still mounted with the old-language intro
+  // baked into `messages`. Replace it in place; the streaming cursor for the
+  // intro is already done by the time the user can reach the language toggle.
+  useEffect(() => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id.startsWith('anoqi-intro-')
+          ? {
+              ...m,
+              text:        COPY[language].introMessage,
+              fullText:    COPY[language].introMessage,
+              isStreaming: false,
+            }
+          : m,
+      ),
+    )
+  }, [language])
+
   const starters = STARTERS[objective ?? 'general'][language]
   const showSummaryBanner = userMessageCount >= 3
 
@@ -414,30 +346,67 @@ export function ChatScreen() {
     }
   }, [messages.length])
 
-  const runAnoqiResponse = useCallback(async () => {
+  const runAnoqiResponse = useCallback(async (userContent: string) => {
     setIsTyping(true)
-    // WIRE API — replace with streaming fetch
-    await new Promise((r) => setTimeout(r, 900 + Math.random() * 400))
-    setIsTyping(false)
-
     const isFirstAnoqi = anoqiMessageCount.current === 0
-    anoqiMessageCount.current += 1
-    const responseText = getMockResponse(language, anoqiMessageCount.current - 1)
-    const sources = SAMPLE_SOURCES[anoqiMessageCount.current % SAMPLE_SOURCES.length]
-    const anoqiId = `anoqi-${Date.now()}`
-    const anoqiMessage: Message = {
-      id: anoqiId,
-      role: 'anoqi',
-      text: '',
-      fullText: responseText,
-      isStreaming: true,
-      sources,
-      isFirst: isFirstAnoqi,
-      timestamp: new Date(),
+
+    try {
+      const response = await postChat({
+        message:        userContent,
+        language,
+        sessionId,
+        objective,
+        conversationId: conversationIdRef.current ?? undefined,
+      })
+
+      // Capture the server-assigned conversation UUID on the first turn so
+      // subsequent calls thread into the same conversation.
+      if (response.conversationId && !conversationIdRef.current) {
+        conversationIdRef.current = response.conversationId
+      }
+
+      setIsTyping(false)
+      anoqiMessageCount.current += 1
+
+      const sources: Source[] = response.message.sources_display.map(toSource)
+      const anoqiId = `anoqi-${response.message.id ?? Date.now()}`
+      const anoqiMessage: Message = {
+        id: anoqiId,
+        role: 'anoqi',
+        text: '',
+        fullText: response.message.content,
+        isStreaming: true,
+        sources,
+        isFirst: isFirstAnoqi,
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, anoqiMessage])
+      setStreamingId(anoqiId)
+    } catch (err) {
+      setIsTyping(false)
+      const friendly = err instanceof AnoqiApiError
+        ? (language === 'fr'
+            ? `Désolée, je n'arrive pas à répondre pour l'instant (${err.status || 'réseau'}). Réessaie dans un instant.`
+            : `Sorry, I can't answer right now (${err.status || 'network'}). Please try again in a moment.`)
+        : (language === 'fr'
+            ? `Quelque chose n'a pas fonctionné. Réessaie.`
+            : `Something went wrong. Please try again.`)
+      const errId = `anoqi-error-${Date.now()}`
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: errId,
+          role: 'anoqi',
+          text: friendly,
+          fullText: friendly,
+          isStreaming: false,
+          isFirst: isFirstAnoqi,
+          timestamp: new Date(),
+        },
+      ])
+      if (__DEV__) console.warn('[chat] postChat failed:', err)
     }
-    setMessages((prev) => [...prev, anoqiMessage])
-    setStreamingId(anoqiId)
-  }, [language])
+  }, [language, objective, sessionId])
 
   const handleSend = useCallback(
     async (text?: string) => {
@@ -464,7 +433,7 @@ export function ChatScreen() {
         return
       }
 
-      await runAnoqiResponse()
+      await runAnoqiResponse(content)
     },
     [input, pendingConsent, runAnoqiResponse],
   )
@@ -484,8 +453,9 @@ export function ChatScreen() {
       setConsentAccepted(true)
       // Replay the held first send into the AI response pipeline.
       if (heldFirstSendRef.current !== null) {
+        const held = heldFirstSendRef.current
         heldFirstSendRef.current = null
-        await runAnoqiResponse()
+        await runAnoqiResponse(held)
       }
     },
     [runAnoqiResponse],
@@ -629,6 +599,32 @@ export function ChatScreen() {
             if (navigation.canGoBack()) navigation.goBack()
             else navigation.navigate('Home')
           }}
+          rightSlot={
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={objMeta[language]}
+              onPress={() => setGoalSheetOpen(true)}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: theme.radii.pill,
+                borderWidth: 1,
+                borderColor: 'rgba(196, 128, 106, 0.28)',
+                backgroundColor: pressed
+                  ? 'rgba(196, 128, 106, 0.20)'
+                  : 'rgba(196, 128, 106, 0.10)',
+              })}
+            >
+              <Icon name={objMeta.icon} size={12} color={palette.ember[300]} strokeWidth={1.8} />
+              <Text variant="label" style={{ color: palette.ember[200] }}>
+                {objMeta[language]}
+              </Text>
+              <Icon name="ChevronDown" size={11} color={palette.ember[300]} strokeWidth={1.8} />
+            </Pressable>
+          }
         />
 
         {messages.length === 0 ? (
@@ -794,18 +790,97 @@ export function ChatScreen() {
             }}
             showsVerticalScrollIndicator={false}
             ListFooterComponent={
-              isTyping ? (
-                <View
-                  style={{
-                    alignSelf: 'center',
-                    width: '100%',
-                    maxWidth: 864,
-                    marginBottom: theme.spacing[5],
-                  }}
-                >
-                  <TypingIndicator />
-                </View>
-              ) : null
+              <>
+                {isTyping ? (
+                  <View
+                    style={{
+                      alignSelf: 'center',
+                      width: '100%',
+                      maxWidth: 864,
+                      marginBottom: theme.spacing[5],
+                    }}
+                  >
+                    <TypingIndicator />
+                  </View>
+                ) : null}
+
+                {userMessageCount === 0 && !streamingId ? (
+                  // Auto-intro pushes a single message into `messages` on
+                  // first visit, so the pure empty-state path doesn't fire.
+                  // Mirror the starter grid here so cards are reachable
+                  // below the intro. Hides after the first user turn.
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      gap: theme.spacing[3],
+                      marginTop: theme.spacing[6],
+                    }}
+                  >
+                    {starters.map((q, i) => (
+                      <View
+                        key={i}
+                        style={{
+                          flexGrow: 1,
+                          flexBasis: '47%',
+                          borderRadius: 22,
+                          overflow: 'hidden',
+                          position: 'relative',
+                          minHeight: 110,
+                        }}
+                      >
+                        <LiquidEmber
+                          intensity={0.55}
+                          fuchsia={false}
+                          blur={36}
+                          borderRadius={22}
+                        />
+                        <Pressable
+                          accessibilityRole="button"
+                          onPress={() => handleSend(q)}
+                          style={({ pressed }) => [
+                            {
+                              flex: 1,
+                              backgroundColor: pressed
+                                ? 'rgba(255, 245, 238, 0.10)'
+                                : 'rgba(255, 245, 238, 0.05)',
+                              borderWidth: 1,
+                              borderColor: 'rgba(255, 245, 238, 0.09)',
+                              borderRadius: 22,
+                              paddingVertical: theme.spacing[4],
+                              paddingHorizontal: theme.spacing[4],
+                              justifyContent: 'space-between',
+                            },
+                            Platform.OS === 'web'
+                              ? ({
+                                  backdropFilter: 'blur(18px) saturate(140%)',
+                                  WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+                                } as any)
+                              : null,
+                          ]}
+                        >
+                          <Icon
+                            name="Sparkles"
+                            size={14}
+                            color={palette.ember[300]}
+                            strokeWidth={1.8}
+                          />
+                          <Text
+                            variant="h4Italic"
+                            style={{
+                              color: palette.warmWhite[100],
+                              marginTop: theme.spacing[3],
+                              lineHeight: 24,
+                            }}
+                          >
+                            {q}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </>
             }
           />
         )}
@@ -1040,6 +1115,14 @@ export function ChatScreen() {
         visible={showConsentSheet}
         language={language}
         onAccept={handleConsentSheetAccept}
+      />
+
+      <GoalSheet
+        visible={goalSheetOpen}
+        selected={objective}
+        language={language}
+        onSelect={setObjective}
+        onClose={() => setGoalSheetOpen(false)}
       />
 
       {/* Drop overlay (web only) — appears while a file is being dragged

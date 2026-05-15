@@ -7,7 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 # Public, non-secret config. Flip ANOQI_RAG_ENABLED via dashboard or `wrangler secret put`
 # when you want runtime control without a redeploy.
 [vars]
-ANOQI_RAG_ENABLED = "false"
+ANOQI_RAG_ENABLED = "true"
 
 # Secrets — set via `wrangler secret put <name> --name anoqi-api-staging`:
 #   GEMINI_API_KEY                — same value as the Supabase Edge Function uses
