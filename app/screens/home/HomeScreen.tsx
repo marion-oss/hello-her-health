@@ -280,10 +280,9 @@ export function HomeScreen() {
             {copy.subhead}
           </Text>
 
-          {/* Focus pill */}
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => navigation.navigate('Objective', { mode: 'change' })}
+          {/* Focus indicator — static. Change-focus moved out of MainNavigator;
+              a future Settings flow can reopen the picker if needed. */}
+          <View
             style={{
               marginTop: theme.spacing[5],
               alignSelf: 'flex-start',
@@ -302,8 +301,7 @@ export function HomeScreen() {
             <Text variant="label" style={{ color: palette.ember[200] }}>
               {objectiveLabel}
             </Text>
-            <Icon name="ChevronRight" size={12} color={palette.ember[300]} strokeWidth={1.8} />
-          </Pressable>
+          </View>
         </View>
 
         {/* Insight glass card — main daily moment */}
