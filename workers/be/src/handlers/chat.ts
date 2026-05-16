@@ -25,12 +25,81 @@ import { parseCitations, type MessageSource } from '../lib/citationParser'
 // ─────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────
+interface ChatRequestDocument {
+  id:           string
+  name:         string | null
+  documentType: string
+  documentDate: string | null
+  cleanText:    string
+}
+
 interface ChatRequest {
   message: string
   conversationId?: string
   sessionId?: string
   journeyType?: string
   language?: 'fr' | 'en'
+  // Documents the user has explicitly marked as in-context on the client.
+  // PII is pseudonymised on device before being sent. Optional — chat works
+  // without them. The handler enforces per-doc + total caps below.
+  documents?: ChatRequestDocument[]
+}
+
+// Caps applied server-side regardless of what the client sends. Belt-and-
+// braces: the client already truncates, but we don't trust client-side
+// limits for prompt-budget reasons.
+const DOC_PER_DOC_MAX_CHARS = 4000
+const DOC_TOTAL_MAX_CHARS   = 12_000
+const DOC_MAX_COUNT         = 10
+
+// Bilingual labels for the user-docs block injected into the system prompt.
+// Keep the EN side a faithful mirror of FR — clinical persona is sensitive
+// to tone shifts.
+const USER_DOCS_BLOCK_COPY: Record<'fr' | 'en', { header: string; footer: string; doc: string }> = {
+  fr: {
+    header: "L'utilisatrice a partagé les documents personnels suivants. Appuie-toi dessus quand c'est pertinent et cite-les naturellement (sans inventer de chiffres).",
+    footer: 'Fin des documents personnels.',
+    doc:    'Document',
+  },
+  en: {
+    header: 'The user has shared the following personal documents. Rely on them where relevant and reference them naturally (without inventing numbers).',
+    footer: 'End of personal documents.',
+    doc:    'Document',
+  },
+}
+
+function renderUserDocsBlock(
+  docs: ChatRequestDocument[] | undefined,
+  language: 'fr' | 'en',
+): string | undefined {
+  if (!docs || docs.length === 0) return undefined
+
+  const copy = USER_DOCS_BLOCK_COPY[language]
+  const capped = docs.slice(0, DOC_MAX_COUNT)
+  let used = 0
+  const blocks: string[] = []
+
+  for (let i = 0; i < capped.length; i++) {
+    if (used >= DOC_TOTAL_MAX_CHARS) break
+    const d = capped[i]
+    if (!d?.cleanText) continue
+    const remaining = DOC_TOTAL_MAX_CHARS - used
+    const cap = Math.min(DOC_PER_DOC_MAX_CHARS, remaining)
+    const text = d.cleanText.length > cap
+      ? d.cleanText.slice(0, cap) + '\n\n[…truncated]'
+      : d.cleanText
+    const headerBits = [
+      d.name && d.name.trim().length > 0 ? `"${d.name.trim()}"` : null,
+      d.documentType,
+      d.documentDate,
+    ].filter(Boolean).join(' · ')
+    blocks.push(`[${copy.doc} ${i + 1}${headerBits ? ` — ${headerBits}` : ''}]\n${text}`)
+    used += text.length
+  }
+
+  if (blocks.length === 0) return undefined
+
+  return `${copy.header}\n\n${blocks.join('\n\n')}\n\n${copy.footer}`
 }
 
 interface SourceDisplay {
@@ -70,7 +139,7 @@ export async function chatHandler(c: Context<{ Bindings: Env }>): Promise<Respon
     return c.json({ error: 'Invalid JSON body' }, 400)
   }
 
-  const { message, conversationId, sessionId, journeyType } = body
+  const { message, conversationId, sessionId, journeyType, documents } = body
   const requestedLanguage: 'fr' | 'en' = body.language === 'en' ? 'en' : 'fr'
   // Override the FE-supplied language when the user clearly writes in the
   // other one (e.g. onboarding defaulted to 'fr' but the user types English).
@@ -199,9 +268,17 @@ export async function chatHandler(c: Context<{ Bindings: Env }>): Promise<Respon
     }
   }
   const systemAddendum = renderSnippetsForPrompt(snippets, language) ?? undefined
+  const userDocsBlock = renderUserDocsBlock(documents, language)
 
   // Call Gemini (policy check runs inside)
-  const aiResponse = await geminiChat(messageHistory, journeyType, systemAddendum, c.env, language)
+  const aiResponse = await geminiChat(
+    messageHistory,
+    journeyType,
+    systemAddendum,
+    c.env,
+    language,
+    userDocsBlock,
+  )
 
   if (aiResponse.error === 'api_error') {
     return c.json(
