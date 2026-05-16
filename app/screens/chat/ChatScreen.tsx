@@ -22,9 +22,11 @@ import {
   Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native'
@@ -44,6 +46,7 @@ import {
 } from '../../context/OnboardingContext'
 import { palette, useTheme } from '../../theme'
 import { STARTERS } from './starters'
+import { StarterCard } from './StarterCard'
 import {
   postChatStream,
   AnoqiApiError,
@@ -61,7 +64,6 @@ import {
   GoalSheet,
   Icon,
   type IconName,
-  LiquidEmber,
   Markdown,
   parseMarkdown,
   StreamingCursor,
@@ -286,6 +288,10 @@ export function ChatScreen() {
   const navigation = useNavigation<any>()
   const { language, objective, setObjective, sessionId } = useOnboarding()
   const theme = useTheme()
+  const { width: screenWidth } = useWindowDimensions()
+  // Cormorant h2 (36px) wraps to 3 lines on FR greeting at < 480px and
+  // pushes the rest of the empty state below the fold. Step down to h3.
+  const greetingVariant = screenWidth < 480 ? 'h3' : 'h2'
   const copy = COPY[language]
 
   const objKey = objective ?? 'general'
@@ -939,16 +945,21 @@ export function ChatScreen() {
         />
 
         {messages.length === 0 ? (
-          // Empty state
-          <View
-            style={{
-              flex: 1,
+          // Empty state — scrollable so content can overflow on small screens
+          // without colliding with the input bar.
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{
+              flexGrow: 1,
               paddingHorizontal: theme.spacing[6],
-              justifyContent: 'center',
+              paddingTop: theme.spacing[8],
               paddingBottom: theme.spacing[16],
+              justifyContent: screenWidth >= 480 ? 'center' : 'flex-start',
             }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
-            <Text variant="h2" tone="primary" align="center">
+            <Text variant={greetingVariant} tone="primary" align="center">
               {copy.greeting}
             </Text>
             <Text
@@ -967,68 +978,15 @@ export function ChatScreen() {
               }}
             >
               {starters.map((q, i) => (
-                <View
+                <StarterCard
                   key={i}
-                  style={{
-                    flexGrow: 1,
-                    flexBasis: '47%',
-                    borderRadius: 22,
-                    overflow: 'hidden',
-                    position: 'relative',
-                    minHeight: 110,
-                  }}
-                >
-                  <LiquidEmber
-                    intensity={0.55}
-                    fuchsia={false}
-                    blur={36}
-                    borderRadius={22}
-                  />
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => handleSend(q)}
-                    style={({ pressed }) => [
-                      {
-                        flex: 1,
-                        backgroundColor: pressed
-                          ? 'rgba(255, 245, 238, 0.10)'
-                          : 'rgba(255, 245, 238, 0.05)',
-                        borderWidth: 1,
-                        borderColor: 'rgba(255, 245, 238, 0.09)',
-                        borderRadius: 22,
-                        paddingVertical: theme.spacing[4],
-                        paddingHorizontal: theme.spacing[4],
-                        justifyContent: 'space-between',
-                      },
-                      Platform.OS === 'web'
-                        ? ({
-                            backdropFilter: 'blur(18px) saturate(140%)',
-                            WebkitBackdropFilter: 'blur(18px) saturate(140%)',
-                          } as any)
-                        : null,
-                    ]}
-                  >
-                    <Icon
-                      name="Sparkles"
-                      size={14}
-                      color={palette.ember[300]}
-                      strokeWidth={1.8}
-                    />
-                    <Text
-                      variant="h4Italic"
-                      style={{
-                        color: palette.warmWhite[100],
-                        marginTop: theme.spacing[3],
-                        lineHeight: 24,
-                      }}
-                    >
-                      {q}
-                    </Text>
-                  </Pressable>
-                </View>
+                  text={q}
+                  index={i}
+                  onPress={() => handleSend(q)}
+                />
               ))}
             </View>
-          </View>
+          </ScrollView>
         ) : (
           <FlatList
             ref={flatListRef}
@@ -1071,65 +1029,12 @@ export function ChatScreen() {
                     }}
                   >
                     {starters.map((q, i) => (
-                      <View
+                      <StarterCard
                         key={i}
-                        style={{
-                          flexGrow: 1,
-                          flexBasis: '47%',
-                          borderRadius: 22,
-                          overflow: 'hidden',
-                          position: 'relative',
-                          minHeight: 110,
-                        }}
-                      >
-                        <LiquidEmber
-                          intensity={0.55}
-                          fuchsia={false}
-                          blur={36}
-                          borderRadius={22}
-                        />
-                        <Pressable
-                          accessibilityRole="button"
-                          onPress={() => handleSend(q)}
-                          style={({ pressed }) => [
-                            {
-                              flex: 1,
-                              backgroundColor: pressed
-                                ? 'rgba(255, 245, 238, 0.10)'
-                                : 'rgba(255, 245, 238, 0.05)',
-                              borderWidth: 1,
-                              borderColor: 'rgba(255, 245, 238, 0.09)',
-                              borderRadius: 22,
-                              paddingVertical: theme.spacing[4],
-                              paddingHorizontal: theme.spacing[4],
-                              justifyContent: 'space-between',
-                            },
-                            Platform.OS === 'web'
-                              ? ({
-                                  backdropFilter: 'blur(18px) saturate(140%)',
-                                  WebkitBackdropFilter: 'blur(18px) saturate(140%)',
-                                } as any)
-                              : null,
-                          ]}
-                        >
-                          <Icon
-                            name="Sparkles"
-                            size={14}
-                            color={palette.ember[300]}
-                            strokeWidth={1.8}
-                          />
-                          <Text
-                            variant="h4Italic"
-                            style={{
-                              color: palette.warmWhite[100],
-                              marginTop: theme.spacing[3],
-                              lineHeight: 24,
-                            }}
-                          >
-                            {q}
-                          </Text>
-                        </Pressable>
-                      </View>
+                        text={q}
+                        index={i}
+                        onPress={() => handleSend(q)}
+                      />
                     ))}
                   </View>
                 ) : null}
