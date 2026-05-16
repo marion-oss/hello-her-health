@@ -19,7 +19,7 @@
  *   here re-reads the flag and swaps navigators.
  */
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { View, StyleSheet, Platform } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native'
@@ -41,10 +41,18 @@ import {
 } from '@expo-google-fonts/inter'
 
 import { OnboardingProvider }  from './app/context/OnboardingContext'
-import { OnboardingNavigator } from './app/screens/onboarding/OnboardingNavigator'
 import { MainNavigator }       from './app/navigation/MainNavigator'
 import { ThemeProvider, darkColors } from './app/theme'
 import { BreathingForm } from './app/components'
+
+// OnboardingNavigator is only rendered for first-time users; returning users
+// (vast majority) skip the entire chunk. Metro emits a separate JS file for
+// this dynamic import, gated behind the AsyncStorage onboarding flag.
+const LazyOnboardingNavigator = lazy(() =>
+  import('./app/screens/onboarding/OnboardingNavigator').then((m) => ({
+    default: m.OnboardingNavigator,
+  })),
+)
 
 // Web-only dev escape hatch: append ?test=breath to the URL to render the
 // BreathingForm in isolation on the void canvas (no glass card, no Liquid
@@ -64,37 +72,32 @@ export default function App() {
   const [onboardingDone, setOnboardingDone] = useState(false)
 
   useEffect(() => {
-    async function bootstrap() {
-      try {
-        const [, flag] = await Promise.all([
-          Font.loadAsync({
-            // Display: Cormorant Garamond — warm humanist serif, italic for
-            // hero copy. Sets "Mieux informée. / Mieux entendue." and every
-            // assistant body in chat.
-            'CormorantGaramond-Regular':      CormorantGaramond_400Regular,
-            'CormorantGaramond-Italic':       CormorantGaramond_400Regular_Italic,
-            'CormorantGaramond-Medium':       CormorantGaramond_500Medium,
-            'CormorantGaramond-MediumItalic': CormorantGaramond_500Medium_Italic,
-            // Body: Inter — precise, never cold. Generous line-height is
-            // enforced in typography.ts, not here.
-            'Inter-Light':    Inter_300Light,
-            'Inter-Regular':  Inter_400Regular,
-            'Inter-Medium':   Inter_500Medium,
-            'Inter-SemiBold': Inter_600SemiBold,
-          }),
-          AsyncStorage.getItem(ONBOARDING_KEY),
-        ])
+    // Fonts load in the background — we render with system fallbacks first so
+    // first paint isn't blocked on ~3 MB of woff downloads. Brief FOUT on the
+    // very first visit; cached forever after. Display: Cormorant Garamond,
+    // Body: Inter. Generous line-height is enforced in typography.ts.
+    Font.loadAsync({
+      'CormorantGaramond-Regular':      CormorantGaramond_400Regular,
+      'CormorantGaramond-Italic':       CormorantGaramond_400Regular_Italic,
+      'CormorantGaramond-Medium':       CormorantGaramond_500Medium,
+      'CormorantGaramond-MediumItalic': CormorantGaramond_500Medium_Italic,
+      'Inter-Light':    Inter_300Light,
+      'Inter-Regular':  Inter_400Regular,
+      'Inter-Medium':   Inter_500Medium,
+      'Inter-SemiBold': Inter_600SemiBold,
+    }).catch((e) => {
+      // Non-fatal — system fonts cover it.
+      console.warn('Font load failed:', e)
+    })
 
+    // The only thing we actually need before mounting a navigator is the
+    // onboarding flag — it decides which navigator goes in.
+    AsyncStorage.getItem(ONBOARDING_KEY)
+      .then((flag) => {
         if (flag === 'true') setOnboardingDone(true)
-      } catch (e) {
-        // Font load failures are non-fatal — system fonts cover it.
-        console.warn('App bootstrap warning:', e)
-      } finally {
-        setAppReady(true)
-      }
-    }
-
-    bootstrap()
+      })
+      .catch((e) => console.warn('App bootstrap warning:', e))
+      .finally(() => setAppReady(true))
   }, [])
 
   const onLayoutRootView = useCallback(async () => {
@@ -163,10 +166,15 @@ export default function App() {
         <ThemeProvider mode="dark">
           <NavigationContainer theme={navTheme}>
             <OnboardingProvider onComplete={handleOnboardingComplete}>
-              {onboardingDone
-                ? <MainNavigator />
-                : <OnboardingNavigator />
-              }
+              {onboardingDone ? (
+                <MainNavigator />
+              ) : (
+                <Suspense
+                  fallback={<View style={{ flex: 1, backgroundColor: colors.bg.canvas }} />}
+                >
+                  <LazyOnboardingNavigator />
+                </Suspense>
+              )}
             </OnboardingProvider>
           </NavigationContainer>
         </ThemeProvider>

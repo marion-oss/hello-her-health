@@ -214,6 +214,147 @@ export async function chat(
 }
 
 // ─────────────────────────────────────────────────────────────
+// CHAT (STREAMING)
+//
+// Same prompt construction as chat(); only the network call differs.
+// Yields `{ text }` deltas as Gemini emits them, then a final `{ done: true,
+// finishReason, tokensUsed }`. Callers run their own policy/citation passes
+// over the accumulated text.
+//
+// Designed for SSE: it does NOT run the policy layer itself, because the
+// handler needs to inspect the accumulated text incrementally between deltas
+// to abort streaming the moment any blocked phrase appears.
+// ─────────────────────────────────────────────────────────────
+export type ChatStreamEvent =
+  | { kind: 'delta'; text: string }
+  | { kind: 'done';  finishReason?: string; tokensUsed: number | null }
+  | { kind: 'error'; reason: 'api_error' | 'parse_error'; status?: number }
+
+export async function* chatStream(
+  messages: ChatMessage[],
+  journeyType: string | undefined,
+  systemAddendum: string | undefined,
+  env: GeminiEnv,
+  language: Language = 'fr',
+  userDocsBlock: string | undefined = undefined,
+): AsyncGenerator<ChatStreamEvent, void, unknown> {
+  const apiKey = env.GEMINI_API_KEY
+
+  if (!apiKey) {
+    console.error('[gemini] GEMINI_API_KEY secret not set')
+    yield { kind: 'error', reason: 'api_error' }
+    return
+  }
+
+  const base = BASE_SYSTEM_PROMPTS[language]
+  const journeyContext = JOURNEY_CONTEXTS[language][journeyType ?? 'free_chat'] ?? ''
+  const baseWithJourney = journeyContext
+    ? `${base}\n\n${journeyContext}`
+    : base
+  // Compose order mirrors chat(): base persona → journey → user docs →
+  // RAG snippets. Keeps the model's anchor on the user's data first.
+  const withUserDocs = userDocsBlock
+    ? `${baseWithJourney}\n\n${userDocsBlock}`
+    : baseWithJourney
+  const systemPrompt = systemAddendum
+    ? `${withUserDocs}\n\n${systemAddendum}`
+    : withUserDocs
+
+  const contents = messages.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }))
+
+  let response: Response
+  try {
+    // `alt=sse` switches the streamGenerateContent endpoint to Server-Sent
+    // Events. Without it, the response is a JSON array delivered as one chunk
+    // (defeats the point).
+    response = await fetch(
+      `${GEMINI_API_BASE}/${CHAT_MODEL}:streamGenerateContent?alt=sse`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':   'application/json',
+          'x-goog-api-key':  apiKey,
+        },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents,
+          generationConfig: {
+            maxOutputTokens: 8192,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        }),
+      },
+    )
+  } catch (e) {
+    console.error('[gemini] streamGenerateContent fetch failed:', e)
+    yield { kind: 'error', reason: 'api_error' }
+    return
+  }
+
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => '')
+    console.error('[gemini] stream API error:', response.status, errorBody)
+    yield { kind: 'error', reason: 'api_error', status: response.status }
+    return
+  }
+  if (!response.body) {
+    yield { kind: 'error', reason: 'api_error' }
+    return
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let finishReason: string | undefined
+  let tokensUsed: number | null = null
+
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+
+    // SSE frames are separated by blank lines; each `data: …` line carries one
+    // JSON payload. Keep the trailing partial in `buffer` for the next chunk.
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed.startsWith('data:')) continue
+      const payload = trimmed.slice(5).trim()
+      if (!payload) continue
+
+      let data: any
+      try {
+        data = JSON.parse(payload)
+      } catch (e) {
+        console.error('[gemini] SSE parse error:', e, payload.slice(0, 200))
+        continue
+      }
+
+      const candidate = data.candidates?.[0]
+      const text: string | undefined = candidate?.content?.parts?.[0]?.text
+      if (typeof text === 'string' && text.length > 0) {
+        yield { kind: 'delta', text }
+      }
+      if (candidate?.finishReason) finishReason = candidate.finishReason
+      if (typeof data.usageMetadata?.candidatesTokenCount === 'number') {
+        tokensUsed = data.usageMetadata.candidatesTokenCount
+      }
+    }
+  }
+
+  if (finishReason && finishReason !== 'STOP') {
+    console.warn(`[gemini] chatStream finishReason=${finishReason} tokens=${tokensUsed}`)
+  }
+
+  yield { kind: 'done', finishReason, tokensUsed }
+}
+
+// ─────────────────────────────────────────────────────────────
 // GENERATE SUMMARY
 // ─────────────────────────────────────────────────────────────
 export async function generateSummary(

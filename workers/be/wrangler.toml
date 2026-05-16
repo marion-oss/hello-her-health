@@ -15,3 +15,16 @@ ANOQI_RAG_ENABLED = "true"
 #   SUPABASE_SERVICE_ROLE_KEY     — bypasses RLS; required by chat / documents / summaries
 #   SUPABASE_JWT_JWKS_URL         — https://xulemxvfufwvewvtwwcv.supabase.co/auth/v1/keys
 #                                   (used by auth.ts to verify mobile-app JWTs)
+
+# Optional: KV namespace for RAG embedding cache.
+# Skips the Gemini embedding round-trip (~150 ms) when the same query has been
+# seen in the last 24h. Safe to leave unbound — retrieval falls back to live
+# embeds. To enable:
+#   wrangler kv:namespace create EMBEDDING_CACHE
+#   wrangler kv:namespace create EMBEDDING_CACHE --preview
+# Then uncomment the block below, dropping in the printed namespace IDs.
+#
+# [[kv_namespaces]]
+# binding    = "EMBEDDING_CACHE"
+# id         = "<production-id>"
+# preview_id = "<preview-id>"

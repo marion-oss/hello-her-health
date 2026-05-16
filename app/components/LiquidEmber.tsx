@@ -23,9 +23,10 @@
 //   blur        — web CSS blur radius in px. Default 48.
 //   borderRadius — pass through so the layer clips with the parent.
 
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Platform, StyleSheet, View, type ViewStyle } from 'react-native'
 import Animated, {
+  cancelAnimation,
   Easing,
   useAnimatedStyle,
   useSharedValue,
@@ -62,14 +63,48 @@ export function LiquidEmber({
   const cx = useSharedValue(0)
   const cy = useSharedValue(0)
 
+  // Page Visibility on web: don't burn CPU/GPU animating six blurred blob
+  // layers when the tab isn't visible. On native, Reanimated already throttles
+  // when the app backgrounds, so we only wire this up for web.
+  const [visible, setVisible] = useState(() =>
+    Platform.OS === 'web' && typeof document !== 'undefined'
+      ? document.visibilityState !== 'hidden'
+      : true,
+  )
   useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return
+    const onChange = () => setVisible(document.visibilityState !== 'hidden')
+    document.addEventListener('visibilitychange', onChange)
+    return () => document.removeEventListener('visibilitychange', onChange)
+  }, [])
+
+  useEffect(() => {
+    if (!visible) {
+      // Freeze the values where they are; cancelling preserves the current
+      // visual position so the resume looks like a pause, not a snap.
+      cancelAnimation(ax)
+      cancelAnimation(ay)
+      cancelAnimation(bx)
+      cancelAnimation(by)
+      cancelAnimation(cx)
+      cancelAnimation(cy)
+      return
+    }
     ax.value = withRepeat(withTiming(1, { duration: 22000, easing: breath }), -1, true)
     ay.value = withRepeat(withTiming(1, { duration: 27000, easing: breath }), -1, true)
     bx.value = withRepeat(withTiming(1, { duration: 26000, easing: breath }), -1, true)
     by.value = withRepeat(withTiming(1, { duration: 29000, easing: breath }), -1, true)
     cx.value = withRepeat(withTiming(1, { duration: 31000, easing: breath }), -1, true)
     cy.value = withRepeat(withTiming(1, { duration: 24000, easing: breath }), -1, true)
-  }, [ax, ay, bx, by, cx, cy])
+    return () => {
+      cancelAnimation(ax)
+      cancelAnimation(ay)
+      cancelAnimation(bx)
+      cancelAnimation(by)
+      cancelAnimation(cx)
+      cancelAnimation(cy)
+    }
+  }, [visible, ax, ay, bx, by, cx, cy])
 
   // Blob A — large ember in the upper-left, drifts diagonally.
   const blobA = useAnimatedStyle(() => ({

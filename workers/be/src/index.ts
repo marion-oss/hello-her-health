@@ -26,6 +26,10 @@ export type Env = {
   SUPABASE_URL: string
   SUPABASE_SERVICE_ROLE_KEY: string
   SUPABASE_JWT_JWKS_URL?: string  // reserved for future JWKS-based local verification
+
+  // Optional KV namespace for the RAG embedding cache (24h TTL). When unset,
+  // retrieval embeds every query live. See wrangler.toml for setup.
+  EMBEDDING_CACHE?: KVNamespace
 }
 
 const app = new Hono<{ Bindings: Env }>()
