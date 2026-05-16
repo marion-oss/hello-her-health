@@ -511,7 +511,7 @@ async function chatStreamHandler(c: Context<{ Bindings: Env }>): Promise<Respons
           accumulated += evt.text
           // Incremental policy check — catches diagnosis language the moment
           // the pattern completes. Cheap regex pass; runs per-delta.
-          const check = checkPolicy(accumulated)
+          const check = checkPolicy(accumulated, language)
           if (!check.safe) {
             redactedContent = check.sanitisedContent ?? ''
             send(controller, 'redact', { content: redactedContent })
