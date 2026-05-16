@@ -28,7 +28,13 @@ import {
 } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native'
-import { listDocuments } from '../../lib/documentStore'
+import {
+  listDocuments,
+  listInContextDocuments,
+  setInContext,
+  type DocumentIndexEntry,
+  type LocalDocument,
+} from '../../lib/documentStore'
 import { setPendingFile } from '../../lib/pendingFile'
 
 import {
@@ -38,7 +44,12 @@ import {
 } from '../../context/OnboardingContext'
 import { palette, useTheme } from '../../theme'
 import { STARTERS } from './starters'
-import { postChatStream, AnoqiApiError, type SourceDisplay } from '../../lib/anoqiApi'
+import {
+  postChatStream,
+  AnoqiApiError,
+  type ChatRequestDocument,
+  type SourceDisplay,
+} from '../../lib/anoqiApi'
 import {
   BackHeader,
   BreathingForm,
@@ -46,6 +57,7 @@ import {
   Button,
   type CitationSource,
   ConsentSheet,
+  DocumentContextSheet,
   GoalSheet,
   Icon,
   type IconName,
@@ -56,6 +68,32 @@ import {
   Text,
   TypingIndicator,
 } from '../../components'
+
+// Cap each document's cleanText at this many characters before sending. The
+// BE applies its own caps too — this just avoids shipping megabytes.
+const DOC_PER_DOC_MAX = 4000
+const DOC_TOTAL_MAX   = 12_000
+
+function buildContextDocsPayload(docs: LocalDocument[]): ChatRequestDocument[] {
+  let used = 0
+  const out: ChatRequestDocument[] = []
+  for (const d of docs) {
+    if (used >= DOC_TOTAL_MAX) break
+    const cap = Math.min(DOC_PER_DOC_MAX, DOC_TOTAL_MAX - used)
+    const text = d.cleanText.length > cap
+      ? d.cleanText.slice(0, cap) + '\n\n[…truncated]'
+      : d.cleanText
+    out.push({
+      id:           d.id,
+      name:         d.name,
+      documentType: d.documentType,
+      documentDate: d.documentDate,
+      cleanText:    text,
+    })
+    used += text.length
+  }
+  return out
+}
 
 type Source = CitationSource & { topic: string }
 
@@ -259,18 +297,34 @@ export function ChatScreen() {
 
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
-  const [documentCount, setDocumentCount] = useState(0)
+  const [documents, setDocuments] = useState<DocumentIndexEntry[]>([])
+  const [docSheetOpen, setDocSheetOpen] = useState(false)
   const [isDraggingFile, setIsDraggingFile] = useState(false)
 
-  // Re-poll the doc count whenever the chat regains focus so a doc added in
-  // the Documents flow shows up in the in-context pill immediately.
+  // Re-poll the document index whenever the chat regains focus so a doc
+  // added in the Documents flow shows up in the in-context pill immediately.
   useFocusEffect(
     useCallback(() => {
       listDocuments()
-        .then((docs) => setDocumentCount(docs.length))
+        .then(setDocuments)
         .catch(() => { /* silent — pill simply won't show */ })
     }, []),
   )
+
+  // Toggle a single document's inContext flag. Persists to documentStore and
+  // mirrors locally so the sheet reflects the change without a re-fetch.
+  const handleToggleDocInContext = useCallback(async (id: string, next: boolean) => {
+    setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, inContext: next } : d)))
+    try {
+      await setInContext(id, next)
+    } catch (err) {
+      // Revert if persistence fails so the UI doesn't lie.
+      setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, inContext: !next } : d)))
+      if (__DEV__) console.warn('[chat] setInContext failed:', err)
+    }
+  }, [])
+
+  const inContextCount = documents.filter((d) => d.inContext).length
 
   // Drag-and-drop file uploads (web only). Dropping a file anywhere on
   // the chat screen sets the pending file + opens the AddDocument modal.
@@ -488,6 +542,18 @@ export function ChatScreen() {
             ? `Quelque chose n'a pas fonctionné. Réessaie.`
             : `Something went wrong. Please try again.`)
 
+    // Pull in-context documents fresh on every send so any toggle made
+    // moments earlier in the bottom-sheet is reflected. Truncate before
+    // shipping.
+    let docsPayload: ChatRequestDocument[] = []
+    try {
+      const inContextDocs = await listInContextDocuments()
+      docsPayload = buildContextDocsPayload(inContextDocs)
+    } catch (err) {
+      // Non-fatal — chat still works without doc context.
+      if (__DEV__) console.warn('[chat] failed to load in-context documents:', err)
+    }
+
     await postChatStream(
       {
         message:        userContent,
@@ -495,6 +561,7 @@ export function ChatScreen() {
         sessionId,
         objective,
         conversationId: conversationIdRef.current ?? undefined,
+        documents:      docsPayload.length > 0 ? docsPayload : undefined,
       },
       {
         // First delta = first sign of life. Hide the typing indicator and
@@ -1110,11 +1177,13 @@ export function ChatScreen() {
 
         {/* Documents-in-context pill — small, ember-tinted, sits right
             above the input border so the user always knows what the model
-            can see. Quiet by design — subordinate to the conversation. */}
-        {documentCount > 0 ? (
+            can see. Quiet by design — subordinate to the conversation.
+            Tapping it opens DocumentContextSheet to toggle which uploaded
+            docs are actually injected into the prompt. */}
+        {documents.length > 0 ? (
           <Pressable
             accessibilityRole="button"
-            onPress={() => navigation.navigate('Documents', { screen: 'DocumentsList' })}
+            onPress={() => setDocSheetOpen(true)}
             style={({ pressed }) => ({
               flexDirection: 'row',
               alignSelf: 'flex-start',
@@ -1137,11 +1206,13 @@ export function ChatScreen() {
                 width: 6,
                 height: 6,
                 borderRadius: 3,
-                backgroundColor: theme.colors.accent.primary,
+                backgroundColor: inContextCount > 0
+                  ? theme.colors.accent.primary
+                  : theme.colors.text.tertiary,
               }}
             />
             <Text variant="label" style={{ color: theme.colors.text.accent }}>
-              {documentCount} {documentCount === 1 ? copy.docsSingular : copy.docsPlural}
+              {inContextCount} {inContextCount === 1 ? copy.docsSingular : copy.docsPlural}
             </Text>
             <Text variant="label" tone="tertiary">
               · {copy.docsManage} →
@@ -1309,6 +1380,18 @@ export function ChatScreen() {
         language={language}
         onSelect={setObjective}
         onClose={() => setGoalSheetOpen(false)}
+      />
+
+      <DocumentContextSheet
+        visible={docSheetOpen}
+        language={language}
+        documents={documents}
+        onToggle={handleToggleDocInContext}
+        onAdd={() => {
+          setDocSheetOpen(false)
+          navigation.navigate('Documents', { screen: 'AddDocument' })
+        }}
+        onClose={() => setDocSheetOpen(false)}
       />
 
       {/* Drop overlay (web only) — appears while a file is being dragged

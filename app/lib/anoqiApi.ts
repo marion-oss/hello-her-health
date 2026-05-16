@@ -52,6 +52,17 @@ export type ChatResponse = {
   blocked:        boolean
 }
 
+// Subset of LocalDocument shipped to the BE as chat context. Carries only
+// the pseudonymised cleanText (PII already stripped on device) plus the
+// minimum identifying metadata needed for the prompt header.
+export type ChatRequestDocument = {
+  id:           string
+  name:         string | null
+  documentType: string
+  documentDate: string | null
+  cleanText:    string
+}
+
 export type ChatRequest = {
   message:         string
   language:        Language
@@ -59,6 +70,9 @@ export type ChatRequest = {
   conversationId?: string
   objective?:      HealthObjective | null
   accessToken?:    string  // future: signed-in users
+  // Documents the user has marked as in-context. Truncated client-side
+  // before send; the BE applies its own caps too.
+  documents?:      ChatRequestDocument[]
 }
 
 export class AnoqiApiError extends Error {
@@ -102,6 +116,7 @@ export async function postChat(req: ChatRequest): Promise<ChatResponse> {
     sessionId:      req.sessionId,
     conversationId: req.conversationId,
     journeyType:    objectiveToJourney(req.objective),
+    documents:      req.documents && req.documents.length > 0 ? req.documents : undefined,
   }
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
@@ -180,6 +195,7 @@ export async function postChatStream(
     sessionId:      req.sessionId,
     conversationId: req.conversationId,
     journeyType:    objectiveToJourney(req.objective),
+    documents:      req.documents && req.documents.length > 0 ? req.documents : undefined,
   }
 
   const headers: Record<string, string> = {

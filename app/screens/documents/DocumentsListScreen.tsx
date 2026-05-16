@@ -16,12 +16,12 @@ import {
   StatusBar,
   View,
 } from 'react-native'
-import { useFocusEffect, useNavigation } from '@react-navigation/native'
+import { useFocusEffect, useIsFocused, useNavigation } from '@react-navigation/native'
 
 import {
   BackHeader,
+  BreathingForm,
   Button,
-  EmptyState,
   Icon,
   type IconName,
   LiquidEmber,
@@ -229,6 +229,9 @@ export function DocumentsListScreen() {
   const navigation = useNavigation<any>()
   const { language } = useOnboarding()
   const copy = COPY[language]
+  // Guard the position:fixed BreathingForm so it doesn't bleed across tabs
+  // that the bottom-tab navigator keeps mounted in parallel.
+  const isFocused = useIsFocused()
 
   const [entries, setEntries] = useState<DocumentIndexEntry[]>([])
   const [docs, setDocs] = useState<Record<string, LocalDocument | null>>({})
@@ -313,8 +316,41 @@ export function DocumentsListScreen() {
   }, [refresh])
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
+    <SafeAreaView style={{ flex: 1 }}>
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.bg.canvas} />
+
+      {/* Brand BreathingForm anchored at bottom-right — same placement as
+          ChatScreen so the visual sits at a consistent corner across tabs.
+          Behind content via DOM order; isFocused guard prevents the
+          position:fixed form (web) from bleeding into other tabs. */}
+      {isFocused ? (
+        <View
+          pointerEvents="none"
+          style={
+            Platform.OS === 'web'
+              ? ({
+                  position: 'fixed',
+                  right: -40,
+                  bottom: -40,
+                  width: 585,
+                  height: 585,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                } as any)
+              : {
+                  position: 'absolute',
+                  right: -40,
+                  bottom: -40,
+                  width: 585,
+                  height: 585,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }
+          }
+        >
+          <BreathingForm size={585} />
+        </View>
+      ) : null}
 
       <BackHeader showWordmark />
 
@@ -345,27 +381,41 @@ export function DocumentsListScreen() {
 
       {/* List body */}
       {loaded && entries.length === 0 ? (
-        <View style={{ flex: 1, justifyContent: 'center' }}>
-          <EmptyState
-            title={copy.emptyTitle}
-            body={copy.emptyBody}
-            ctaSlot={
-              <Button
-                label={copy.add}
-                variant="primary"
-                size="md"
-                onPress={() => navigation.navigate('AddDocument')}
-                leftAdornment={
-                  <Icon
-                    name="Plus"
-                    size={16}
-                    color={theme.colors.accent.primaryOnText}
-                    strokeWidth={2}
-                  />
-                }
-              />
-            }
-          />
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingHorizontal: theme.spacing[6],
+          }}
+        >
+          <Text variant="h4" tone="primary" align="center">
+            {copy.emptyTitle}
+          </Text>
+          <Text
+            variant="body"
+            tone="secondary"
+            align="center"
+            style={{ marginTop: theme.spacing[2], maxWidth: 320 }}
+          >
+            {copy.emptyBody}
+          </Text>
+          <View style={{ marginTop: theme.spacing[5] }}>
+            <Button
+              label={copy.add}
+              variant="primary"
+              size="md"
+              onPress={() => navigation.navigate('AddDocument')}
+              leftAdornment={
+                <Icon
+                  name="Plus"
+                  size={16}
+                  color={theme.colors.accent.primaryOnText}
+                  strokeWidth={2}
+                />
+              }
+            />
+          </View>
         </View>
       ) : (
         <FlatList

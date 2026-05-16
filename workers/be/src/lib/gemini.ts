@@ -52,7 +52,7 @@ Ton rôle :
 - Expliquer les examens et les traitements de façon accessible
 - Soutenir émotionnellement avec empathie et sans jugement
 
-Langue : Réponds en français. N'utilise pas l'anglais sauf si l'utilisatrice te le demande explicitement.`,
+Langue : Par défaut, réponds en français. Si l'utilisatrice écrit en anglais (ou dans une autre langue), réponds dans la même langue qu'elle.`,
 
   en: `You are Anoqi, a warm and knowledgeable women's health assistant. You help women understand their symptoms, prepare for medical consultations, and navigate the healthcare system.
 
@@ -68,7 +68,7 @@ Your role:
 - Explain tests and treatments in accessible language
 - Offer emotional support with empathy and without judgment
 
-Language: Reply in English. Do not switch to French unless the user asks you to.`,
+Language: By default, reply in English. If the user writes in French (or another language), reply in the same language they used.`,
 }
 
 const JOURNEY_CONTEXTS: Record<Language, Record<string, string>> = {
@@ -120,6 +120,7 @@ export async function chat(
   systemAddendum: string | undefined,
   env: GeminiEnv,
   language: Language = 'fr',
+  userDocsBlock: string | undefined = undefined,
 ): Promise<ChatResult> {
   const apiKey = env.GEMINI_API_KEY
 
@@ -133,9 +134,15 @@ export async function chat(
   const baseWithJourney = journeyContext
     ? `${base}\n\n${journeyContext}`
     : base
-  const systemPrompt = systemAddendum
-    ? `${baseWithJourney}\n\n${systemAddendum}`
+  // Compose order: base persona → journey → user documents → RAG snippets.
+  // User docs come before RAG snippets so the model anchors on the user's
+  // own data when both are present.
+  const withUserDocs = userDocsBlock
+    ? `${baseWithJourney}\n\n${userDocsBlock}`
     : baseWithJourney
+  const systemPrompt = systemAddendum
+    ? `${withUserDocs}\n\n${systemAddendum}`
+    : withUserDocs
 
   const contents = messages.map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
@@ -189,7 +196,7 @@ export async function chat(
       console.warn('[gemini] chat finishReason=' + finishReason + ' tokens=' + tokensUsed)
     }
 
-    const policyResult = checkPolicy(rawContent)
+    const policyResult = checkPolicy(rawContent, language)
 
     return {
       content:      policyResult.safe
@@ -229,6 +236,7 @@ export async function* chatStream(
   systemAddendum: string | undefined,
   env: GeminiEnv,
   language: Language = 'fr',
+  userDocsBlock: string | undefined = undefined,
 ): AsyncGenerator<ChatStreamEvent, void, unknown> {
   const apiKey = env.GEMINI_API_KEY
 
@@ -243,9 +251,14 @@ export async function* chatStream(
   const baseWithJourney = journeyContext
     ? `${base}\n\n${journeyContext}`
     : base
-  const systemPrompt = systemAddendum
-    ? `${baseWithJourney}\n\n${systemAddendum}`
+  // Compose order mirrors chat(): base persona → journey → user docs →
+  // RAG snippets. Keeps the model's anchor on the user's data first.
+  const withUserDocs = userDocsBlock
+    ? `${baseWithJourney}\n\n${userDocsBlock}`
     : baseWithJourney
+  const systemPrompt = systemAddendum
+    ? `${withUserDocs}\n\n${systemAddendum}`
+    : withUserDocs
 
   const contents = messages.map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
