@@ -120,6 +120,7 @@ export async function chat(
   systemAddendum: string | undefined,
   env: GeminiEnv,
   language: Language = 'fr',
+  userDocsBlock: string | undefined = undefined,
 ): Promise<ChatResult> {
   const apiKey = env.GEMINI_API_KEY
 
@@ -133,9 +134,15 @@ export async function chat(
   const baseWithJourney = journeyContext
     ? `${base}\n\n${journeyContext}`
     : base
-  const systemPrompt = systemAddendum
-    ? `${baseWithJourney}\n\n${systemAddendum}`
+  // Compose order: base persona → journey → user documents → RAG snippets.
+  // User docs come before RAG snippets so the model anchors on the user's
+  // own data when both are present.
+  const withUserDocs = userDocsBlock
+    ? `${baseWithJourney}\n\n${userDocsBlock}`
     : baseWithJourney
+  const systemPrompt = systemAddendum
+    ? `${withUserDocs}\n\n${systemAddendum}`
+    : withUserDocs
 
   const contents = messages.map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
