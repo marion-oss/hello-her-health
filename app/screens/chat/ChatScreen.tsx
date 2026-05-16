@@ -9,8 +9,10 @@
 // ConsentSheet for the skip-and-chat path.
 
 import React, {
+  memo,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react'
@@ -20,6 +22,7 @@ import {
   Platform,
   Pressable,
   SafeAreaView,
+  StyleSheet,
   TextInput,
   View,
 } from 'react-native'
@@ -35,7 +38,7 @@ import {
 } from '../../context/OnboardingContext'
 import { palette, useTheme } from '../../theme'
 import { STARTERS } from './starters'
-import { postChat, AnoqiApiError, type SourceDisplay } from '../../lib/anoqiApi'
+import { postChatStream, AnoqiApiError, type SourceDisplay } from '../../lib/anoqiApi'
 import {
   BackHeader,
   BreathingForm,
@@ -139,6 +142,106 @@ const OBJECTIVE_LABELS: Record<HealthObjective, { fr: string; en: string; icon: 
 function toSource(d: SourceDisplay): Source {
   return { label: d.label, name: d.name, topic: d.topic, url: d.url }
 }
+
+// Fake-stream cadence. The full response text is already in memory once the
+// /chat fetch resolves — the typewriter is purely cosmetic. ~16 chars per
+// 24 ms tick ≈ 660 chars/sec, ~5× faster than the previous 2/15ms loop. Keeps
+// the "answer is appearing" feel without making the user wait on a UI animation
+// after the network already finished.
+const STREAM_TICK_MS = 24
+const STREAM_CHARS_PER_TICK = 16
+
+// Stable keyExtractor & item separator. Pulled out so FlatList sees identical
+// function references across renders (otherwise every parent state change
+// invalidates virtualization).
+const messageKeyExtractor = (m: Message) => m.id
+
+// Static styles for message items. Theme-dependent values (spacing, colors)
+// stay inline in the components below; everything else is hoisted so RN-Web
+// doesn't re-emit a className per render.
+const messageStyles = StyleSheet.create({
+  userWrap: {
+    width: '100%',
+    alignSelf: 'center',
+    maxWidth: 864,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  assistantWrap: {
+    width: '100%',
+    alignSelf: 'center',
+    maxWidth: 864,
+  },
+  safetyNote: {
+    borderTopWidth: 1,
+  },
+})
+
+// Memoised user bubble. Re-renders only when its own text changes — past
+// messages stay quiet while the latest one streams.
+const UserMessageItem = memo(function UserMessageItem({ text }: { text: string }) {
+  const theme = useTheme()
+  return (
+    <View style={[messageStyles.userWrap, { marginBottom: theme.spacing[5] }]}>
+      {/* Bubble already caps its own width at 86%; nesting a second
+          maxWidth wrapper collapses to per-character width on RN-Web. */}
+      <Bubble role="user">
+        <Text
+          variant="bodyLg"
+          style={{ color: theme.colors.accent.primaryOnText }}
+        >
+          {text}
+        </Text>
+      </Bubble>
+    </View>
+  )
+})
+
+// Memoised assistant message. parseMarkdown runs once per text change instead
+// of every parent render — during streaming that turns ~250 parses into ~30,
+// and other messages above stop re-parsing entirely.
+const AssistantMessageItem = memo(function AssistantMessageItem({
+  text,
+  isStreaming,
+  sources,
+  isFirst,
+  safetyNote,
+}: {
+  text: string
+  isStreaming: boolean
+  sources?: Source[]
+  isFirst?: boolean
+  safetyNote: string
+}) {
+  const theme = useTheme()
+  const blocks = useMemo(() => parseMarkdown(text), [text])
+  return (
+    <View style={[messageStyles.assistantWrap, { marginBottom: theme.spacing[8] }]}>
+      <Markdown
+        blocks={blocks}
+        sources={sources}
+        trailingCursor={isStreaming ? <StreamingCursor /> : null}
+      />
+
+      {!isStreaming && isFirst ? (
+        <Text
+          variant="caption"
+          tone="tertiary"
+          style={[
+            messageStyles.safetyNote,
+            {
+              marginTop: theme.spacing[2],
+              paddingTop: theme.spacing[3],
+              borderTopColor: theme.colors.border.subtle,
+            },
+          ]}
+        >
+          {safetyNote}
+        </Text>
+      ) : null}
+    </View>
+  )
+})
 
 
 export function ChatScreen() {
@@ -317,28 +420,52 @@ export function ChatScreen() {
   const starters = STARTERS[objective ?? 'general'][language]
   const showSummaryBanner = userMessageCount >= 3
 
+  // Streaming typewriter. Single interval driven by `streamingId` only — never
+  // by `messages` — so each setMessages tick does NOT re-fire this effect.
+  // The previous implementation listed `messages` in the dep array, which made
+  // every tick re-bind the timer and re-find the streaming message, causing
+  // ~250 effect runs per response and the visible mobile-web jank.
   useEffect(() => {
     if (!streamingId) return
-    const msg = messages.find((m) => m.id === streamingId)
-    if (!msg) return
-    if (msg.text.length >= msg.fullText.length) {
-      setMessages((prev) =>
-        prev.map((m) => (m.id === streamingId ? { ...m, isStreaming: false } : m)),
-      )
-      setStreamingId(null)
-      return
+
+    let stopped = false
+    const tick = () => {
+      if (stopped) return
+      setMessages((prev) => {
+        const idx = prev.findIndex((m) => m.id === streamingId)
+        if (idx === -1) return prev
+        const msg = prev[idx]
+        if (msg.text.length >= msg.fullText.length) return prev
+        const nextLen = Math.min(
+          msg.text.length + STREAM_CHARS_PER_TICK,
+          msg.fullText.length,
+        )
+        const done = nextLen >= msg.fullText.length
+        const next = prev.slice()
+        next[idx] = {
+          ...msg,
+          text: msg.fullText.slice(0, nextLen),
+          isStreaming: !done,
+        }
+        if (done) {
+          // Defer to break the setState-during-setState rule.
+          Promise.resolve().then(() => {
+            if (!stopped) setStreamingId(null)
+          })
+        }
+        return next
+      })
     }
-    const timer = setTimeout(() => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === streamingId
-            ? { ...m, text: m.fullText.slice(0, m.text.length + 2) }
-            : m,
-        ),
-      )
-    }, 15)
-    return () => clearTimeout(timer)
-  }, [streamingId, messages])
+
+    // Immediate first tick so the response visibly starts within a frame
+    // instead of waiting STREAM_TICK_MS.
+    tick()
+    const id = setInterval(tick, STREAM_TICK_MS)
+    return () => {
+      stopped = true
+      clearInterval(id)
+    }
+  }, [streamingId])
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -349,63 +476,152 @@ export function ChatScreen() {
   const runAnoqiResponse = useCallback(async (userContent: string) => {
     setIsTyping(true)
     const isFirstAnoqi = anoqiMessageCount.current === 0
+    const anoqiId = `anoqi-stream-${Date.now()}`
+    let insertedMessage = false
 
-    try {
-      const response = await postChat({
+    const buildFriendlyError = (err: AnoqiApiError | null) =>
+      err && err.status > 0
+        ? (language === 'fr'
+            ? `Désolée, je n'arrive pas à répondre pour l'instant (${err.status}). Réessaie dans un instant.`
+            : `Sorry, I can't answer right now (${err.status}). Please try again in a moment.`)
+        : (language === 'fr'
+            ? `Quelque chose n'a pas fonctionné. Réessaie.`
+            : `Something went wrong. Please try again.`)
+
+    await postChatStream(
+      {
         message:        userContent,
         language,
         sessionId,
         objective,
         conversationId: conversationIdRef.current ?? undefined,
-      })
-
-      // Capture the server-assigned conversation UUID on the first turn so
-      // subsequent calls thread into the same conversation.
-      if (response.conversationId && !conversationIdRef.current) {
-        conversationIdRef.current = response.conversationId
-      }
-
-      setIsTyping(false)
-      anoqiMessageCount.current += 1
-
-      const sources: Source[] = response.message.sources_display.map(toSource)
-      const anoqiId = `anoqi-${response.message.id ?? Date.now()}`
-      const anoqiMessage: Message = {
-        id: anoqiId,
-        role: 'anoqi',
-        text: '',
-        fullText: response.message.content,
-        isStreaming: true,
-        sources,
-        isFirst: isFirstAnoqi,
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, anoqiMessage])
-      setStreamingId(anoqiId)
-    } catch (err) {
-      setIsTyping(false)
-      const friendly = err instanceof AnoqiApiError
-        ? (language === 'fr'
-            ? `Désolée, je n'arrive pas à répondre pour l'instant (${err.status || 'réseau'}). Réessaie dans un instant.`
-            : `Sorry, I can't answer right now (${err.status || 'network'}). Please try again in a moment.`)
-        : (language === 'fr'
-            ? `Quelque chose n'a pas fonctionné. Réessaie.`
-            : `Something went wrong. Please try again.`)
-      const errId = `anoqi-error-${Date.now()}`
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: errId,
-          role: 'anoqi',
-          text: friendly,
-          fullText: friendly,
-          isStreaming: false,
-          isFirst: isFirstAnoqi,
-          timestamp: new Date(),
+      },
+      {
+        // First delta = first sign of life. Hide the typing indicator and
+        // drop in the assistant bubble pre-populated with the initial chunk,
+        // so the user goes directly from indicator → readable content.
+        onDelta: (text) => {
+          if (!insertedMessage) {
+            insertedMessage = true
+            setIsTyping(false)
+            anoqiMessageCount.current += 1
+            const newMsg: Message = {
+              id: anoqiId,
+              role: 'anoqi',
+              text,
+              fullText: text,
+              isStreaming: true,
+              sources: [],
+              isFirst: isFirstAnoqi,
+              timestamp: new Date(),
+            }
+            setMessages((prev) => [...prev, newMsg])
+            return
+          }
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === anoqiId
+                ? { ...m, text: m.text + text, fullText: m.fullText + text }
+                : m,
+            ),
+          )
         },
-      ])
-      if (__DEV__) console.warn('[chat] postChat failed:', err)
-    }
+        // Output policy blocked the reply mid-stream. Replace whatever the
+        // user has seen so far with the sanitised fallback.
+        onRedact: (content) => {
+          if (!insertedMessage) {
+            insertedMessage = true
+            setIsTyping(false)
+            anoqiMessageCount.current += 1
+            const newMsg: Message = {
+              id: anoqiId,
+              role: 'anoqi',
+              text: content,
+              fullText: content,
+              isStreaming: false,
+              sources: [],
+              isFirst: isFirstAnoqi,
+              timestamp: new Date(),
+            }
+            setMessages((prev) => [...prev, newMsg])
+            return
+          }
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === anoqiId
+                ? { ...m, text: content, fullText: content, isStreaming: false }
+                : m,
+            ),
+          )
+        },
+        onDone: (final) => {
+          if (final.conversationId && !conversationIdRef.current) {
+            conversationIdRef.current = final.conversationId
+          }
+          const sources: Source[] = final.sources_display.map(toSource)
+          setMessages((prev) => {
+            // Edge case: the server returned `done` without any prior delta
+            // (shouldn't happen in practice but be defensive).
+            if (!insertedMessage) {
+              return [
+                ...prev,
+                {
+                  id: anoqiId,
+                  role: 'anoqi',
+                  text: final.cleanContent,
+                  fullText: final.cleanContent,
+                  isStreaming: false,
+                  sources,
+                  isFirst: isFirstAnoqi,
+                  timestamp: new Date(),
+                },
+              ]
+            }
+            return prev.map((m) =>
+              m.id === anoqiId
+                ? {
+                    ...m,
+                    text: final.cleanContent,
+                    fullText: final.cleanContent,
+                    isStreaming: false,
+                    sources,
+                  }
+                : m,
+            )
+          })
+          setIsTyping(false)
+        },
+        onError: (err) => {
+          setIsTyping(false)
+          const friendly = buildFriendlyError(err instanceof AnoqiApiError ? err : null)
+          // If we'd already started rendering, replace the in-flight bubble
+          // with the error text rather than leaving a half-finished message.
+          setMessages((prev) => {
+            if (insertedMessage) {
+              return prev.map((m) =>
+                m.id === anoqiId
+                  ? { ...m, text: friendly, fullText: friendly, isStreaming: false }
+                  : m,
+              )
+            }
+            const errId = `anoqi-error-${Date.now()}`
+            return [
+              ...prev,
+              {
+                id: errId,
+                role: 'anoqi',
+                text: friendly,
+                fullText: friendly,
+                isStreaming: false,
+                isFirst: isFirstAnoqi,
+                timestamp: new Date(),
+              },
+            ]
+          })
+          if (__DEV__) console.warn('[chat] postChatStream failed:', err)
+        },
+      },
+    )
   }, [language, objective, sessionId])
 
   const handleSend = useCallback(
@@ -459,6 +675,34 @@ export function ChatScreen() {
       }
     },
     [runAnoqiResponse],
+  )
+
+  // Stable references for FlatList. Inline renderItem + inline
+  // contentContainerStyle break virtualization because every parent render
+  // hands FlatList "new" props.
+  const renderMessage = useCallback(
+    ({ item }: { item: Message }) =>
+      item.role === 'user' ? (
+        <UserMessageItem text={item.text} />
+      ) : (
+        <AssistantMessageItem
+          text={item.text}
+          isStreaming={item.isStreaming}
+          sources={item.sources}
+          isFirst={item.isFirst}
+          safetyNote={copy.safetyNote}
+        />
+      ),
+    [copy.safetyNote],
+  )
+
+  const listContentStyle = useMemo(
+    () => ({
+      paddingHorizontal: theme.spacing[5],
+      paddingTop: theme.spacing[4],
+      paddingBottom: theme.spacing[3],
+    }),
+    [theme.spacing],
   )
 
   // ── Consent gate (Cotton Rose overlay — not a black scrim) ─────────────
@@ -722,72 +966,14 @@ export function ChatScreen() {
           <FlatList
             ref={flatListRef}
             data={messages}
-            keyExtractor={(m) => m.id}
-            renderItem={({ item }) =>
-              item.role === 'user' ? (
-                <View
-                  style={{
-                    width: '100%',
-                    alignSelf: 'center',
-                    maxWidth: 864,
-                    flexDirection: 'row',
-                    justifyContent: 'flex-end',
-                    marginBottom: theme.spacing[5],
-                  }}
-                >
-                  {/* Bubble already caps its own width at 86%; nesting a
-                      second maxWidth wrapper collapses to per-character
-                      width on RN-Web for short messages like "test". */}
-                  <Bubble role="user">
-                    <Text
-                      variant="bodyLg"
-                      style={{ color: theme.colors.accent.primaryOnText }}
-                    >
-                      {item.text}
-                    </Text>
-                  </Bubble>
-                </View>
-              ) : (
-                // Assistant — article-style reading pane. No bubble shell;
-                // Markdown handles headings, body, bullets, and inline
-                // citation pills. Streaming cursor anchors to the tail of
-                // the last block in the parsed tree.
-                <View
-                  style={{
-                    width: '100%',
-                    alignSelf: 'center',
-                    maxWidth: 864,
-                    marginBottom: theme.spacing[8],
-                  }}
-                >
-                  <Markdown
-                    blocks={parseMarkdown(item.text)}
-                    sources={item.sources}
-                    trailingCursor={item.isStreaming ? <StreamingCursor /> : null}
-                  />
-
-                  {!item.isStreaming && item.isFirst ? (
-                    <Text
-                      variant="caption"
-                      tone="tertiary"
-                      style={{
-                        marginTop: theme.spacing[2],
-                        paddingTop: theme.spacing[3],
-                        borderTopWidth: 1,
-                        borderTopColor: theme.colors.border.subtle,
-                      }}
-                    >
-                      {copy.safetyNote}
-                    </Text>
-                  ) : null}
-                </View>
-              )
-            }
-            contentContainerStyle={{
-              paddingHorizontal: theme.spacing[5],
-              paddingTop: theme.spacing[4],
-              paddingBottom: theme.spacing[3],
-            }}
+            keyExtractor={messageKeyExtractor}
+            renderItem={renderMessage}
+            extraData={streamingId}
+            initialNumToRender={8}
+            maxToRenderPerBatch={6}
+            windowSize={7}
+            removeClippedSubviews={Platform.OS === 'web'}
+            contentContainerStyle={listContentStyle}
             showsVerticalScrollIndicator={false}
             ListFooterComponent={
               <>
