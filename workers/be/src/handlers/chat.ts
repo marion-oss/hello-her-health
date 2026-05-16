@@ -71,7 +71,11 @@ export async function chatHandler(c: Context<{ Bindings: Env }>): Promise<Respon
   }
 
   const { message, conversationId, sessionId, journeyType } = body
-  const language: 'fr' | 'en' = body.language === 'en' ? 'en' : 'fr'
+  const requestedLanguage: 'fr' | 'en' = body.language === 'en' ? 'en' : 'fr'
+  // Override the FE-supplied language when the user clearly writes in the
+  // other one (e.g. onboarding defaulted to 'fr' but the user types English).
+  // Falls back to requestedLanguage on ambiguous text.
+  const language: 'fr' | 'en' = detectMessageLanguage(message ?? '') ?? requestedLanguage
 
   if (!message || typeof message !== 'string' || message.trim().length === 0) {
     return c.json({ error: 'message is required and must be a non-empty string' }, 400)
@@ -260,6 +264,28 @@ export async function chatHandler(c: Context<{ Bindings: Env }>): Promise<Respon
 // ─────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────
+
+// Cheap heuristic: detect whether the user's message is clearly French or
+// English, so we can override a stale onboarding-default language. Returns
+// null when the signal is too weak (very short message, code-switching, etc.)
+// — caller falls back to the FE-supplied language in that case.
+const FRENCH_STOP_WORDS = /\b(je|tu|il|elle|nous|vous|ils|elles|le|la|les|un|une|des|du|de|et|ou|mais|donc|car|ne|pas|plus|que|qui|quoi|où|quand|comment|pourquoi|mon|ma|mes|ton|ta|tes|son|sa|ses|notre|votre|leur|est|sont|été|avoir|être|j'ai|c'est|n'est|d'un|d'une|l'on)\b/i
+const ENGLISH_STOP_WORDS = /\b(i|you|he|she|we|they|the|a|an|and|or|but|so|because|not|no|yes|that|which|what|where|when|how|why|my|your|his|her|our|their|is|are|was|were|been|have|has|had|do|does|did|will|would|could|should|may|might|with|for|from|to|of|in|on|at|by)\b/i
+
+function detectMessageLanguage(text: string): 'fr' | 'en' | null {
+  const trimmed = text.trim()
+  if (trimmed.length < 8) return null
+
+  const hasFrenchDiacritics = /[àâçéèêëîïôûùüÿœæ]/i.test(trimmed)
+  const frHits = (trimmed.match(new RegExp(FRENCH_STOP_WORDS, 'gi')) ?? []).length
+  const enHits = (trimmed.match(new RegExp(ENGLISH_STOP_WORDS, 'gi')) ?? []).length
+
+  if (hasFrenchDiacritics && frHits > 0) return 'fr'
+  if (enHits >= 2 && frHits === 0 && !hasFrenchDiacritics) return 'en'
+  if (frHits >= 2 && enHits === 0) return 'fr'
+  return null
+}
+
 async function persistMessages(
   supabase: SupabaseClient,
   opts: {
