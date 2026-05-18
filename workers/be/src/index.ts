@@ -33,6 +33,10 @@ export type Env = {
   // defaults baked in below. Set when standing up a new preview build
   // (e.g. a PR-deploy URL) without redeploying.
   ANOQI_CORS_EXTRA_ORIGINS?: string
+
+  // Optional KV namespace for the RAG embedding cache (24h TTL). When unset,
+  // retrieval embeds every query live. See wrangler.toml for setup.
+  EMBEDDING_CACHE?: KVNamespace
 }
 
 const app = new Hono<{ Bindings: Env }>()

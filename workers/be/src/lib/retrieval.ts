@@ -72,6 +72,29 @@ export interface RetrieveOptions {
 /** Just the slice of `env` this module needs. */
 export interface RetrievalEnv {
   GEMINI_API_KEY: string
+  /** Optional KV namespace for embedding cache. When absent, every query embeds live. */
+  EMBEDDING_CACHE?: KVNamespace
+}
+
+// Cache TTL — 24h. Queries are stable in semantics (same words → same vector)
+// but Gemini's model could rotate; 24h is short enough that a model upgrade
+// flushes within a day without us shipping a cache-bust.
+const EMBED_CACHE_TTL_SECONDS = 60 * 60 * 24
+// Bumped any time the embedding contract changes (model, dim, taskType, etc).
+// Stale entries from older versions are ignored on read.
+const EMBED_CACHE_VERSION = 'v1'
+
+// SHA-256 hash of the query text → 64-char hex. Deterministic, no collisions
+// at our scale, doesn't expose the literal query as a KV key (privacy nicety).
+async function hashQuery(text: string): Promise<string> {
+  const buf = new TextEncoder().encode(text)
+  const digest = await crypto.subtle.digest('SHA-256', buf)
+  const bytes = new Uint8Array(digest)
+  let hex = ''
+  for (let i = 0; i < bytes.length; i += 1) {
+    hex += bytes[i]!.toString(16).padStart(2, '0')
+  }
+  return hex
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -86,6 +109,23 @@ export async function embedQuery(text: string, env: RetrievalEnv): Promise<numbe
 
   const trimmed = text.trim()
   if (!trimmed) return null
+
+  // Cache lookup — saves ~150 ms when the same query has been seen recently.
+  // `EMBEDDING_CACHE` is optional; if unbound we go straight to the live API.
+  const cache = env.EMBEDDING_CACHE
+  let cacheKey: string | null = null
+  if (cache) {
+    try {
+      cacheKey = `${EMBED_CACHE_VERSION}:${EMBEDDING_MODEL}:${await hashQuery(trimmed)}`
+      const cached = await cache.get(cacheKey, 'json') as number[] | null
+      if (Array.isArray(cached) && cached.length === EMBEDDING_DIM) {
+        return cached
+      }
+    } catch (e) {
+      // Cache failures are non-fatal — embedding will fall through to live.
+      console.error('[retrieval] embed cache read failed:', e)
+    }
+  }
 
   try {
     const res = await fetch(GEMINI_EMBED_URL, {
@@ -113,6 +153,16 @@ export async function embedQuery(text: string, env: RetrievalEnv): Promise<numbe
       console.error('[retrieval] embed returned unexpected shape:', { length: values?.length })
       return null
     }
+
+    // Best-effort cache write. Errors here are non-fatal; the embedding still
+    // returns. KV writes are eventually consistent — first cache hit may be
+    // delayed by a few seconds globally, which is fine.
+    if (cache && cacheKey) {
+      cache
+        .put(cacheKey, JSON.stringify(values), { expirationTtl: EMBED_CACHE_TTL_SECONDS })
+        .catch((e) => console.error('[retrieval] embed cache write failed:', e))
+    }
+
     return values
   } catch (e) {
     console.error('[retrieval] embed exception:', e)

@@ -17,20 +17,89 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Env } from '../index'
 import { getServiceClient } from '../lib/supabase'
 import { getUserIdFromRequest } from '../auth'
-import { classifyInput } from '../policy/policyChecker'
-import { chat as geminiChat } from '../lib/gemini'
+import { classifyInput, checkPolicy } from '../policy/policyChecker'
+import { chat as geminiChat, chatStream as geminiChatStream } from '../lib/gemini'
 import { retrieve, renderSnippetsForPrompt, type Snippet } from '../lib/retrieval'
 import { parseCitations, type MessageSource } from '../lib/citationParser'
 
 // ─────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────
+interface ChatRequestDocument {
+  id:           string
+  name:         string | null
+  documentType: string
+  documentDate: string | null
+  cleanText:    string
+}
+
 interface ChatRequest {
   message: string
   conversationId?: string
   sessionId?: string
   journeyType?: string
   language?: 'fr' | 'en'
+  // Documents the user has explicitly marked as in-context on the client.
+  // PII is pseudonymised on device before being sent. Optional — chat works
+  // without them. The handler enforces per-doc + total caps below.
+  documents?: ChatRequestDocument[]
+}
+
+// Caps applied server-side regardless of what the client sends. Belt-and-
+// braces: the client already truncates, but we don't trust client-side
+// limits for prompt-budget reasons.
+const DOC_PER_DOC_MAX_CHARS = 4000
+const DOC_TOTAL_MAX_CHARS   = 12_000
+const DOC_MAX_COUNT         = 10
+
+// Bilingual labels for the user-docs block injected into the system prompt.
+// Keep the EN side a faithful mirror of FR — clinical persona is sensitive
+// to tone shifts.
+const USER_DOCS_BLOCK_COPY: Record<'fr' | 'en', { header: string; footer: string; doc: string }> = {
+  fr: {
+    header: "L'utilisatrice a partagé les documents personnels suivants. Appuie-toi dessus quand c'est pertinent et cite-les naturellement (sans inventer de chiffres).",
+    footer: 'Fin des documents personnels.',
+    doc:    'Document',
+  },
+  en: {
+    header: 'The user has shared the following personal documents. Rely on them where relevant and reference them naturally (without inventing numbers).',
+    footer: 'End of personal documents.',
+    doc:    'Document',
+  },
+}
+
+function renderUserDocsBlock(
+  docs: ChatRequestDocument[] | undefined,
+  language: 'fr' | 'en',
+): string | undefined {
+  if (!docs || docs.length === 0) return undefined
+
+  const copy = USER_DOCS_BLOCK_COPY[language]
+  const capped = docs.slice(0, DOC_MAX_COUNT)
+  let used = 0
+  const blocks: string[] = []
+
+  for (let i = 0; i < capped.length; i++) {
+    if (used >= DOC_TOTAL_MAX_CHARS) break
+    const d = capped[i]
+    if (!d?.cleanText) continue
+    const remaining = DOC_TOTAL_MAX_CHARS - used
+    const cap = Math.min(DOC_PER_DOC_MAX_CHARS, remaining)
+    const text = d.cleanText.length > cap
+      ? d.cleanText.slice(0, cap) + '\n\n[…truncated]'
+      : d.cleanText
+    const headerBits = [
+      d.name && d.name.trim().length > 0 ? `"${d.name.trim()}"` : null,
+      d.documentType,
+      d.documentDate,
+    ].filter(Boolean).join(' · ')
+    blocks.push(`[${copy.doc} ${i + 1}${headerBits ? ` — ${headerBits}` : ''}]\n${text}`)
+    used += text.length
+  }
+
+  if (blocks.length === 0) return undefined
+
+  return `${copy.header}\n\n${blocks.join('\n\n')}\n\n${copy.footer}`
 }
 
 interface SourceDisplay {
@@ -65,55 +134,94 @@ const CITATION_HALLUCINATION_FALLBACK_FR = `Je n'ai pas trouvé de source fiable
 const CITATION_HALLUCINATION_FALLBACK_EN = `I couldn't find a reliable source to answer this confidently. Try rephrasing, or I can suggest a medical consultation.`
 
 // ─────────────────────────────────────────────────────────────
-// HANDLER
+// Setup pipeline shared by JSON + streaming finishers.
+//
+// Returns either a fully-formed early Response (validation failure, auth
+// failure, conversation not found, input blocked by safety policy) OR a
+// "prep" bundle the finishers can use to call Gemini and assemble the reply.
 // ─────────────────────────────────────────────────────────────
-export async function chatHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
-  // Parse body
+type ChatPrep = {
+  kind: 'proceed'
+  supabase: SupabaseClient
+  userId: string | null
+  activeConversationId: string
+  isNewConversation: boolean
+  message: string
+  language: 'fr' | 'en'
+  journeyType: string | undefined
+  messageHistory: { role: 'user' | 'assistant'; content: string }[]
+  snippets: Snippet[]
+  systemAddendum: string | undefined
+  userDocsBlock: string | undefined
+}
+
+async function prepareChat(
+  c: Context<{ Bindings: Env }>,
+): Promise<ChatPrep | { kind: 'early'; response: Response }> {
   let body: ChatRequest
   try {
     body = await c.req.json()
   } catch {
-    return c.json({ error: 'Invalid JSON body' }, 400)
+    return { kind: 'early', response: c.json({ error: 'Invalid JSON body' }, 400) }
   }
 
-  const { message, conversationId, sessionId, journeyType } = body
-  const language: 'fr' | 'en' = body.language === 'en' ? 'en' : 'fr'
+  const { message, conversationId, sessionId, journeyType, documents } = body
+  const requestedLanguage: 'fr' | 'en' = body.language === 'en' ? 'en' : 'fr'
+  // Override the FE-supplied language when the user clearly writes in the
+  // other one (e.g. onboarding defaulted to 'fr' but the user types English).
+  // Falls back to requestedLanguage on ambiguous text.
+  const language: 'fr' | 'en' = detectMessageLanguage(message ?? '') ?? requestedLanguage
 
   if (!message || typeof message !== 'string' || message.trim().length === 0) {
-    return c.json({ error: 'message is required and must be a non-empty string' }, 400)
+    return {
+      kind: 'early',
+      response: c.json({ error: 'message is required and must be a non-empty string' }, 400),
+    }
   }
   if (message.length > 4000) {
-    return c.json({ error: 'message exceeds maximum length of 4000 characters' }, 400)
+    return {
+      kind: 'early',
+      response: c.json({ error: 'message exceeds maximum length of 4000 characters' }, 400),
+    }
   }
 
-  // Auth — userId or anonymous sessionId
   const supabase = getServiceClient(c.env)
-  const userId   = await getUserIdFromRequest(c.req.raw, supabase)
+  const userId = await getUserIdFromRequest(c.req.raw, supabase)
 
   if (!userId && !sessionId) {
-    return c.json({ error: 'Either a valid auth token or a sessionId is required' }, 401)
+    return {
+      kind: 'early',
+      response: c.json(
+        { error: 'Either a valid auth token or a sessionId is required' },
+        401,
+      ),
+    }
   }
 
-  // Get or create conversation
   let activeConversationId = conversationId
+  let isNewConversation = false
 
   if (!activeConversationId) {
     const { data: conv, error: convError } = await supabase
       .from('conversations')
       .insert({
-        user_id:      userId,
-        session_id:   sessionId ?? null,
+        user_id: userId,
+        session_id: sessionId ?? null,
         journey_type: journeyType ?? 'free_chat',
-        status:       'active',
+        status: 'active',
       })
       .select('id')
       .single()
 
     if (convError || !conv) {
       console.error('Failed to create conversation:', convError)
-      return c.json({ error: 'Failed to create conversation' }, 500)
+      return {
+        kind: 'early',
+        response: c.json({ error: 'Failed to create conversation' }, 500),
+      }
     }
     activeConversationId = conv.id as string
+    isNewConversation = true
   } else {
     const filter = userId
       ? { id: activeConversationId, user_id: userId }
@@ -126,15 +234,43 @@ export async function chatHandler(c: Context<{ Bindings: Env }>): Promise<Respon
       .single()
 
     if (convError || !conv) {
-      return c.json({ error: 'Conversation not found or access denied' }, 404)
+      return {
+        kind: 'early',
+        response: c.json({ error: 'Conversation not found or access denied' }, 404),
+      }
     }
     if (conv.status === 'archived') {
-      return c.json({ error: 'Cannot send messages to an archived conversation' }, 400)
+      return {
+        kind: 'early',
+        response: c.json(
+          { error: 'Cannot send messages to an archived conversation' },
+          400,
+        ),
+      }
     }
   }
 
-  // Load history (last 20)
-  const { data: existingMessages, error: historyError } = await supabase
+  // History load and RAG retrieval are independent — fire them in parallel.
+  // The previous serial pipeline blocked ~30 ms on history before kicking off
+  // the embedding round-trip; with `Promise.all` the embedding starts the
+  // moment we know `activeConversationId`. RAG-disabled deployments skip the
+  // call entirely and the second slot resolves to an empty snippet list.
+  //
+  // RAG gate (Option C — closed pilot). Two ways RAG turns on:
+  //   1. Global: ANOQI_RAG_ENABLED='true' (everyone, including anon sessions).
+  //   2. Pilot:  the authenticated userId is in ANOQI_RAG_PILOT_USERS (a
+  //      comma-separated allowlist of UUIDs). Anonymous sessions never
+  //      qualify — pilot is auth-gated by design.
+  const ragGlobal = (c.env.ANOQI_RAG_ENABLED ?? '').toLowerCase() === 'true'
+  const pilotList = (c.env.ANOQI_RAG_PILOT_USERS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const ragPilot   = userId !== null && pilotList.includes(userId)
+  const ragEnabled = ragGlobal || ragPilot
+  const trimmedMessage = message.trim()
+
+  const historyP = supabase
     .from('messages')
     .select('role, content')
     .eq('conversation_id', activeConversationId)
@@ -142,18 +278,42 @@ export async function chatHandler(c: Context<{ Bindings: Env }>): Promise<Respon
     .order('created_at', { ascending: true })
     .limit(20)
 
+  const retrieveP: Promise<Snippet[]> = ragEnabled
+    ? retrieve(
+        supabase,
+        { message: trimmedMessage, journeyType, language, topK: 5 },
+        c.env,
+      ).catch((e) => {
+        console.error('[chat] retrieval failed (non-fatal):', e)
+        return []
+      })
+    : Promise.resolve([])
+
+  const [{ data: existingMessages, error: historyError }, snippets] = await Promise.all([
+    historyP,
+    retrieveP,
+  ])
+
   if (historyError) {
     console.error('Failed to load message history:', historyError)
-    return c.json({ error: 'Failed to load conversation history' }, 500)
+    return {
+      kind: 'early',
+      response: c.json({ error: 'Failed to load conversation history' }, 500),
+    }
   }
 
-  // Classify input
-  const inputCheck = classifyInput(message.trim())
+  // Whether or not this is the first message (i.e. should we auto-title).
+  // For an existing conversation the loader returns 0 rows on the very first
+  // call too, so this is shared by both paths.
+  const isFirstMessage = !existingMessages || existingMessages.length === 0
+  isNewConversation = isNewConversation || isFirstMessage
+
+  const inputCheck = classifyInput(trimmedMessage)
   if (!inputCheck.safe) {
     await persistMessages(supabase, {
       conversationId: activeConversationId,
       userId,
-      userMessage: message.trim(),
+      userMessage: trimmedMessage,
       assistantContent: INPUT_BLOCKED_RESPONSE,
       policyFlags: [{ rule: 'input_blocked', reason: inputCheck.reason }],
       sources: [],
@@ -161,7 +321,7 @@ export async function chatHandler(c: Context<{ Bindings: Env }>): Promise<Respon
       modelUsed: 'policy_layer',
     })
 
-    const responsePayload: ChatResponse = {
+    const payload: ChatResponse = {
       message: {
         id: crypto.randomUUID(),
         content: INPUT_BLOCKED_RESPONSE,
@@ -174,56 +334,87 @@ export async function chatHandler(c: Context<{ Bindings: Env }>): Promise<Respon
       conversationId: activeConversationId,
       blocked: true,
     }
-    return c.json(responsePayload, 200)
+
+    // Streaming clients still want the redaction; non-streaming gets JSON.
+    const acceptsSSE = (c.req.header('Accept') ?? '').includes('text/event-stream')
+    if (acceptsSSE) {
+      return {
+        kind: 'early',
+        response: sseEarlyMessage(payload, INPUT_BLOCKED_RESPONSE),
+      }
+    }
+    return { kind: 'early', response: c.json(payload, 200) }
   }
 
-  // Build message history for Gemini
   const messageHistory = [
-    ...(existingMessages ?? []).map(m => ({
+    ...(existingMessages ?? []).map((m) => ({
       role: m.role as 'user' | 'assistant',
       content: m.content as string,
     })),
-    { role: 'user' as const, content: message.trim() },
+    { role: 'user' as const, content: trimmedMessage },
   ]
 
-  // Retrieval (gated). Two ways RAG turns on:
-  //   1. Global: ANOQI_RAG_ENABLED='true' (everyone, including anon sessions).
-  //   2. Pilot:  the authenticated userId is in ANOQI_RAG_PILOT_USERS (a
-  //      comma-separated allowlist of UUIDs). Anonymous sessions never
-  //      qualify — pilot is auth-gated by design.
-  const ragGlobal = (c.env.ANOQI_RAG_ENABLED ?? '').toLowerCase() === 'true'
-  const pilotList = (c.env.ANOQI_RAG_PILOT_USERS ?? '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean)
-  const ragPilot   = userId !== null && pilotList.includes(userId)
-  const ragEnabled = ragGlobal || ragPilot
-
-  let snippets: Snippet[] = []
-  if (ragEnabled) {
-    try {
-      snippets = await retrieve(
-        supabase,
-        { message: message.trim(), journeyType, language, topK: 5 },
-        c.env,
-      )
-    } catch (e) {
-      console.error('[chat] retrieval failed (non-fatal):', e)
-    }
-  }
   const systemAddendum = renderSnippetsForPrompt(snippets, language) ?? undefined
+  const userDocsBlock = renderUserDocsBlock(documents, language)
+
+  return {
+    kind: 'proceed',
+    supabase,
+    userId,
+    activeConversationId,
+    isNewConversation,
+    message: trimmedMessage,
+    language,
+    journeyType,
+    messageHistory,
+    snippets,
+    systemAddendum,
+    userDocsBlock,
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// HANDLER — dispatches on `Accept: text/event-stream`.
+//
+// Streaming clients see tokens land progressively (TTFT ~500 ms instead of
+// ~5 s on a typical reply). Non-streaming clients get the original JSON
+// response — both paths produce the same final shape.
+// ─────────────────────────────────────────────────────────────
+export async function chatHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
+  const acceptsSSE = (c.req.header('Accept') ?? '').includes('text/event-stream')
+  return acceptsSSE ? chatStreamHandler(c) : chatJsonHandler(c)
+}
+
+async function chatJsonHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
+  const prep = await prepareChat(c)
+  if (prep.kind === 'early') return prep.response
+
+  const {
+    supabase, userId, activeConversationId, isNewConversation,
+    message, language, journeyType, messageHistory, snippets, systemAddendum,
+    userDocsBlock,
+  } = prep
 
   // Call Gemini (policy check runs inside)
-  const aiResponse = await geminiChat(messageHistory, journeyType, systemAddendum, c.env)
+  const aiResponse = await geminiChat(
+    messageHistory,
+    journeyType,
+    systemAddendum,
+    c.env,
+    language,
+    userDocsBlock,
+  )
 
   if (aiResponse.error === 'api_error') {
     return c.json(
-      { error: 'AI service temporarily unavailable. Please try again in a moment.', conversationId: activeConversationId },
+      {
+        error: 'AI service temporarily unavailable. Please try again in a moment.',
+        conversationId: activeConversationId,
+      },
       503,
     )
   }
 
-  // Parse citations + detect hallucinations
   const { cleanContent, citedSources, hallucinatedLabels } = parseCitations(
     aiResponse.content,
     snippets,
@@ -270,14 +461,12 @@ export async function chatHandler(c: Context<{ Bindings: Env }>): Promise<Respon
 
   const combinedFlags = aiResponse.policyResult.flags
 
-  // Enrich citations
   const sourcesDisplay = await enrichSources(supabase, citedSources, language)
 
-  // Persist
   await persistMessages(supabase, {
     conversationId: activeConversationId,
     userId,
-    userMessage: message.trim(),
+    userMessage: message,
     assistantContent: cleanContent,
     policyFlags: combinedFlags,
     sources: citedSources,
@@ -285,10 +474,20 @@ export async function chatHandler(c: Context<{ Bindings: Env }>): Promise<Respon
     modelUsed: aiResponse.modelUsed,
   })
 
-  // First-message title
-  if (!existingMessages || existingMessages.length === 0) {
-    const title = generateTitle(message.trim())
-    await supabase.from('conversations').update({ title }).eq('id', activeConversationId)
+  // Auto-title on the first message. The user never sees this update — it's
+  // for the conversation list — so push it off the response path via
+  // ctx.waitUntil. Local dev without `executionCtx` falls back to awaiting.
+  if (isNewConversation) {
+    const titleP = (async () => {
+      const { error } = await supabase
+        .from('conversations')
+        .update({ title: generateTitle(message) })
+        .eq('id', activeConversationId)
+      if (error) console.error('[chat] auto-title update failed:', error)
+    })()
+    const waitUntil = c.executionCtx?.waitUntil?.bind(c.executionCtx)
+    if (waitUntil) waitUntil(titleP)
+    else await titleP
   }
 
   const responsePayload: ChatResponse = {
@@ -308,8 +507,216 @@ export async function chatHandler(c: Context<{ Bindings: Env }>): Promise<Respon
 }
 
 // ─────────────────────────────────────────────────────────────
+// STREAMING HANDLER — SSE
+//
+// Emits three event types over the wire:
+//   event: delta   — partial token chunks (data: { "text": "…" })
+//   event: redact  — incremental policy block, replaces accumulated text
+//   event: done    — final metadata (id, sources_display, policyFlags, …)
+//   event: error   — transport / Gemini failure
+//
+// Safety: every delta runs through `checkPolicy(accumulated)` before being
+// flushed. If a blocked phrase appears, we send `redact` (replaces the visible
+// text with the sanitised fallback) and stop forwarding further deltas.
+// ─────────────────────────────────────────────────────────────
+async function chatStreamHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
+  const prep = await prepareChat(c)
+  if (prep.kind === 'early') return prep.response
+
+  const {
+    supabase, userId, activeConversationId, isNewConversation,
+    message, language, journeyType, messageHistory, snippets, systemAddendum,
+    userDocsBlock,
+  } = prep
+
+  const encoder = new TextEncoder()
+  const send = (controller: ReadableStreamDefaultController, event: string, data: unknown) => {
+    controller.enqueue(
+      encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
+    )
+  }
+
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      let accumulated = ''
+      let redactedContent: string | null = null
+      let geminiErrored = false
+
+      try {
+        for await (const evt of geminiChatStream(
+          messageHistory, journeyType, systemAddendum, c.env, language, userDocsBlock,
+        )) {
+          if (evt.kind === 'error') {
+            geminiErrored = true
+            send(controller, 'error', {
+              error: 'AI service temporarily unavailable. Please try again in a moment.',
+              status: evt.status ?? 503,
+            })
+            controller.close()
+            return
+          }
+          if (evt.kind === 'done') {
+            break
+          }
+          // evt.kind === 'delta'
+          accumulated += evt.text
+          // Incremental policy check — catches diagnosis language the moment
+          // the pattern completes. Cheap regex pass; runs per-delta.
+          const check = checkPolicy(accumulated, language)
+          if (!check.safe) {
+            redactedContent = check.sanitisedContent ?? ''
+            send(controller, 'redact', { content: redactedContent })
+            // Stop forwarding further deltas; we still want to drain Gemini
+            // so the connection closes cleanly, but consumers won't see them.
+            // Cheapest: break the loop — Gemini's response will be GC'd.
+            break
+          }
+          send(controller, 'delta', { text: evt.text })
+        }
+
+        if (geminiErrored) return
+
+        // Post-stream finalisation. `cleanContent` strips citation tokens from
+        // visible text; the unstripped accumulated text is the one the client
+        // already saw (which is what we want — citations are rendered as pills,
+        // not raw markers).
+        const finalContent = redactedContent ?? accumulated
+        const { cleanContent, citedSources, hallucinatedLabels } = parseCitations(
+          finalContent, snippets,
+        )
+        const citationFlags = hallucinatedLabels.length > 0
+          ? [{
+              rule: 'hallucinated_citation',
+              severity: 'warn' as const,
+              message: `Model cited unknown labels: ${hallucinatedLabels.join(', ')}`,
+            }]
+          : []
+        const policyFlags = redactedContent !== null
+          ? [{ rule: 'policy_block', severity: 'block' as const, message: 'Streamed reply blocked by output policy' }]
+          : []
+        const combinedFlags = [...policyFlags, ...citationFlags]
+
+        const sourcesDisplay = await enrichSources(supabase, citedSources, language)
+
+        // Persist + auto-title in the background — these are durable writes,
+        // not on the user-visible critical path. `waitUntil` lets the Worker
+        // keep them alive after the Response closes.
+        const persistP = (async () => {
+          await persistMessages(supabase, {
+            conversationId: activeConversationId,
+            userId,
+            userMessage: message,
+            assistantContent: cleanContent,
+            policyFlags: combinedFlags,
+            sources: citedSources,
+            tokensUsed: null,
+            modelUsed: 'gemini-2.5-flash',
+          })
+          if (isNewConversation) {
+            const title = generateTitle(message)
+            await supabase
+              .from('conversations')
+              .update({ title })
+              .eq('id', activeConversationId)
+          }
+        })().catch((e) => console.error('[chat-stream] persist error:', e))
+
+        const waitUntil = c.executionCtx?.waitUntil?.bind(c.executionCtx)
+        if (waitUntil) waitUntil(persistP)
+
+        send(controller, 'done', {
+          id: crypto.randomUUID(),
+          cleanContent,
+          sources: citedSources,
+          sources_display: sourcesDisplay,
+          policyFlags: combinedFlags,
+          conversationId: activeConversationId,
+          blocked: redactedContent !== null,
+          createdAt: new Date().toISOString(),
+        })
+        controller.close()
+      } catch (e) {
+        console.error('[chat-stream] handler error:', e)
+        try {
+          send(controller, 'error', { error: 'Internal error' })
+        } catch { /* controller may already be closed */ }
+        try { controller.close() } catch { /* idem */ }
+      }
+    },
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type':       'text/event-stream',
+      'Cache-Control':      'no-cache, no-transform',
+      'Connection':         'keep-alive',
+      // Disable proxy buffering (some CDN edges hold SSE until N bytes).
+      'X-Accel-Buffering':  'no',
+    },
+  })
+}
+
+// Synthesises a short SSE stream for the early "input blocked" path so the
+// streaming client doesn't have to special-case format detection.
+function sseEarlyMessage(payload: ChatResponse, fullText: string): Response {
+  const enc = new TextEncoder()
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(
+        enc.encode(`event: delta\ndata: ${JSON.stringify({ text: fullText })}\n\n`),
+      )
+      controller.enqueue(
+        enc.encode(
+          `event: done\ndata: ${JSON.stringify({
+            id: payload.message.id,
+            cleanContent: fullText,
+            sources: [],
+            sources_display: [],
+            policyFlags: payload.message.policyFlags,
+            conversationId: payload.conversationId,
+            blocked: true,
+            createdAt: payload.message.createdAt,
+          })}\n\n`,
+        ),
+      )
+      controller.close()
+    },
+  })
+  return new Response(body, {
+    headers: {
+      'Content-Type':       'text/event-stream',
+      'Cache-Control':      'no-cache, no-transform',
+      'Connection':         'keep-alive',
+      'X-Accel-Buffering':  'no',
+    },
+  })
+}
+
+// ─────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────
+
+// Cheap heuristic: detect whether the user's message is clearly French or
+// English, so we can override a stale onboarding-default language. Returns
+// null when the signal is too weak (very short message, code-switching, etc.)
+// — caller falls back to the FE-supplied language in that case.
+const FRENCH_STOP_WORDS = /\b(je|tu|il|elle|nous|vous|ils|elles|le|la|les|un|une|des|du|de|et|ou|mais|donc|car|ne|pas|plus|que|qui|quoi|où|quand|comment|pourquoi|mon|ma|mes|ton|ta|tes|son|sa|ses|notre|votre|leur|est|sont|été|avoir|être|j'ai|c'est|n'est|d'un|d'une|l'on)\b/i
+const ENGLISH_STOP_WORDS = /\b(i|you|he|she|we|they|the|a|an|and|or|but|so|because|not|no|yes|that|which|what|where|when|how|why|my|your|his|her|our|their|is|are|was|were|been|have|has|had|do|does|did|will|would|could|should|may|might|with|for|from|to|of|in|on|at|by)\b/i
+
+function detectMessageLanguage(text: string): 'fr' | 'en' | null {
+  const trimmed = text.trim()
+  if (trimmed.length < 8) return null
+
+  const hasFrenchDiacritics = /[àâçéèêëîïôûùüÿœæ]/i.test(trimmed)
+  const frHits = (trimmed.match(new RegExp(FRENCH_STOP_WORDS, 'gi')) ?? []).length
+  const enHits = (trimmed.match(new RegExp(ENGLISH_STOP_WORDS, 'gi')) ?? []).length
+
+  if (hasFrenchDiacritics && frHits > 0) return 'fr'
+  if (enHits >= 2 && frHits === 0 && !hasFrenchDiacritics) return 'en'
+  if (frHits >= 2 && enHits === 0) return 'fr'
+  return null
+}
+
 async function persistMessages(
   supabase: SupabaseClient,
   opts: {

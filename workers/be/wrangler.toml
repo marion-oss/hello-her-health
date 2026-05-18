@@ -7,7 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 # Public, non-secret config. Flip ANOQI_RAG_ENABLED via dashboard or `wrangler secret put`
 # when you want runtime control without a redeploy.
 [vars]
-ANOQI_RAG_ENABLED = "false"
+ANOQI_RAG_ENABLED = "true"
 
 # Secrets — set via `wrangler secret put <name> --name anoqi-api-staging`:
 #   GEMINI_API_KEY                — same value as the Supabase Edge Function uses
@@ -19,3 +19,16 @@ ANOQI_RAG_ENABLED = "false"
 #                                   even when ANOQI_RAG_ENABLED=false. Used
 #                                   to run a closed pilot while public traffic
 #                                   stays off. Anonymous sessions never qualify.
+
+# Optional: KV namespace for RAG embedding cache.
+# Skips the Gemini embedding round-trip (~150 ms) when the same query has been
+# seen in the last 24h. Safe to leave unbound — retrieval falls back to live
+# embeds. To enable:
+#   wrangler kv:namespace create EMBEDDING_CACHE
+#   wrangler kv:namespace create EMBEDDING_CACHE --preview
+# Then uncomment the block below, dropping in the printed namespace IDs.
+#
+# [[kv_namespaces]]
+# binding    = "EMBEDDING_CACHE"
+# id         = "<production-id>"
+# preview_id = "<preview-id>"

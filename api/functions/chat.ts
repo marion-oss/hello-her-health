@@ -276,7 +276,21 @@ serve(async (req: Request) => {
         console.error('[chat] retrieval failed (non-fatal):', e)
       }
     }
-    const systemAddendum = renderSnippetsForPrompt(snippets, language) ?? undefined
+    // ── 6.6 User document context ────────────────────────────
+    // Pseudonymisation runs on-device before upload (see
+    // app/lib/documentStore.ts), so injecting the user's clean_text +
+    // structured fields into the system prompt preserves the privacy
+    // invariant. Anonymous sessions skip this — /documents requires auth
+    // anyway, so no docs exist for them.
+    const userDocsBlock = userId
+      ? await loadUserDocumentContext(supabase, userId, language)
+      : ''
+
+    const ragAddendum  = renderSnippetsForPrompt(snippets, language) ?? ''
+    const systemAddendum = [ragAddendum, userDocsBlock]
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .join('\n\n') || undefined
 
     // ── 7. Call Gemini (policy check runs inside gemini.ts) ───
     const aiResponse = await chat(messageHistory, journeyType, systemAddendum)
@@ -552,4 +566,104 @@ async function enrichSources(
       topic:       row?.pathway_key ?? '',
     }
   })
+}
+
+// ─────────────────────────────────────────────────────────────
+// USER DOCUMENT CONTEXT
+//
+// Fetch the user's most recent on-device documents (already pseudonymised
+// before upload) and render them as a system-prompt block so the LLM can
+// reason about labs / prescriptions / reports the user has shared.
+//
+// Caps: 5 newest documents · 1500 chars of clean_text per doc. Sized so
+// the resulting block stays well under any reasonable context budget even
+// if every doc is at the cap. Lab values + medications are short structured
+// rows; they are included in full.
+//
+// Returns '' on no docs or on DB error — chat must never break because of
+// a document fetch.
+// ─────────────────────────────────────────────────────────────
+const DOC_CONTEXT_MAX_DOCS = 5
+const DOC_CONTEXT_TEXT_CAP = 1500
+
+type LabValueRow   = { name: string; value: number; unit: string; referenceRange: string | null; flag: 'low' | 'high' | 'critical' | null }
+type MedicationRow = { name: string; dose: string | null; frequency: string | null; duration: string | null }
+
+async function loadUserDocumentContext(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  language: 'fr' | 'en',
+): Promise<string> {
+  const { data: docs, error } = await supabase
+    .from('documents')
+    .select('document_type, document_date, created_at, clean_text, lab_values, medications')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(DOC_CONTEXT_MAX_DOCS)
+
+  if (error) {
+    console.warn('[chat] Failed to load user documents for context:', error)
+    return ''
+  }
+  if (!docs || docs.length === 0) return ''
+
+  const labelFor = (key: 'header' | 'labs' | 'meds' | 'footer'): string => {
+    if (language === 'en') {
+      return {
+        header: "USER DOCUMENTS (pseudonymised on-device — personal information already removed). Most recent first:",
+        labs:   'Lab values:',
+        meds:   'Medications:',
+        footer: 'Use these documents only when the question relates to them. Do not enumerate them unprompted.',
+      }[key]
+    }
+    return {
+      header: "DOCUMENTS DE L'UTILISATRICE (pseudonymisés sur l'appareil — informations personnelles déjà retirées). Les plus récents en premier :",
+      labs:   'Valeurs de laboratoire :',
+      meds:   'Médicaments :',
+      footer: "Utilise ces documents seulement quand la question s'y rapporte. Ne les énumère pas spontanément.",
+    }[key]
+  }
+
+  const blocks = docs.map((doc, i) => {
+    const datePart = doc.document_date ? `, ${language === 'fr' ? 'daté du' : 'dated'} ${doc.document_date}` : ''
+    const header = `[Document ${i + 1} — ${doc.document_type}${datePart}]`
+
+    const text =
+      typeof doc.clean_text === 'string' && doc.clean_text.length > DOC_CONTEXT_TEXT_CAP
+        ? doc.clean_text.slice(0, DOC_CONTEXT_TEXT_CAP) + '… [tronqué]'
+        : doc.clean_text ?? ''
+
+    const parts: string[] = [header, text]
+
+    const labs = doc.lab_values as LabValueRow[] | null
+    if (Array.isArray(labs) && labs.length > 0) {
+      parts.push(labelFor('labs'))
+      parts.push(
+        labs
+          .map((lv) => {
+            const range = lv.referenceRange ? ` (réf. ${lv.referenceRange})` : ''
+            const flag  = lv.flag ? ` [${lv.flag}]` : ''
+            return `- ${lv.name} : ${lv.value} ${lv.unit}${range}${flag}`
+          })
+          .join('\n'),
+      )
+    }
+
+    const meds = doc.medications as MedicationRow[] | null
+    if (Array.isArray(meds) && meds.length > 0) {
+      parts.push(labelFor('meds'))
+      parts.push(
+        meds
+          .map((m) => {
+            const bits = [m.name, m.dose, m.frequency, m.duration].filter(Boolean)
+            return `- ${bits.join(', ')}`
+          })
+          .join('\n'),
+      )
+    }
+
+    return parts.join('\n')
+  })
+
+  return `${labelFor('header')}\n\n${blocks.join('\n\n')}\n\n---\n${labelFor('footer')}`
 }

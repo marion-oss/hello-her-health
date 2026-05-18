@@ -49,3 +49,14 @@ supabase/.temp/
 
 # OS
 Thumbs.db
+
+# Local debug screenshots (Playwright MCP, ad-hoc)
+.playwright-mcp/
+anoqi-*.png
+anoqi-*.jpeg
+welcome-*.png
+welcome-*.jpeg
+home-*.png
+home-*.jpeg
+hover-*.png
+hover-*.jpeg

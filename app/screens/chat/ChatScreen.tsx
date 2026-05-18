@@ -1,404 +1,431 @@
-/**
- * anoqi — ChatScreen
- *
- * Main conversation interface. Designed to feel like Claude — clean,
- * focused, no chrome — with anoqi's trust layer on top.
- *
- * Features:
- *   • Empty state: "What's on your mind today?" + 4 objective-based starters
- *   • Streaming message reveal (character by character)
- *   • Animated typing indicator (3 pulsing dots)
- *   • Source citation chips on every anoqi response
- *   • Safety note on the very first anoqi message
- *   • "Generate doctor summary →" banner after 3 user messages
- *   • Document attach button in input bar
- *   • Keyboard-aware layout
- *   • Full FR / EN support
- *
- * API: calls /functions/v1/chat (api/functions/chat.ts) via supabase.functions.invoke.
- *      Anon-mode sessions use a persisted session_id; signed-in users send the
- *      JWT. Responses arrive in one shot today (no token streaming yet — the
- *      visual streaming below is a presentation effect over the full payload).
- *
- * Brand palette:
- *   Neon Fuchsia  #FF0472  · Hot Coral  #FF6B3D
- *   Midnight Navy #000E28  · Warm Cream #FFF3EE
- *   Off White     #FFF8F5  · Candy Pink #FFB0CC
- */
+// Anoqi — ChatScreen.
+//
+// Conversation UI. Assistant replies render as an article-style reading
+// pane (no bubble shell) with markdown structure: serif h2 title, sans-
+// serif section headings, bodyLg paragraphs, bulleted lists, **bold**
+// inline, and inline [Sn] citation pills. User questions stay in the
+// fuchsia bubble — kept as the brand "send" moment. Consent flows are
+// unchanged: full-screen gate for direct-to-Anoqi entry, bottom-sheet
+// ConsentSheet for the skip-and-chat path.
 
 import React, {
-  useState,
-  useRef,
-  useEffect,
+  memo,
   useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from 'react'
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
   FlatList,
-  StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
-  Animated,
-  Linking,
   Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+  useWindowDimensions,
 } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { useNavigation } from '@react-navigation/native'
-import { useOnboarding, type HealthObjective, type Language } from '../../context/OnboardingContext'
-import { supabase } from '../../lib/supabase'
+import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native'
+import {
+  listDocuments,
+  listInContextDocuments,
+  setInContext,
+  type DocumentIndexEntry,
+  type LocalDocument,
+} from '../../lib/documentStore'
+import { setPendingFile } from '../../lib/pendingFile'
 import { pseudonymise } from '../../lib/pseudonymise'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
+import {
+  useOnboarding,
+  type HealthObjective,
+  type Language,
+} from '../../context/OnboardingContext'
+import { palette, useTheme } from '../../theme'
+import { STARTERS } from './starters'
+import { StarterCard } from './StarterCard'
+import {
+  postChatStream,
+  AnoqiApiError,
+  type ChatRequestDocument,
+  type SourceDisplay,
+} from '../../lib/anoqiApi'
+import {
+  BackHeader,
+  BreathingForm,
+  Bubble,
+  Button,
+  type CitationSource,
+  ConsentSheet,
+  DocumentContextSheet,
+  GoalSheet,
+  Icon,
+  type IconName,
+  Markdown,
+  parseMarkdown,
+  StreamingCursor,
+  Text,
+  TypingIndicator,
+} from '../../components'
 
-// Display-side shape used by SourceChip. The server's /chat endpoint
-// returns persisted citation refs in `messages.sources` plus optional
-// display enrichment in `sources_display` (see api/functions/chat.ts
-// step 7.5). Mobile coerces both into this shape for rendering.
-type Source = {
-  /** Citation label as rendered inline in the message body, e.g. 'S1'. Optional for legacy / non-RAG sources. */
-  label?: string
-  /** Display name, e.g. 'NHS' or the pathway title. Falls back to label if missing. */
-  name: string
-  /** Short topic line, e.g. 'Menstrual health' or pathway key. */
-  topic: string
-  /** Tappable link if available. */
-  url?: string
-  /** Provenance refs from the server — useful for analytics, not rendered. */
-  source_kind?: 'pathway' | 'source' | 'pathway_red_flag'
-  source_ref?: string
-  pathway_key?: string | null
+// Cap each document's cleanText at this many characters before sending. The
+// BE applies its own caps too — this just avoids shipping megabytes.
+const DOC_PER_DOC_MAX = 4000
+const DOC_TOTAL_MAX   = 12_000
+
+function buildContextDocsPayload(docs: LocalDocument[]): ChatRequestDocument[] {
+  let used = 0
+  const out: ChatRequestDocument[] = []
+  for (const d of docs) {
+    if (used >= DOC_TOTAL_MAX) break
+    const cap = Math.min(DOC_PER_DOC_MAX, DOC_TOTAL_MAX - used)
+    const text = d.cleanText.length > cap
+      ? d.cleanText.slice(0, cap) + '\n\n[…truncated]'
+      : d.cleanText
+    out.push({
+      id:           d.id,
+      name:         d.name,
+      documentType: d.documentType,
+      documentDate: d.documentDate,
+      cleanText:    text,
+    })
+    used += text.length
+  }
+  return out
 }
+
+type Source = CitationSource & { topic: string }
 
 type Message = {
   id: string
   role: 'user' | 'anoqi'
   text: string
-  fullText: string       // complete text (text streams toward this)
+  fullText: string
   isStreaming: boolean
   sources?: Source[]
-  isFirst?: boolean      // first anoqi message → show safety note
+  isFirst?: boolean
   timestamp: Date
 }
 
-// Response shape from /functions/v1/chat. Mirror of ChatResponse in
-// api/functions/chat.ts plus sources_display from the server-side enricher.
-type ChatApiResponse = {
-  message: {
-    id:              string
-    content:         string
-    role:            'assistant'
-    sources:         Array<{
-      label:           string
-      row_id:          string
-      source_kind:     'pathway' | 'source' | 'pathway_red_flag'
-      source_ref:      string
-      pathway_key:     string | null
-      pathway_version: string | null
-    }>
-    sources_display: Array<{
-      label:       string
-      source_kind: 'pathway' | 'source' | 'pathway_red_flag'
-      source_ref:  string
-      name:        string
-      topic:       string
-      url?:        string
-    }>
-    policyFlags:     unknown[]
-    createdAt:       string
-  }
-  conversationId: string
-  blocked:        boolean
-}
-
-// Lightweight UUID-ish session ID. Tries crypto.randomUUID (Hermes ≥0.74,
-// modern web) and falls back to a timestamp+random hex string. The server
-// only uses this as an opaque key, so format isn't load-bearing.
-function generateSessionId(): string {
-  try {
-    // @ts-ignore — crypto.randomUUID exists in Hermes recent enough
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      return crypto.randomUUID()
-    }
-  } catch { /* fall through */ }
-  return (
-    Date.now().toString(36) + '-' +
-    Math.random().toString(36).slice(2, 10) +
-    Math.random().toString(36).slice(2, 10)
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Copy — all user-facing strings
-// ─────────────────────────────────────────────────────────────────────────────
-
 const COPY = {
   fr: {
-    greeting: 'Qu\'est-ce qui te préoccupe aujourd\'hui ?',
+    greeting: "Qu'est-ce qui te préoccupe aujourd'hui ?",
+    sub: 'Pose ta question. Sans détour.',
     inputPlaceholder: 'Pose ta question…',
     safetyNote: 'Anoqi informe, elle ne diagnostique pas. Consulte toujours ton médecin.',
-    summaryBanner: 'Générer un résumé pour ton médecin →',
-    sourcesLabel: 'Sources',
+    summaryBanner: 'Générer un résumé pour ton médecin',
     send: 'Envoyer',
     attach: 'Joindre un document',
-    errorGeneric: 'Une erreur s\'est produite. Réessaie.',
-    introMessage: 'Bonjour, je suis anoqi. Pose-moi toutes tes questions — je te montrerai toujours la source derrière chaque réponse. Et rien de ce que tu partages ici n\'est lié à ton nom ou à ton identité.',
+    docsSingular: 'document en mémoire',
+    docsPlural:   'documents en mémoire',
+    docsManage:   'gérer',
+    dropTitle:    'Dépose ton document.',
+    dropBody:     'PDF ou texte · nettoyé sur ton appareil avant d\'être enregistré.',
+    introMessage:
+      'Bonjour, je suis Anoqi. Pose-moi toutes tes questions — je te montrerai toujours la source derrière chaque réponse. Rien de ce que tu partages ici n\'est lié à ton nom.',
     consentGate: {
       title: 'Avant ta première question',
       subtitle: 'Quelques points pour utiliser Anoqi en toute confiance.',
       points: [
-        'Anoqi t\'informe, elle ne pose pas de diagnostic.',
-        'Tes données sont pseudonymisées avant tout traitement.',
-        'Tes données sont hébergées en Europe (UE).',
-        'Tu peux demander la suppression de tes données à tout moment.',
+        { icon: 'BookOpen' as IconName, text: 'Anoqi t\'informe, elle ne pose pas de diagnostic.' },
+        { icon: 'ShieldCheck' as IconName, text: 'Tes données sont pseudonymisées avant tout traitement.' },
+        { icon: 'Trash2' as IconName, text: 'Tu peux demander la suppression à tout moment.' },
       ],
       cta: 'Je comprends et j\'accepte',
       footnote: 'Pour le consentement détaillé, crée un compte plus tard.',
     },
   },
   en: {
-    greeting: 'What\'s on your mind today?',
+    greeting: "What's on your mind today?",
+    sub: 'Ask directly. No detours.',
     inputPlaceholder: 'Ask your question…',
-    safetyNote: 'Anoqi informs, it doesn\'t diagnose. Always consult your doctor.',
-    summaryBanner: 'Generate a summary for your doctor →',
-    sourcesLabel: 'Sources',
+    safetyNote: "Anoqi informs, it doesn't diagnose. Always consult your doctor.",
+    summaryBanner: 'Generate a summary for your doctor',
     send: 'Send',
     attach: 'Attach a document',
-    errorGeneric: 'Something went wrong. Please try again.',
-    introMessage: 'Hi, I\'m anoqi. Ask me anything — I\'ll always show you the source behind my answer. And nothing you share here is linked to your name or any personal identifier.',
+    docsSingular: 'document in context',
+    docsPlural:   'documents in context',
+    docsManage:   'manage',
+    dropTitle:    'Drop your document.',
+    dropBody:     'PDF or text · cleaned on your device before anything is saved.',
+    introMessage:
+      "Hi, I'm Anoqi. Ask me anything — I'll always show you the source behind my answer. Nothing you share here is linked to your name.",
     consentGate: {
       title: 'Before your first question',
       subtitle: 'A few things so you can use Anoqi with full confidence.',
       points: [
-        'Anoqi informs you — it does not diagnose.',
-        'Your data is pseudonymised before any processing.',
-        'Your data is hosted in Europe (EU).',
-        'You can request deletion of your data at any time.',
+        { icon: 'BookOpen' as IconName, text: 'Anoqi informs you — it does not diagnose.' },
+        { icon: 'ShieldCheck' as IconName, text: 'Your data is pseudonymised before any processing.' },
+        { icon: 'Trash2' as IconName, text: 'You can request deletion at any time.' },
       ],
       cta: 'I understand and agree',
       footnote: 'For detailed consent, sign up later.',
     },
   },
+} as const
+
+// Bilingual goal labels mirrored on the Chat header chip. Same icon set as
+// the Home pill so the visual identity stays consistent across surfaces.
+const OBJECTIVE_LABELS: Record<HealthObjective, { fr: string; en: string; icon: IconName }> = {
+  symptoms:      { fr: 'Symptômes',      en: 'Symptoms',        icon: 'Stethoscope' },
+  contraception: { fr: 'Contraception',  en: 'Contraception',   icon: 'Pill' },
+  menopause:     { fr: 'Ménopause',      en: 'Menopause',       icon: 'Sunset' },
+  fertility:     { fr: 'Fertilité',      en: 'Fertility',       icon: 'Sprout' },
+  general:       { fr: 'Santé générale', en: 'General health',  icon: 'MessageCircle' },
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Starter questions — 4 per objective, bilingual
-// ─────────────────────────────────────────────────────────────────────────────
-
-const STARTERS: Record<HealthObjective | 'general', { fr: string[]; en: string[] }> = {
-  symptoms: {
-    fr: [
-      'J\'ai des règles irrégulières depuis 3 mois',
-      'J\'ai des douleurs pelviennes — que dois-je savoir ?',
-      'Qu\'est-ce qui pourrait expliquer ma fatigue ?',
-      'Comment préparer ma consultation gynécologique ?',
-    ],
-    en: [
-      'I\'ve been having irregular periods for 3 months',
-      'I have pelvic pain — what should I know?',
-      'What could be causing my fatigue?',
-      'How do I prepare for a gynaecology appointment?',
-    ],
-  },
-  contraception: {
-    fr: [
-      'Quelle est la différence entre la pilule et le stérilet ?',
-      'Je veux arrêter la pilule — à quoi m\'attendre ?',
-      'Quels effets secondaires peuvent avoir les contraceptifs ?',
-      'La pilule fait-elle vraiment grossir ?',
-    ],
-    en: [
-      'What\'s the difference between the pill and the coil?',
-      'I want to stop the pill — what should I expect?',
-      'What side effects can I expect from contraceptives?',
-      'Does the pill really cause weight gain?',
-    ],
-  },
-  menopause: {
-    fr: [
-      'Quels sont les premiers signes de la périménopause ?',
-      'Le THM est-il fait pour moi ?',
-      'Comment gérer les bouffées de chaleur ?',
-      'Que fait la ménopause à mes os ?',
-    ],
-    en: [
-      'What are the first signs of perimenopause?',
-      'Is HRT right for me?',
-      'How do I manage hot flashes?',
-      'What does menopause do to my bones?',
-    ],
-  },
-  fertility: {
-    fr: [
-      'Comment repérer ma fenêtre de fertilité ?',
-      'Qu\'est-ce qui influence la qualité des ovules ?',
-      'J\'essaie depuis 6 mois — quand consulter ?',
-      'Que m\'indique la longueur de mon cycle ?',
-    ],
-    en: [
-      'How do I track my fertile window?',
-      'What affects egg quality?',
-      'I\'ve been trying for 6 months — when should I see a doctor?',
-      'What does my cycle length tell me?',
-    ],
-  },
-  general: {
-    fr: [
-      'Je veux mieux comprendre mes hormones',
-      'Je me sens épuisée — est-ce hormonal ?',
-      'Comment les hormones influencent mon énergie et mes performances ?',
-      'Comment trouver un médecin qui m\'écoute vraiment ?',
-    ],
-    en: [
-      'I want to understand my hormones better',
-      'I\'ve been feeling exhausted — could it be hormonal?',
-      'How do hormones affect my energy and performance?',
-      'How do I find a doctor who listens?',
-    ],
-  },
+// Map the BE's sources_display payload into the local Source shape (which is
+// CitationSource & { topic: string }). Pathway-typed entries have no URL.
+function toSource(d: SourceDisplay): Source {
+  return { label: d.label, name: d.name, topic: d.topic, url: d.url }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TypingIndicator — three pulsing dots
-// ─────────────────────────────────────────────────────────────────────────────
+// Fake-stream cadence. The full response text is already in memory once the
+// /chat fetch resolves — the typewriter is purely cosmetic. ~16 chars per
+// 24 ms tick ≈ 660 chars/sec, ~5× faster than the previous 2/15ms loop. Keeps
+// the "answer is appearing" feel without making the user wait on a UI animation
+// after the network already finished.
+const STREAM_TICK_MS = 24
+const STREAM_CHARS_PER_TICK = 16
 
-function TypingIndicator() {
-  const dots = [
-    useRef(new Animated.Value(0.3)).current,
-    useRef(new Animated.Value(0.3)).current,
-    useRef(new Animated.Value(0.3)).current,
-  ]
+// Stable keyExtractor & item separator. Pulled out so FlatList sees identical
+// function references across renders (otherwise every parent state change
+// invalidates virtualization).
+const messageKeyExtractor = (m: Message) => m.id
 
-  useEffect(() => {
-    const animations = dots.map((dot, i) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(i * 150),
-          Animated.timing(dot, { toValue: 1, duration: 300, useNativeDriver: true }),
-          Animated.timing(dot, { toValue: 0.3, duration: 300, useNativeDriver: true }),
-          Animated.delay((2 - i) * 150),
-        ])
-      )
-    )
-    animations.forEach(a => a.start())
-    return () => animations.forEach(a => a.stop())
-  }, [])
+// Static styles for message items. Theme-dependent values (spacing, colors)
+// stay inline in the components below; everything else is hoisted so RN-Web
+// doesn't re-emit a className per render.
+const messageStyles = StyleSheet.create({
+  userWrap: {
+    width: '100%',
+    alignSelf: 'center',
+    maxWidth: 864,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  assistantWrap: {
+    width: '100%',
+    alignSelf: 'center',
+    maxWidth: 864,
+  },
+  safetyNote: {
+    borderTopWidth: 1,
+  },
+})
 
+// Memoised user bubble. Re-renders only when its own text changes — past
+// messages stay quiet while the latest one streams.
+const UserMessageItem = memo(function UserMessageItem({ text }: { text: string }) {
+  const theme = useTheme()
   return (
-    <View style={styles.typingWrapper}>
-      <View style={styles.typingBubble}>
-        {dots.map((dot, i) => (
-          <Animated.View key={i} style={[styles.typingDot, { opacity: dot }]} />
-        ))}
-      </View>
-    </View>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SourceChip — tappable source pill
-// ─────────────────────────────────────────────────────────────────────────────
-
-function SourceChip({ source }: { source: Source }) {
-  const labelBadge = source.label ? `[${source.label}] ` : ''
-  return (
-    <TouchableOpacity
-      style={styles.sourceChip}
-      onPress={() => source.url && Linking.openURL(source.url)}
-      accessibilityRole={source.url ? 'link' : 'button'}
-      accessibilityLabel={`${source.label ? source.label + ' — ' : ''}${source.name} · ${source.topic}`}
-    >
-      {source.label && <Text style={styles.sourceChipLabel}>{labelBadge}</Text>}
-      <Text style={styles.sourceChipName}>{source.name}</Text>
-      {source.topic ? <Text style={styles.sourceChipDot}> · </Text> : null}
-      {source.topic ? <Text style={styles.sourceChipTopic}>{source.topic}</Text> : null}
-    </TouchableOpacity>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MessageBubble
-// ─────────────────────────────────────────────────────────────────────────────
-
-function MessageBubble({ message, language }: { message: Message; language: Language }) {
-  const isUser = message.role === 'user'
-  const copy = COPY[language]
-
-  return (
-    <View style={[styles.messageRow, isUser ? styles.messageRowUser : styles.messageRowAnoqi]}>
-      {!isUser && (
-        <View style={styles.avatarDot} />
-      )}
-      <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAnoqi]}>
-        <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextAnoqi]}>
-          {message.text}
-          {message.isStreaming && (
-            <Text style={styles.cursor}>▋</Text>
-          )}
+    <View style={[messageStyles.userWrap, { marginBottom: theme.spacing[5] }]}>
+      {/* Bubble already caps its own width at 86%; nesting a second
+          maxWidth wrapper collapses to per-character width on RN-Web. */}
+      <Bubble role="user">
+        <Text
+          variant="bodyLg"
+          style={{ color: theme.colors.accent.primaryOnText }}
+        >
+          {text}
         </Text>
-
-        {/* Safety note — first anoqi message only */}
-        {!isUser && message.isFirst && (
-          <View style={styles.safetyNote}>
-            <Text style={styles.safetyNoteText}>{copy.safetyNote}</Text>
-          </View>
-        )}
-
-        {/* Source chips */}
-        {!isUser && !message.isStreaming && message.sources && message.sources.length > 0 && (
-          <View style={styles.sourcesRow}>
-            {message.sources.map((s, i) => (
-              <SourceChip key={i} source={s} />
-            ))}
-          </View>
-        )}
-      </View>
+      </Bubble>
     </View>
   )
-}
+})
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ChatScreen
-// ─────────────────────────────────────────────────────────────────────────────
+// Memoised assistant message. parseMarkdown runs once per text change instead
+// of every parent render — during streaming that turns ~250 parses into ~30,
+// and other messages above stop re-parsing entirely.
+const AssistantMessageItem = memo(function AssistantMessageItem({
+  text,
+  isStreaming,
+  sources,
+  isFirst,
+  safetyNote,
+}: {
+  text: string
+  isStreaming: boolean
+  sources?: Source[]
+  isFirst?: boolean
+  safetyNote: string
+}) {
+  const theme = useTheme()
+  const blocks = useMemo(() => parseMarkdown(text), [text])
+  return (
+    <View style={[messageStyles.assistantWrap, { marginBottom: theme.spacing[8] }]}>
+      <Markdown
+        blocks={blocks}
+        sources={sources}
+        trailingCursor={isStreaming ? <StreamingCursor /> : null}
+      />
+
+      {!isStreaming && isFirst ? (
+        <Text
+          variant="caption"
+          tone="tertiary"
+          style={[
+            messageStyles.safetyNote,
+            {
+              marginTop: theme.spacing[2],
+              paddingTop: theme.spacing[3],
+              borderTopColor: theme.colors.border.subtle,
+            },
+          ]}
+        >
+          {safetyNote}
+        </Text>
+      ) : null}
+    </View>
+  )
+})
+
 
 export function ChatScreen() {
   const navigation = useNavigation<any>()
-  const { language, objective } = useOnboarding()
+  const { language, objective, setObjective, sessionId } = useOnboarding()
+  const theme = useTheme()
+  const { width: screenWidth } = useWindowDimensions()
+  // Cormorant h2 (36px) wraps to 3 lines on FR greeting at < 480px and
+  // pushes the rest of the empty state below the fold. Step down to h3.
+  const greetingVariant = screenWidth < 480 ? 'h3' : 'h2'
   const copy = COPY[language]
+
+  const objKey = objective ?? 'general'
+  const objMeta = OBJECTIVE_LABELS[objKey]
+  const [goalSheetOpen, setGoalSheetOpen] = useState(false)
+  // Without this guard, the form's `position: fixed` (web) bleeds into
+  // sibling tabs because the bottom-tab navigator keeps screens mounted.
+  const isFocused = useIsFocused()
 
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
+  const [documents, setDocuments] = useState<DocumentIndexEntry[]>([])
+  const [docSheetOpen, setDocSheetOpen] = useState(false)
+  const [isDraggingFile, setIsDraggingFile] = useState(false)
+
+  // Re-poll the document index whenever the chat regains focus so a doc
+  // added in the Documents flow shows up in the in-context pill immediately.
+  useFocusEffect(
+    useCallback(() => {
+      listDocuments()
+        .then(setDocuments)
+        .catch(() => { /* silent — pill simply won't show */ })
+    }, []),
+  )
+
+  // Toggle a single document's inContext flag. Persists to documentStore and
+  // mirrors locally so the sheet reflects the change without a re-fetch.
+  const handleToggleDocInContext = useCallback(async (id: string, next: boolean) => {
+    setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, inContext: next } : d)))
+    try {
+      await setInContext(id, next)
+    } catch (err) {
+      // Revert if persistence fails so the UI doesn't lie.
+      setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, inContext: !next } : d)))
+      if (__DEV__) console.warn('[chat] setInContext failed:', err)
+    }
+  }, [])
+
+  const inContextCount = documents.filter((d) => d.inContext).length
+
+  // Drag-and-drop file uploads (web only). Dropping a file anywhere on
+  // the chat screen sets the pending file + opens the AddDocument modal.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return
+
+    let depth = 0
+    const onDragEnter = (e: DragEvent) => {
+      if (!e.dataTransfer?.types?.includes('Files')) return
+      e.preventDefault()
+      depth++
+      setIsDraggingFile(true)
+    }
+    const onDragOver = (e: DragEvent) => {
+      if (!e.dataTransfer?.types?.includes('Files')) return
+      e.preventDefault()
+      e.dataTransfer!.dropEffect = 'copy'
+    }
+    const onDragLeave = (e: DragEvent) => {
+      if (!e.dataTransfer?.types?.includes('Files')) return
+      depth = Math.max(0, depth - 1)
+      if (depth === 0) setIsDraggingFile(false)
+    }
+    const onDrop = (e: DragEvent) => {
+      if (!e.dataTransfer?.files?.length) return
+      e.preventDefault()
+      depth = 0
+      setIsDraggingFile(false)
+      const file = e.dataTransfer.files[0]
+      setPendingFile(file)
+      navigation.navigate('Documents', { screen: 'AddDocument' })
+    }
+
+    window.addEventListener('dragenter', onDragEnter)
+    window.addEventListener('dragover',  onDragOver)
+    window.addEventListener('dragleave', onDragLeave)
+    window.addEventListener('drop',      onDrop)
+    return () => {
+      window.removeEventListener('dragenter', onDragEnter)
+      window.removeEventListener('dragover',  onDragOver)
+      window.removeEventListener('dragleave', onDragLeave)
+      window.removeEventListener('drop',      onDrop)
+    }
+  }, [navigation])
   const [isTyping, setIsTyping] = useState(false)
   const [streamingId, setStreamingId] = useState<string | null>(null)
   const [userMessageCount, setUserMessageCount] = useState(0)
+  const [consentChecked, setConsentChecked] = useState(false)
+  const [consentAccepted, setConsentAccepted] = useState(false)
+  // Skip-and-chat path: user entered Chat directly from ObjectiveScreen
+  // without going through ConsentScreen. We let them compose + send their
+  // first message, then show the consent bottom-sheet before generating any
+  // AI response.
+  const [pendingConsent, setPendingConsent] = useState(false)
+  const [showConsentSheet, setShowConsentSheet] = useState(false)
 
   const flatListRef = useRef<FlatList>(null)
   const anoqiMessageCount = useRef(0)
+  // Holds the user's first message content while the consent sheet is open,
+  // so we can fire the AI response once consent is granted.
+  const heldFirstSendRef = useRef<string | null>(null)
   // Server-assigned conversation UUID. Null until the first /chat response
   // creates it; reused on every subsequent turn so the server can rebuild
   // history. Stays in the screen's lifetime — leaving and re-entering Chat
   // starts a fresh conversation, which matches the current UX.
   const conversationIdRef = useRef<string | null>(null)
 
-  // ── Consent gate (anon-mode lighter "I understand and agree") ─
-  // The "Commencer la conversation →" shortcut on Objective bypasses formal
-  // Consent, so we block the chat UI here until the user accepts the short
-  // version. ConsentScreen mirrors this flag — signed-up users skip the
-  // gate. See ROADMAP "Consent strategy (GDPR — three-tier)".
-  // ──────────────────────────────────────────────────────────────
-  const [consentChecked, setConsentChecked] = useState(false)
-  const [consentAccepted, setConsentAccepted] = useState(false)
-
   useEffect(() => {
-    AsyncStorage.getItem('anoqi_chat_consent_accepted').then(v => {
+    AsyncStorage.getItem('anoqi_chat_consent_accepted').then((v) => {
       setConsentAccepted(v === 'true')
       setConsentChecked(true)
     })
+  }, [])
+
+  // Read skip-and-chat handoff state once on mount. The prefill is consumed
+  // immediately so re-entering Chat later starts with an empty composer.
+  useEffect(() => {
+    let cancelled = false
+    async function readHandoff() {
+      const [[, prefill], [, pending]] = await AsyncStorage.multiGet([
+        'anoqi_chat_prefill',
+        'anoqi_pending_consent',
+      ])
+      if (cancelled) return
+      if (prefill) {
+        setInput(prefill)
+        AsyncStorage.removeItem('anoqi_chat_prefill')
+      }
+      if (pending === 'true') setPendingConsent(true)
+    }
+    readHandoff()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   async function handleAcceptConsent() {
@@ -406,17 +433,13 @@ export function ChatScreen() {
     setConsentAccepted(true)
   }
 
-  // ── First-visit intro message ─────────────────────────────────
-  // Deferred until consent is accepted so the persisted intro_shown flag
-  // isn't burned before the user actually sees the chat.
   useEffect(() => {
     if (!consentAccepted) return
-    const currentLanguage = language // capture at mount
+    const currentLanguage = language
     async function maybeShowIntro() {
       const shown = await AsyncStorage.getItem('anoqi_intro_shown')
       if (shown) return
       await AsyncStorage.setItem('anoqi_intro_shown', 'true')
-
       const introText = COPY[currentLanguage].introMessage
       const introId = `anoqi-intro-${Date.now()}`
       const introMsg: Message = {
@@ -435,719 +458,906 @@ export function ChatScreen() {
     maybeShowIntro()
   }, [consentAccepted]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Retranslate the intro message when the user switches language. Chat lives
+  // in a bottom-tab navigator, so tabbing to Profile, flipping FR↔EN, and
+  // coming back finds the screen still mounted with the old-language intro
+  // baked into `messages`. Replace it in place; the streaming cursor for the
+  // intro is already done by the time the user can reach the language toggle.
+  useEffect(() => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id.startsWith('anoqi-intro-')
+          ? {
+              ...m,
+              text:        COPY[language].introMessage,
+              fullText:    COPY[language].introMessage,
+              isStreaming: false,
+            }
+          : m,
+      ),
+    )
+  }, [language])
+
   const starters = STARTERS[objective ?? 'general'][language]
   const showSummaryBanner = userMessageCount >= 3
 
-  // ── Streaming effect ──────────────────────────────────────────
+  // Streaming typewriter. Single interval driven by `streamingId` only — never
+  // by `messages` — so each setMessages tick does NOT re-fire this effect.
+  // The previous implementation listed `messages` in the dep array, which made
+  // every tick re-bind the timer and re-find the streaming message, causing
+  // ~250 effect runs per response and the visible mobile-web jank.
   useEffect(() => {
     if (!streamingId) return
 
-    const msg = messages.find(m => m.id === streamingId)
-    if (!msg) return
-
-    if (msg.text.length >= msg.fullText.length) {
-      setMessages(prev =>
-        prev.map(m => m.id === streamingId ? { ...m, isStreaming: false } : m)
-      )
-      setStreamingId(null)
-      return
+    let stopped = false
+    const tick = () => {
+      if (stopped) return
+      setMessages((prev) => {
+        const idx = prev.findIndex((m) => m.id === streamingId)
+        if (idx === -1) return prev
+        const msg = prev[idx]
+        if (msg.text.length >= msg.fullText.length) return prev
+        const nextLen = Math.min(
+          msg.text.length + STREAM_CHARS_PER_TICK,
+          msg.fullText.length,
+        )
+        const done = nextLen >= msg.fullText.length
+        const next = prev.slice()
+        next[idx] = {
+          ...msg,
+          text: msg.fullText.slice(0, nextLen),
+          isStreaming: !done,
+        }
+        if (done) {
+          // Defer to break the setState-during-setState rule.
+          Promise.resolve().then(() => {
+            if (!stopped) setStreamingId(null)
+          })
+        }
+        return next
+      })
     }
 
-    const chunkSize = 3
-    const timer = setTimeout(() => {
-      setMessages(prev =>
-        prev.map(m =>
-          m.id === streamingId
-            ? { ...m, text: m.fullText.slice(0, m.text.length + chunkSize) }
-            : m
-        )
-      )
-    }, 18)
+    // Immediate first tick so the response visibly starts within a frame
+    // instead of waiting STREAM_TICK_MS.
+    tick()
+    const id = setInterval(tick, STREAM_TICK_MS)
+    return () => {
+      stopped = true
+      clearInterval(id)
+    }
+  }, [streamingId])
 
-    return () => clearTimeout(timer)
-  }, [streamingId, messages])
-
-  // ── Scroll to bottom on new message ──────────────────────────
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80)
     }
   }, [messages.length])
 
-  // ── Send a message ────────────────────────────────────────────
-  const handleSend = useCallback(async (text?: string) => {
-    const content = (text ?? input).trim()
-    if (!content) return
+  const runAnoqiResponse = useCallback(async (userContent: string) => {
+    setIsTyping(true)
+    const isFirstAnoqi = anoqiMessageCount.current === 0
+    const anoqiId = `anoqi-stream-${Date.now()}`
+    let insertedMessage = false
 
-    setInput('')
+    const buildFriendlyError = (err: AnoqiApiError | null) =>
+      err && err.status > 0
+        ? (language === 'fr'
+            ? `Désolée, je n'arrive pas à répondre pour l'instant (${err.status}). Réessaie dans un instant.`
+            : `Sorry, I can't answer right now (${err.status}). Please try again in a moment.`)
+        : (language === 'fr'
+            ? `Quelque chose n'a pas fonctionné. Réessaie.`
+            : `Something went wrong. Please try again.`)
 
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      text: content,
-      fullText: content,
-      isStreaming: false,
-      timestamp: new Date(),
+    // Pull in-context documents fresh on every send so any toggle made
+    // moments earlier in the bottom-sheet is reflected. Truncate before
+    // shipping.
+    let docsPayload: ChatRequestDocument[] = []
+    try {
+      const inContextDocs = await listInContextDocuments()
+      docsPayload = buildContextDocsPayload(inContextDocs)
+    } catch (err) {
+      // Non-fatal — chat still works without doc context.
+      if (__DEV__) console.warn('[chat] failed to load in-context documents:', err)
     }
 
-    setMessages(prev => [...prev, userMessage])
-    setUserMessageCount(prev => prev + 1)
-    setIsTyping(true)
+    // Pseudonymise BEFORE leaving the device. The user's own bubble
+    // (set in handleSend above) still shows the raw text they typed —
+    // pseudonymisation is for the server-bound payload only.
+    // See app/lib/pseudonymise.ts for the pattern set.
+    const { pseudonymisedText } = pseudonymise(userContent)
 
-    // ── Call /functions/v1/chat ─────────────────────────────────
-    // Anon-mode sessions: we mint a session_id once per install and stash
-    // it in AsyncStorage. The server accepts either an auth JWT or a
-    // sessionId (see api/functions/chat.ts step 2).
-    //
-    // Failure path: any error (network, 503, blocked) surfaces as an
-    // error bubble. The server-side policy layer and citation parser
-    // already strip unsafe / hallucinated content before it reaches here.
-    try {
-      let sessionId = await AsyncStorage.getItem('anoqi_session_id')
-      if (!sessionId) {
-        sessionId = generateSessionId()
-        await AsyncStorage.setItem('anoqi_session_id', sessionId)
-      }
-
-      // Pseudonymise BEFORE leaving the device. The user's own bubble
-      // (userMessage.text above) still shows the raw `content` they typed —
-      // pseudonymisation is for what goes server-side, not what they see.
-      // See app/lib/pseudonymise.ts for the pattern set.
-      const { pseudonymisedText } = pseudonymise(content)
-
-      const { data, error } = await supabase.functions.invoke<ChatApiResponse>('chat', {
-        body: {
-          message:        pseudonymisedText,
-          conversationId: conversationIdRef.current,
-          sessionId,
-          journeyType:    objective ?? 'free_chat',
-          language,
+    await postChatStream(
+      {
+        message:        pseudonymisedText,
+        language,
+        sessionId,
+        objective,
+        conversationId: conversationIdRef.current ?? undefined,
+        documents:      docsPayload.length > 0 ? docsPayload : undefined,
+      },
+      {
+        // First delta = first sign of life. Hide the typing indicator and
+        // drop in the assistant bubble pre-populated with the initial chunk,
+        // so the user goes directly from indicator → readable content.
+        onDelta: (text) => {
+          if (!insertedMessage) {
+            insertedMessage = true
+            setIsTyping(false)
+            anoqiMessageCount.current += 1
+            const newMsg: Message = {
+              id: anoqiId,
+              role: 'anoqi',
+              text,
+              fullText: text,
+              isStreaming: true,
+              sources: [],
+              isFirst: isFirstAnoqi,
+              timestamp: new Date(),
+            }
+            setMessages((prev) => [...prev, newMsg])
+            return
+          }
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === anoqiId
+                ? { ...m, text: m.text + text, fullText: m.fullText + text }
+                : m,
+            ),
+          )
         },
-      })
+        // Output policy blocked the reply mid-stream. Replace whatever the
+        // user has seen so far with the sanitised fallback.
+        onRedact: (content) => {
+          if (!insertedMessage) {
+            insertedMessage = true
+            setIsTyping(false)
+            anoqiMessageCount.current += 1
+            const newMsg: Message = {
+              id: anoqiId,
+              role: 'anoqi',
+              text: content,
+              fullText: content,
+              isStreaming: false,
+              sources: [],
+              isFirst: isFirstAnoqi,
+              timestamp: new Date(),
+            }
+            setMessages((prev) => [...prev, newMsg])
+            return
+          }
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === anoqiId
+                ? { ...m, text: content, fullText: content, isStreaming: false }
+                : m,
+            ),
+          )
+        },
+        onDone: (final) => {
+          if (final.conversationId && !conversationIdRef.current) {
+            conversationIdRef.current = final.conversationId
+          }
+          const sources: Source[] = final.sources_display.map(toSource)
+          setMessages((prev) => {
+            // Edge case: the server returned `done` without any prior delta
+            // (shouldn't happen in practice but be defensive).
+            if (!insertedMessage) {
+              return [
+                ...prev,
+                {
+                  id: anoqiId,
+                  role: 'anoqi',
+                  text: final.cleanContent,
+                  fullText: final.cleanContent,
+                  isStreaming: false,
+                  sources,
+                  isFirst: isFirstAnoqi,
+                  timestamp: new Date(),
+                },
+              ]
+            }
+            return prev.map((m) =>
+              m.id === anoqiId
+                ? {
+                    ...m,
+                    text: final.cleanContent,
+                    fullText: final.cleanContent,
+                    isStreaming: false,
+                    sources,
+                  }
+                : m,
+            )
+          })
+          setIsTyping(false)
+        },
+        onError: (err) => {
+          setIsTyping(false)
+          const friendly = buildFriendlyError(err instanceof AnoqiApiError ? err : null)
+          // If we'd already started rendering, replace the in-flight bubble
+          // with the error text rather than leaving a half-finished message.
+          setMessages((prev) => {
+            if (insertedMessage) {
+              return prev.map((m) =>
+                m.id === anoqiId
+                  ? { ...m, text: friendly, fullText: friendly, isStreaming: false }
+                  : m,
+              )
+            }
+            const errId = `anoqi-error-${Date.now()}`
+            return [
+              ...prev,
+              {
+                id: errId,
+                role: 'anoqi',
+                text: friendly,
+                fullText: friendly,
+                isStreaming: false,
+                isFirst: isFirstAnoqi,
+                timestamp: new Date(),
+              },
+            ]
+          })
+          if (__DEV__) console.warn('[chat] postChatStream failed:', err)
+        },
+      },
+    )
+  }, [language, objective, sessionId])
 
-      setIsTyping(false)
+  const handleSend = useCallback(
+    async (text?: string) => {
+      const content = (text ?? input).trim()
+      if (!content) return
+      setInput('')
+      const userMessage: Message = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        text: content,
+        fullText: content,
+        isStreaming: false,
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, userMessage])
+      setUserMessageCount((prev) => prev + 1)
 
-      if (error || !data) {
-        const errId = `error-${Date.now()}`
-        setMessages(prev => [...prev, {
-          id:         errId,
-          role:       'anoqi',
-          text:       copy.errorGeneric,
-          fullText:   copy.errorGeneric,
-          isStreaming: false,
-          timestamp:  new Date(),
-        }])
+      // Skip-and-chat path: hold the AI response until consent is granted via
+      // the bottom-sheet. The user's typed message is already in the transcript
+      // so they see what they sent.
+      if (pendingConsent && anoqiMessageCount.current === 0) {
+        heldFirstSendRef.current = content
+        setShowConsentSheet(true)
         return
       }
 
-      conversationIdRef.current = data.conversationId
+      await runAnoqiResponse(content)
+    },
+    [input, pendingConsent, runAnoqiResponse],
+  )
 
-      const isFirstAnoqi = anoqiMessageCount.current === 0
-      anoqiMessageCount.current += 1
-
-      const displaySources: Source[] = (data.message.sources_display ?? []).map(s => ({
-        label:       s.label,
-        name:        s.name,
-        topic:       s.topic,
-        url:         s.url,
-        source_kind: s.source_kind,
-        source_ref:  s.source_ref,
-      }))
-
-      const anoqiMessage: Message = {
-        id:          data.message.id,
-        role:        'anoqi',
-        text:        '',
-        fullText:    data.message.content,
-        isStreaming: true,
-        sources:     displaySources,
-        isFirst:     isFirstAnoqi,
-        timestamp:   new Date(data.message.createdAt),
+  const handleConsentSheetAccept = useCallback(
+    async (_researchOptIn: boolean) => {
+      await AsyncStorage.multiSet([
+        ['anoqi_chat_consent_accepted', 'true'],
+        // Suppress the welcome intro: the user already sent a question, so a
+        // separate "Hi, I'm Anoqi" message before the AI's first reply would
+        // feel out of place.
+        ['anoqi_intro_shown', 'true'],
+      ])
+      await AsyncStorage.removeItem('anoqi_pending_consent')
+      setPendingConsent(false)
+      setShowConsentSheet(false)
+      setConsentAccepted(true)
+      // Replay the held first send into the AI response pipeline.
+      if (heldFirstSendRef.current !== null) {
+        const held = heldFirstSendRef.current
+        heldFirstSendRef.current = null
+        await runAnoqiResponse(held)
       }
+    },
+    [runAnoqiResponse],
+  )
 
-      setMessages(prev => [...prev, anoqiMessage])
-      setStreamingId(data.message.id)
-    } catch (e) {
-      setIsTyping(false)
-      console.error('[ChatScreen] /chat call failed:', e)
-      const errId = `error-${Date.now()}`
-      setMessages(prev => [...prev, {
-        id:          errId,
-        role:        'anoqi',
-        text:        copy.errorGeneric,
-        fullText:    copy.errorGeneric,
-        isStreaming: false,
-        timestamp:   new Date(),
-      }])
-    }
-  }, [input, language, objective])
+  // Stable references for FlatList. Inline renderItem + inline
+  // contentContainerStyle break virtualization because every parent render
+  // hands FlatList "new" props.
+  const renderMessage = useCallback(
+    ({ item }: { item: Message }) =>
+      item.role === 'user' ? (
+        <UserMessageItem text={item.text} />
+      ) : (
+        <AssistantMessageItem
+          text={item.text}
+          isStreaming={item.isStreaming}
+          sources={item.sources}
+          isFirst={item.isFirst}
+          safetyNote={copy.safetyNote}
+        />
+      ),
+    [copy.safetyNote],
+  )
 
-  // ── Consent gate render (anon-mode lighter consent before chat) ──
-  // Wait for the AsyncStorage check to resolve so users who've already
-  // accepted don't get a gate flash on every Chat mount.
+  const listContentStyle = useMemo(
+    () => ({
+      paddingHorizontal: theme.spacing[5],
+      paddingTop: theme.spacing[4],
+      paddingBottom: theme.spacing[3],
+    }),
+    [theme.spacing],
+  )
+
+  // ── Consent gate (Cotton Rose overlay — not a black scrim) ─────────────
   if (!consentChecked) {
-    return <SafeAreaView style={styles.safe} />
+    return <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }} />
   }
-  if (!consentAccepted) {
+  if (!consentAccepted && !pendingConsent) {
     const gate = copy.consentGate
     return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.gateContainer}>
-          <View style={styles.gateHeader}>
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              style={styles.backButton}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={language === 'fr' ? 'Retour' : 'Back'}
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.surfaceMuted }}>
+        <BackHeader
+          onBack={() => {
+            if (navigation.canGoBack()) navigation.goBack()
+            else navigation.navigate('Home')
+          }}
+        />
+        <View
+          style={{
+            flex: 1,
+            paddingHorizontal: theme.spacing[6],
+            paddingBottom: theme.spacing[6],
+            justifyContent: 'space-between',
+          }}
+        >
+          <View style={{ marginTop: theme.spacing[8] }}>
+            <Text variant="h1" tone="primary">
+              {gate.title}
+            </Text>
+            <Text
+              variant="bodyLg"
+              tone="secondary"
+              style={{ marginTop: theme.spacing[3], marginBottom: theme.spacing[8] }}
             >
-              <Text style={styles.backIcon}>←</Text>
-            </TouchableOpacity>
-            <Text style={styles.wordmark}>anoqi</Text>
-          </View>
-          <View style={styles.gateContent}>
-            <Text style={styles.gateTitle}>{gate.title}</Text>
-            <Text style={styles.gateSubtitle}>{gate.subtitle}</Text>
-            <View style={styles.gateList}>
+              {gate.subtitle}
+            </Text>
+            <View style={{ gap: theme.spacing[5] }}>
               {gate.points.map((p, i) => (
-                <View key={i} style={styles.gateRow}>
-                  <Text style={styles.gateBullet}>✓</Text>
-                  <Text style={styles.gateRowText}>{p}</Text>
+                <View
+                  key={i}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'flex-start',
+                    gap: theme.spacing[4],
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      backgroundColor: theme.colors.bg.surface,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Icon
+                      name={p.icon}
+                      size={18}
+                      color={theme.colors.accent.success}
+                      strokeWidth={1.6}
+                    />
+                  </View>
+                  <Text variant="body" tone="primary" style={{ flex: 1, marginTop: 8 }}>
+                    {p.text}
+                  </Text>
                 </View>
               ))}
             </View>
           </View>
-          <View style={styles.gateFooter}>
-            <TouchableOpacity
-              style={styles.gateButton}
+          <View>
+            <Button
+              label={gate.cta}
+              size="lg"
+              fullWidth
               onPress={handleAcceptConsent}
-              accessibilityRole="button"
+            />
+            <Text
+              variant="caption"
+              tone="tertiary"
+              align="center"
+              style={{ marginTop: theme.spacing[3] }}
             >
-              <Text style={styles.gateButtonText}>{gate.cta}</Text>
-            </TouchableOpacity>
-            <Text style={styles.gateFootnote}>{gate.footnote}</Text>
+              {gate.footnote}
+            </Text>
           </View>
         </View>
       </SafeAreaView>
     )
   }
 
-  // ── Render ────────────────────────────────────────────────────
+  // ── Main render ─────────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={{ flex: 1 }}>
+      {/* Breathing form tucked into the bottom-right corner — exact same
+          placement as DocumentsScreen so the brand visual sits at a
+          consistent anchor across tabs. Behind content via DOM order.
+          Guarded by isFocused so the form's `position: fixed` (web) doesn't
+          bleed into sibling tabs that the bottom-tab navigator keeps
+          mounted in parallel. */}
+      {isFocused ? (
+        <View
+          pointerEvents="none"
+          style={
+            Platform.OS === 'web'
+              ? ({
+                  position: 'fixed',
+                  right: -40,
+                  bottom: -40,
+                  width: 585,
+                  height: 585,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                } as any)
+              : {
+                  position: 'absolute',
+                  right: -40,
+                  bottom: -40,
+                  width: 585,
+                  height: 585,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }
+          }
+        >
+          <BreathingForm size={585} />
+        </View>
+      ) : null}
+
       <KeyboardAvoidingView
-        style={styles.flex}
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
       >
+        <BackHeader
+          onBack={() => {
+            // Chat lives in the tab navigator alongside Home — goBack() does
+            // nothing when there's no stack history, so route by name.
+            if (navigation.canGoBack()) navigation.goBack()
+            else navigation.navigate('Home')
+          }}
+          rightSlot={
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={objMeta[language]}
+              onPress={() => setGoalSheetOpen(true)}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: theme.radii.pill,
+                borderWidth: 1,
+                borderColor: 'rgba(196, 128, 106, 0.28)',
+                backgroundColor: pressed
+                  ? 'rgba(196, 128, 106, 0.20)'
+                  : 'rgba(196, 128, 106, 0.10)',
+              })}
+            >
+              <Icon name={objMeta.icon} size={12} color={palette.ember[300]} strokeWidth={1.8} />
+              <Text variant="label" style={{ color: palette.ember[200] }}>
+                {objMeta[language]}
+              </Text>
+              <Icon name="ChevronDown" size={11} color={palette.ember[300]} strokeWidth={1.8} />
+            </Pressable>
+          }
+        />
 
-        {/* ── Header ───────────────────────────────────────── */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={language === 'fr' ? 'Retour' : 'Back'}
-          >
-            <Text style={styles.backIcon}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.wordmark}>anoqi</Text>
-        </View>
-
-        {/* ── Message list ─────────────────────────────────── */}
         {messages.length === 0 ? (
-          // Empty state
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyGreeting}>{copy.greeting}</Text>
-            <View style={styles.starterList}>
+          // Empty state — scrollable so content can overflow on small screens
+          // without colliding with the input bar.
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{
+              flexGrow: 1,
+              paddingHorizontal: theme.spacing[6],
+              paddingTop: theme.spacing[8],
+              paddingBottom: theme.spacing[16],
+              justifyContent: screenWidth >= 480 ? 'center' : 'flex-start',
+            }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text variant={greetingVariant} tone="primary" align="center">
+              {copy.greeting}
+            </Text>
+            <Text
+              variant="body"
+              tone="secondary"
+              align="center"
+              style={{ marginTop: theme.spacing[3], marginBottom: theme.spacing[8] }}
+            >
+              {copy.sub}
+            </Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: theme.spacing[3],
+              }}
+            >
               {starters.map((q, i) => (
-                <Pressable
+                <StarterCard
                   key={i}
-                  style={({ pressed }) => [styles.starterChip, pressed && styles.starterChipPressed]}
+                  text={q}
+                  index={i}
                   onPress={() => handleSend(q)}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.starterChipText}>{q}</Text>
-                </Pressable>
+                />
               ))}
             </View>
-          </View>
+          </ScrollView>
         ) : (
           <FlatList
             ref={flatListRef}
             data={messages}
-            keyExtractor={m => m.id}
-            renderItem={({ item }) => (
-              <MessageBubble message={item} language={language} />
-            )}
-            contentContainerStyle={styles.messageList}
+            keyExtractor={messageKeyExtractor}
+            renderItem={renderMessage}
+            extraData={streamingId}
+            initialNumToRender={8}
+            maxToRenderPerBatch={6}
+            windowSize={7}
+            removeClippedSubviews={Platform.OS === 'web'}
+            contentContainerStyle={listContentStyle}
             showsVerticalScrollIndicator={false}
-            onContentSizeChange={() =>
-              flatListRef.current?.scrollToEnd({ animated: true })
-            }
             ListFooterComponent={
               <>
-                {isTyping && <TypingIndicator />}
-                {/* Show starter chips below intro message until user sends first message */}
-                {userMessageCount === 0 && !streamingId && (
-                  <View style={styles.starterListInline}>
+                {isTyping ? (
+                  <View
+                    style={{
+                      alignSelf: 'center',
+                      width: '100%',
+                      maxWidth: 864,
+                      marginBottom: theme.spacing[5],
+                    }}
+                  >
+                    <TypingIndicator />
+                  </View>
+                ) : null}
+
+                {userMessageCount === 0 && !streamingId ? (
+                  // Auto-intro pushes a single message into `messages` on
+                  // first visit, so the pure empty-state path doesn't fire.
+                  // Mirror the starter grid here so cards are reachable
+                  // below the intro. Hides after the first user turn.
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      gap: theme.spacing[3],
+                      marginTop: theme.spacing[6],
+                    }}
+                  >
                     {starters.map((q, i) => (
-                      <Pressable
+                      <StarterCard
                         key={i}
-                        style={({ pressed }) => [styles.starterChip, pressed && styles.starterChipPressed]}
+                        text={q}
+                        index={i}
                         onPress={() => handleSend(q)}
-                        accessibilityRole="button"
-                      >
-                        <Text style={styles.starterChipText}>{q}</Text>
-                      </Pressable>
+                      />
                     ))}
                   </View>
-                )}
+                ) : null}
               </>
             }
           />
         )}
 
-        {/* ── Summary banner ───────────────────────────────── */}
-        {showSummaryBanner && messages.length > 0 && (
-          <TouchableOpacity
-            style={styles.summaryBanner}
-            onPress={() => { /* navigate to SummaryScreen */ }}
+        {showSummaryBanner && messages.length > 0 ? (
+          <Pressable
             accessibilityRole="button"
+            onPress={() => {
+              /* navigate to SummaryScreen */
+            }}
+            style={{
+              marginHorizontal: theme.spacing[5],
+              marginBottom: theme.spacing[2],
+              backgroundColor: theme.colors.bg.surfaceWarm,
+              borderRadius: theme.radii.lg,
+              paddingVertical: theme.spacing[3],
+              paddingHorizontal: theme.spacing[4],
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: theme.spacing[3],
+            }}
           >
-            <Text style={styles.summaryBannerText}>{copy.summaryBanner}</Text>
-          </TouchableOpacity>
-        )}
+            <Icon
+              name="FileText"
+              size={18}
+              color={theme.colors.text.accent}
+              strokeWidth={1.6}
+            />
+            <Text variant="bodyMed" tone="accent" style={{ flex: 1 }}>
+              {copy.summaryBanner}
+            </Text>
+            <Icon
+              name="ArrowRight"
+              size={16}
+              color={theme.colors.text.accent}
+              strokeWidth={2}
+            />
+          </Pressable>
+        ) : null}
 
-        {/* ── Input bar ────────────────────────────────────── */}
-        <View style={styles.inputBar}>
-          {/* Attach */}
-          <TouchableOpacity
-            style={styles.attachButton}
-            onPress={() => { /* open document picker */ }}
+        {/* Documents-in-context pill — small, ember-tinted, sits right
+            above the input border so the user always knows what the model
+            can see. Quiet by design — subordinate to the conversation.
+            Tapping it opens DocumentContextSheet to toggle which uploaded
+            docs are actually injected into the prompt. */}
+        {documents.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setDocSheetOpen(true)}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignSelf: 'flex-start',
+              alignItems: 'center',
+              gap: theme.spacing[2],
+              marginLeft: theme.spacing[5],
+              marginBottom: theme.spacing[2],
+              paddingHorizontal: theme.spacing[3],
+              paddingVertical: theme.spacing[2],
+              backgroundColor: theme.colors.bg.surfaceWarm,
+              borderRadius: theme.radii.pill,
+              borderWidth: 1,
+              borderColor: 'rgba(196, 128, 106, 0.20)',
+              opacity: pressed ? 0.7 : 1,
+              transform: pressed ? [{ scale: 0.985 }] : undefined,
+            })}
+          >
+            <View
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: inContextCount > 0
+                  ? theme.colors.accent.primary
+                  : theme.colors.text.tertiary,
+              }}
+            />
+            <Text variant="label" style={{ color: theme.colors.text.accent }}>
+              {inContextCount} {inContextCount === 1 ? copy.docsSingular : copy.docsPlural}
+            </Text>
+            <Text variant="label" tone="tertiary">
+              · {copy.docsManage} →
+            </Text>
+          </Pressable>
+        ) : null}
+
+        {/* Input bar — sits above the floating LiquidTabBar. The pill is
+            ~62px tall and floats 14px above the safe-area; 92px of bottom
+            clearance keeps the input fully visible. Background is intentionally
+            transparent — a solid bg here would create a visible "column"
+            rectangle against the position:fixed BreathingForm in the void. */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            paddingHorizontal: theme.spacing[4],
+            paddingVertical: theme.spacing[3],
+            paddingBottom: theme.spacing[3],
+            marginBottom: 92,
+            borderTopWidth: 1,
+            borderTopColor: theme.colors.border.subtle,
+            gap: theme.spacing[2],
+          }}
+        >
+          <Pressable
             accessibilityRole="button"
             accessibilityLabel={copy.attach}
+            onPress={() =>
+              navigation.navigate('Documents', { screen: 'AddDocument' })
+            }
+            style={({ pressed }) => ({
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              backgroundColor: theme.colors.bg.surfaceMuted,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 1,
+              transform: pressed ? [{ scale: 0.97 }] : undefined,
+            })}
           >
-            <Text style={styles.attachIcon}>⊕</Text>
-          </TouchableOpacity>
+            <Icon
+              name="Paperclip"
+              size={18}
+              color={theme.colors.text.secondary}
+              strokeWidth={1.6}
+            />
+          </Pressable>
 
-          {/* Text input */}
-          <TextInput
-            style={styles.input}
-            value={input}
-            onChangeText={setInput}
-            placeholder={copy.inputPlaceholder}
-            placeholderTextColor="#BBBBBB"
-            multiline
-            maxLength={2000}
-            returnKeyType="send"
-            blurOnSubmit={false}
-            onSubmitEditing={() => handleSend()}
-          />
-
-          {/* Send */}
-          <TouchableOpacity
-            style={[styles.sendButton, (!input.trim() || isTyping) && styles.sendButtonDisabled]}
-            onPress={() => handleSend()}
-            disabled={!input.trim() || isTyping}
-            accessibilityRole="button"
-            accessibilityLabel={copy.send}
+          {/* Input pill — TextInput + send button visually inside one
+              rounded shape. The pill is the styled wrapper; the TextInput
+              sits inside with right padding reserved for the send button. */}
+          <View
+            style={{
+              flex: 1,
+              position: 'relative',
+              backgroundColor: 'rgba(255, 245, 238, 0.04)',
+              borderRadius: theme.radii.pill,
+              borderWidth: 1,
+              borderColor: 'rgba(255, 245, 238, 0.10)',
+            }}
           >
-            <Text style={styles.sendIcon}>↑</Text>
-          </TouchableOpacity>
+            <TextInput
+              value={input}
+              onChangeText={setInput}
+              placeholder={copy.inputPlaceholder}
+              placeholderTextColor={theme.colors.text.placeholder}
+              multiline
+              maxLength={2000}
+              returnKeyType="send"
+              blurOnSubmit={false}
+              onSubmitEditing={() => handleSend()}
+              // Web: Enter sends, Shift+Enter inserts a newline. multiline
+              // TextInputs don't fire onSubmitEditing on web, so intercept
+              // keypress directly. Native multiline keeps its default
+              // newline-on-Enter behaviour.
+              onKeyPress={
+                Platform.OS === 'web'
+                  ? ((e: any) => {
+                      if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                        e.preventDefault?.()
+                        handleSend()
+                      }
+                    }) as any
+                  : undefined
+              }
+              textAlignVertical="center"
+              style={{
+                paddingLeft: theme.spacing[4],
+                paddingRight: 48,
+                // Asymmetric padding compensates for font-metric quirk:
+                // most fonts put more visible mass above the baseline, so
+                // geometric centring renders the text slightly above visual
+                // centre. Extra paddingTop pushes glyphs down to look right.
+                paddingTop: 14,
+                paddingBottom: 8,
+                minHeight: 44,
+                fontSize: 15,
+                fontFamily: 'Inter-Regular',
+                color: theme.colors.text.primary,
+                maxHeight: 120,
+                lineHeight: 22,
+                ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null),
+              }}
+            />
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={copy.send}
+              onPress={() => handleSend()}
+              disabled={!input.trim() || isTyping}
+              style={[
+                {
+                  position: 'absolute',
+                  right: 10,
+                  top: '50%',
+                  marginTop: -16,
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  backgroundColor:
+                    !input.trim() || isTyping
+                      ? theme.colors.bg.surfaceWarm
+                      : theme.colors.accent.primary,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+                !input.trim() || isTyping
+                  ? null
+                  : Platform.OS === 'web'
+                    ? ({ boxShadow: '0 0 20px rgba(255, 4, 114, 0.45)' } as any)
+                    : {
+                        shadowColor: '#FF0472',
+                        shadowOpacity: 0.55,
+                        shadowRadius: 10,
+                        shadowOffset: { width: 0, height: 0 },
+                      },
+              ]}
+            >
+              <Icon
+                name="ArrowUp"
+                size={16}
+                color={
+                  !input.trim() || isTyping
+                    ? theme.colors.text.tertiary
+                    : theme.colors.accent.primaryOnText
+                }
+                strokeWidth={2.4}
+              />
+            </Pressable>
+          </View>
         </View>
-
       </KeyboardAvoidingView>
+
+      <ConsentSheet
+        visible={showConsentSheet}
+        language={language}
+        onAccept={handleConsentSheetAccept}
+      />
+
+      <GoalSheet
+        visible={goalSheetOpen}
+        selected={objective}
+        language={language}
+        onSelect={setObjective}
+        onClose={() => setGoalSheetOpen(false)}
+      />
+
+      <DocumentContextSheet
+        visible={docSheetOpen}
+        language={language}
+        documents={documents}
+        onToggle={handleToggleDocInContext}
+        onAdd={() => {
+          setDocSheetOpen(false)
+          navigation.navigate('Documents', { screen: 'AddDocument' })
+        }}
+        onClose={() => setDocSheetOpen(false)}
+      />
+
+      {/* Drop overlay (web only) — appears while a file is being dragged
+          anywhere over the chat window. */}
+      {isDraggingFile && Platform.OS === 'web' ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 0, left: 0, right: 0, bottom: 0,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: theme.spacing[6],
+            backgroundColor: 'rgba(13, 13, 18, 0.85)',
+          }}
+        >
+          <View
+            style={{
+              alignItems: 'center',
+              paddingVertical: theme.spacing[10],
+              paddingHorizontal: theme.spacing[8],
+              borderRadius: theme.radii.xl,
+              borderWidth: 2,
+              borderColor: theme.colors.accent.primary,
+              borderStyle: 'dashed' as any,
+              backgroundColor: 'rgba(196, 128, 106, 0.06)',
+              maxWidth: 420,
+            }}
+          >
+            <Icon
+              name="UploadCloud"
+              size={48}
+              color={theme.colors.accent.primary}
+              strokeWidth={1.5}
+            />
+            <Text
+              variant="h3Italic"
+              tone="primary"
+              align="center"
+              style={{ marginTop: theme.spacing[4] }}
+            >
+              {copy.dropTitle}
+            </Text>
+            <Text
+              variant="bodyLight"
+              tone="secondary"
+              align="center"
+              style={{ marginTop: theme.spacing[2], maxWidth: 320 }}
+            >
+              {copy.dropBody}
+            </Text>
+          </View>
+        </View>
+      ) : null}
     </SafeAreaView>
   )
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Styles
-// ─────────────────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#FFF8F5',
-  },
-  flex: {
-    flex: 1,
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#FFE8E0',
-    gap: 12,
-  },
-  backButton: {
-    padding: 4,
-  },
-  backIcon: {
-    fontSize: 22,
-    color: '#FF0472',
-    lineHeight: 24,
-  },
-  wordmark: {
-    fontSize: 18,
-    fontFamily: 'BricolageGrotesque-ExtraBold',
-    color: '#FF0472',
-    letterSpacing: -0.5,
-  },
-
-  // Empty state
-  emptyState: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: 'center',
-    paddingBottom: 60,
-  },
-  emptyGreeting: {
-    fontSize: 26,
-    fontFamily: 'BricolageGrotesque-ExtraBold',
-    color: '#000E28',
-    letterSpacing: -0.8,
-    marginBottom: 28,
-    textAlign: 'center',
-  },
-  starterList: {
-    gap: 10,
-  },
-  starterListInline: {
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  starterChip: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#EDE5E0',
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-  },
-  starterChipPressed: {
-    backgroundColor: '#FFF3EE',
-    borderColor: '#FF6B3D',
-  },
-  starterChipText: {
-    fontSize: 15,
-    fontFamily: 'DMSans-Regular',
-    color: '#000E28',
-    lineHeight: 22,
-  },
-
-  // Message list
-  messageList: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-    gap: 12,
-  },
-
-  // Message rows
-  messageRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  messageRowUser: {
-    justifyContent: 'flex-end',
-  },
-  messageRowAnoqi: {
-    justifyContent: 'flex-start',
-  },
-
-  // Avatar dot (anoqi side)
-  avatarDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#FF0472',
-    marginBottom: 4,
-    flexShrink: 0,
-  },
-
-  // Bubbles
-  bubble: {
-    maxWidth: '80%',
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  bubbleUser: {
-    backgroundColor: '#FF0472',
-    borderBottomRightRadius: 4,
-  },
-  bubbleAnoqi: {
-    backgroundColor: '#FFFFFF',
-    borderBottomLeftRadius: 4,
-    shadowColor: '#000E28',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  bubbleText: {
-    fontSize: 15,
-    lineHeight: 23,
-    fontFamily: 'DMSans-Regular',
-  },
-  bubbleTextUser: {
-    color: '#FFFFFF',
-  },
-  bubbleTextAnoqi: {
-    color: '#000E28',
-  },
-  cursor: {
-    color: '#FF0472',
-    fontWeight: '200',
-  },
-
-  // Safety note
-  safetyNote: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#EDE5E0',
-  },
-  safetyNoteText: {
-    fontSize: 11,
-    fontFamily: 'DMSans-Regular',
-    color: '#AAAAAA',
-    lineHeight: 16,
-    fontStyle: 'italic',
-  },
-
-  // Sources
-  sourcesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 10,
-  },
-  sourceChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF3EE',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: '#FFB0CC',
-  },
-  sourceChipLabel: {
-    fontSize: 10,
-    fontFamily: 'DMSans-Medium',
-    color: '#FF0472',
-    fontWeight: '700',
-    marginRight: 2,
-  },
-  sourceChipName: {
-    fontSize: 11,
-    fontFamily: 'DMSans-Medium',
-    color: '#FF6B3D',
-    fontWeight: '600',
-  },
-  sourceChipDot: {
-    fontSize: 11,
-    color: '#FFB0CC',
-  },
-  sourceChipTopic: {
-    fontSize: 11,
-    fontFamily: 'DMSans-Regular',
-    color: '#888888',
-  },
-
-  // Typing indicator
-  typingWrapper: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-    paddingLeft: 16,
-    paddingTop: 4,
-  },
-  typingBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    borderBottomLeftRadius: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    shadowColor: '#000E28',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  typingDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#FF6B3D',
-  },
-
-  // Summary banner
-  summaryBanner: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    backgroundColor: '#FFF3EE',
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#FFB0CC',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  summaryBannerText: {
-    fontSize: 14,
-    fontFamily: 'DMSans-Medium',
-    color: '#FF6B3D',
-    fontWeight: '600',
-  },
-
-  // Input bar
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    paddingBottom: Platform.OS === 'ios' ? 16 : 10,
-    borderTopWidth: 1,
-    borderTopColor: '#EDE5E0',
-    backgroundColor: '#FFF8F5',
-    gap: 8,
-  },
-  attachButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#FFF3EE',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 1,
-  },
-  attachIcon: {
-    fontSize: 20,
-    color: '#FF6B3D',
-    lineHeight: 24,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: '#EDE5E0',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 10 : 8,
-    paddingBottom: Platform.OS === 'ios' ? 10 : 8,
-    fontSize: 15,
-    fontFamily: 'DMSans-Regular',
-    color: '#000E28',
-    maxHeight: 120,
-    lineHeight: 22,
-  },
-  sendButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#FF0472',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 1,
-  },
-  sendButtonDisabled: {
-    backgroundColor: '#E8DDD9',
-  },
-  sendIcon: {
-    fontSize: 18,
-    color: '#FFFFFF',
-    fontWeight: '700',
-    lineHeight: 22,
-  },
-
-  // Consent gate (lighter "I understand and agree" — anon-mode entry)
-  gateContainer: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-  },
-  gateHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 8,
-    gap: 12,
-  },
-  gateContent: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: 24,
-  },
-  gateTitle: {
-    fontSize: 28,
-    fontFamily: 'BricolageGrotesque-ExtraBold',
-    color: '#000E28',
-    letterSpacing: -0.8,
-  },
-  gateSubtitle: {
-    fontSize: 15,
-    fontFamily: 'DMSans-Regular',
-    color: '#777777',
-    lineHeight: 22,
-  },
-  gateList: {
-    gap: 14,
-  },
-  gateRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  gateBullet: {
-    fontSize: 14,
-    color: '#FF0472',
-    fontFamily: 'DMSans-Medium',
-    fontWeight: '700',
-    marginTop: 1,
-  },
-  gateRowText: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: 'DMSans-Regular',
-    color: '#000E28',
-    lineHeight: 21,
-  },
-  gateFooter: {
-    paddingTop: 16,
-    gap: 12,
-  },
-  gateButton: {
-    backgroundColor: '#FF0472',
-    borderRadius: 16,
-    paddingVertical: 18,
-    alignItems: 'center',
-  },
-  gateButtonText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontFamily: 'BricolageGrotesque-ExtraBold',
-    letterSpacing: -0.3,
-  },
-  gateFootnote: {
-    fontSize: 12,
-    fontFamily: 'DMSans-Regular',
-    color: '#AAAAAA',
-    textAlign: 'center',
-  },
-})

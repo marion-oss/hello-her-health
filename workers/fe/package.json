@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "build": "rm -rf assets && cd ../.. && npx expo export --platform web --output-dir workers/fe/assets",
+    "build": "cd ../.. && npx expo export --platform web --output-dir workers/fe/assets",
     "deploy": "npm run build && wrangler deploy",
     "typecheck": "tsc --noEmit"
   },

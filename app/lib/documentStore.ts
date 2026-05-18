@@ -52,6 +52,7 @@ const MAX_TEXT_LENGTH = 50_000                   // chars — refuse suspiciousl
 // ─────────────────────────────────────────────────────────────
 export type LocalDocument = {
   id: string
+  name: string | null                  // user-facing label — filename on import, editable later
   documentType: DocumentCategory
   documentDate: string | null          // ISO date string "YYYY-MM-DD", from user or parsed
   createdAt: string                    // ISO datetime string
@@ -61,15 +62,21 @@ export type LocalDocument = {
   researchConsent: boolean
   uploadedAt: string | null            // ISO datetime if already sent to server
   serverId: string | null              // documents.id from Supabase, once uploaded
+  // Whether this document is included in the chat prompt as context.
+  // Defaults to true on creation; the user can toggle it from the chat
+  // "documents in context" bottom-sheet. Persisted so it survives reloads.
+  inContext: boolean
 }
 
 // Minimal record stored in the AsyncStorage index (avoids loading every full doc)
 export type DocumentIndexEntry = {
   id: string
+  name: string | null
   documentType: DocumentCategory
   documentDate: string | null
   createdAt: string
   uploadedAt: string | null
+  inContext: boolean
 }
 
 // What gets sent to the server — no original text, no filenames
@@ -92,7 +99,19 @@ async function readIndex(): Promise<DocumentIndexEntry[]> {
   const raw = await AsyncStorage.getItem(INDEX_KEY)
   if (!raw) return []
   try {
-    return JSON.parse(raw) as DocumentIndexEntry[]
+    const parsed = JSON.parse(raw) as Partial<DocumentIndexEntry>[]
+    // Backfill `inContext` for pre-existing entries written before the flag
+    // existed. Treat them as opted-in so the user's old documents keep
+    // flowing into the prompt by default.
+    return parsed.map((e) => ({
+      id:           e.id           ?? '',
+      name:         e.name         ?? null,
+      documentType: (e.documentType ?? 'autre') as DocumentCategory,
+      documentDate: e.documentDate ?? null,
+      createdAt:    e.createdAt    ?? new Date(0).toISOString(),
+      uploadedAt:   e.uploadedAt   ?? null,
+      inContext:    e.inContext    ?? true,
+    }))
   } catch {
     return []
   }
@@ -119,6 +138,7 @@ export function processText(
     documentDate?: string | null
     researchConsent: boolean
     overrideType?: DocumentCategory  // if user manually selected a type
+    name?: string | null             // user-facing label — defaults to the filename if absent
   }
 ): ProcessResult {
   if (!rawText || rawText.trim().length === 0) {
@@ -144,6 +164,7 @@ export function processText(
   // 4. Build LocalDocument (not yet persisted)
   const doc: LocalDocument = {
     id: generateId(),
+    name: options.name ?? null,
     documentType,
     documentDate: options.documentDate ?? null,
     createdAt: new Date().toISOString(),
@@ -153,6 +174,7 @@ export function processText(
     researchConsent: options.researchConsent,
     uploadedAt: null,
     serverId: null,
+    inContext: true,
   }
 
   return {
@@ -168,18 +190,24 @@ export function processText(
 // Writes doc to FileSystem and updates the AsyncStorage index
 // ─────────────────────────────────────────────────────────────
 export async function saveDocument(doc: LocalDocument): Promise<void> {
-  await storage.writeDocument(doc.id, JSON.stringify(doc))
+  // Old docs (loaded before the migration ran) may arrive here without an
+  // inContext flag set. Normalise to `true` so the persisted file matches
+  // the index entry below.
+  const normalised: LocalDocument = { ...doc, inContext: doc.inContext ?? true }
+  await storage.writeDocument(normalised.id, JSON.stringify(normalised))
 
   // Update index
   const index = await readIndex()
   const entry: DocumentIndexEntry = {
-    id: doc.id,
-    documentType: doc.documentType,
-    documentDate: doc.documentDate,
-    createdAt: doc.createdAt,
-    uploadedAt: doc.uploadedAt,
+    id: normalised.id,
+    name: normalised.name,
+    documentType: normalised.documentType,
+    documentDate: normalised.documentDate,
+    createdAt: normalised.createdAt,
+    uploadedAt: normalised.uploadedAt,
+    inContext: normalised.inContext,
   }
-  const filtered = index.filter(e => e.id !== doc.id) // replace if re-saving
+  const filtered = index.filter(e => e.id !== normalised.id) // replace if re-saving
   await writeIndex([...filtered, entry])
 }
 
@@ -199,6 +227,34 @@ export async function loadDocument(id: string): Promise<LocalDocument | null> {
 export async function listDocuments(): Promise<DocumentIndexEntry[]> {
   const index = await readIndex()
   return index.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+
+// Toggle a single document's inContext flag. Updates the index entry and
+// the persisted LocalDocument file so the next read returns the new value.
+export async function setInContext(id: string, value: boolean): Promise<void> {
+  const index = await readIndex()
+  const idx = index.findIndex(e => e.id === id)
+  if (idx === -1) return
+  const updatedIndex = [...index]
+  updatedIndex[idx] = { ...updatedIndex[idx], inContext: value }
+  await writeIndex(updatedIndex)
+
+  // Mirror to the blob so loadDocument(id).inContext stays in sync.
+  const doc = await loadDocument(id)
+  if (doc) {
+    const updated: LocalDocument = { ...doc, inContext: value }
+    await storage.writeDocument(id, JSON.stringify(updated))
+  }
+}
+
+// Returns the full LocalDocument records (with cleanText) for every entry
+// currently flagged inContext=true. Used by the chat send path to inject
+// document text into the prompt.
+export async function listInContextDocuments(): Promise<LocalDocument[]> {
+  const index = await readIndex()
+  const inContext = index.filter(e => e.inContext)
+  const docs = await Promise.all(inContext.map(e => loadDocument(e.id)))
+  return docs.filter((d): d is LocalDocument => d !== null)
 }
 
 // ─────────────────────────────────────────────────────────────

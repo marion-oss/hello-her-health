@@ -1,0 +1,1977 @@
+<!DOCTYPE html>
+<html lang="en" data-concept="a">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Anoqi — Concept Designs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Inter:wght@200;300;400;500;600;700&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  /* ─────────────────────────────────────────────────────────────
+     ANOQI — Sanctuary Palette (locked from brand deck)
+     ───────────────────────────────────────────────────────────── */
+  :root {
+    --void: #0D0D12;
+    --surface: #16161E;
+    --surface-2: #1E1E28;
+    --fuchsia: #FF0472;
+    --warm-white: #FFF5EE;
+    --ember: #C4806A;
+    --dusk: #2E2030;
+
+    --display: 'Cormorant Garamond', 'Times New Roman', serif;
+    --body: 'Inter', system-ui, -apple-system, sans-serif;
+
+    --fuchsia-mix: 1;
+    --ember-mix: 1;
+    --type-contrast: 1;
+
+    --ease-breath: cubic-bezier(0.45, 0, 0.55, 1);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    background: #07070A;
+    color: var(--warm-white);
+    font-family: var(--body);
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: auto;
+  }
+
+  /* Concept switching — CSS-only */
+  .screen-variant, .note-variant { display: none; }
+  :root[data-concept="a"] .screen-variant[data-concept="a"],
+  :root[data-concept="b"] .screen-variant[data-concept="b"],
+  :root[data-concept="c"] .screen-variant[data-concept="c"],
+  :root[data-concept="a"] .note-variant[data-concept="a"],
+  :root[data-concept="b"] .note-variant[data-concept="b"],
+  :root[data-concept="c"] .note-variant[data-concept="c"] { display: block; }
+
+  /* ─────────────────────────────────────────────────────────────
+     Page chrome
+     ───────────────────────────────────────────────────────────── */
+  .page {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-height: 100vh;
+  }
+
+  header.bar {
+    padding: 28px 40px 24px;
+    border-bottom: 1px solid rgba(255, 245, 238, 0.06);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+  .bar-title {
+    font: 300 22px var(--display);
+    letter-spacing: 0.5px;
+  }
+  .bar-title em {
+    font-style: italic;
+    color: var(--ember);
+  }
+  .bar-title .dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--fuchsia);
+    margin-left: 4px;
+    transform: translateY(-10px);
+    animation: pulse-tl 4s var(--ease-breath) infinite;
+  }
+  .bar-subtitle {
+    font: 400 11px var(--body);
+    letter-spacing: 0.15em;
+    color: rgba(255, 245, 238, 0.4);
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .concepts {
+    display: flex;
+    gap: 8px;
+    padding: 4px;
+    background: rgba(255, 245, 238, 0.04);
+    border-radius: 999px;
+    border: 1px solid rgba(255, 245, 238, 0.06);
+  }
+  .concept-pill {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: rgba(255, 245, 238, 0.55);
+    font: 500 12px var(--body);
+    letter-spacing: 0.04em;
+    padding: 9px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: color 200ms var(--ease-breath), background 200ms var(--ease-breath);
+  }
+  .concept-pill:hover { color: rgba(255, 245, 238, 0.85); }
+  :root[data-concept="a"] .concept-pill[data-concept="a"],
+  :root[data-concept="b"] .concept-pill[data-concept="b"],
+  :root[data-concept="c"] .concept-pill[data-concept="c"] {
+    color: var(--warm-white);
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px rgba(255, 4, 114, calc(0.35 * var(--fuchsia-mix)));
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     Body layout
+     ───────────────────────────────────────────────────────────── */
+  main.body {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 40px;
+    padding: 32px 40px 40px;
+    align-items: start;
+  }
+
+  .controls {
+    position: sticky;
+    top: 24px;
+    padding: 24px 22px;
+    background: var(--surface);
+    border-radius: 18px;
+    border: 1px solid rgba(255, 245, 238, 0.05);
+  }
+  .controls h3 {
+    margin: 0 0 4px;
+    font: 300 22px var(--display);
+    letter-spacing: 0.3px;
+  }
+  .controls .sub {
+    font: 400 11px var(--body);
+    letter-spacing: 0.12em;
+    color: rgba(255, 245, 238, 0.4);
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+  .control { margin-bottom: 22px; }
+  .control:last-child { margin-bottom: 0; }
+  .control label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font: 500 12px var(--body);
+    letter-spacing: 0.04em;
+    margin-bottom: 8px;
+    color: rgba(255, 245, 238, 0.8);
+  }
+  .control label .val {
+    font: 400 11px var(--body);
+    color: var(--ember);
+    font-variant-numeric: tabular-nums;
+  }
+  .control input[type="range"] {
+    width: 100%;
+    appearance: none;
+    height: 2px;
+    background: rgba(255, 245, 238, 0.12);
+    border-radius: 999px;
+    outline: none;
+  }
+  .control input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--fuchsia);
+    cursor: pointer;
+    box-shadow: 0 0 0 4px rgba(255, 4, 114, 0.15);
+  }
+  .control input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--fuchsia);
+    cursor: pointer;
+  }
+
+  .concept-note {
+    margin-top: 28px;
+    padding-top: 22px;
+    border-top: 1px solid rgba(255, 245, 238, 0.06);
+  }
+  .concept-note .label {
+    font: 600 10px var(--body);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--fuchsia);
+    margin-bottom: 8px;
+  }
+  .concept-note .name {
+    font: 400 20px var(--display);
+    margin-bottom: 8px;
+  }
+  .concept-note .desc {
+    font: 300 13px var(--body);
+    line-height: 1.5;
+    color: rgba(255, 245, 238, 0.6);
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     Phone row
+     ───────────────────────────────────────────────────────────── */
+  .phones {
+    display: flex;
+    gap: 36px;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 8px 4px;
+    overflow-x: auto;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+  }
+  .phone-label {
+    font: 500 10px var(--body);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(255, 245, 238, 0.35);
+  }
+  .phone {
+    width: 340px;
+    height: 720px;
+    border-radius: 44px;
+    background: var(--void);
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+      0 30px 80px -20px rgba(0, 0, 0, 0.7),
+      0 0 0 1.5px rgba(255, 245, 238, 0.07),
+      inset 0 0 0 6px rgba(0, 0, 0, 0.4);
+  }
+  .phone::before {
+    content: "";
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 110px;
+    height: 30px;
+    background: #000;
+    border-radius: 16px;
+    z-index: 100;
+  }
+
+  .phone-status {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 28px 0;
+    z-index: 50;
+    pointer-events: none;
+    font: 600 13px var(--body);
+    color: var(--warm-white);
+    font-variant-numeric: tabular-nums;
+  }
+  .status-icons {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    opacity: 0.85;
+    font-size: 11px;
+    letter-spacing: -1px;
+  }
+
+  .phone-screen {
+    position: absolute;
+    inset: 54px 0 0 0;
+    overflow: hidden;
+    color: var(--warm-white);
+  }
+  .screen-variant.active-by-default { display: block; }
+
+  /* ─────────────────────────────────────────────────────────────
+     Animations
+     ───────────────────────────────────────────────────────────── */
+  @keyframes pulse-tl {
+    0%, 100% { opacity: 0.9; transform: scale(1) translateY(-10px); }
+    50% { opacity: 0.55; transform: scale(0.82) translateY(-10px); }
+  }
+  @keyframes pulse-il {
+    0%, 100% { opacity: 0.9; transform: scale(1); }
+    50% { opacity: 0.55; transform: scale(0.82); }
+  }
+  @keyframes breathe-form {
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50% { opacity: 0.75; transform: scale(1.04); }
+  }
+  @keyframes typing-dot {
+    0%, 60%, 100% { opacity: 0.25; transform: scale(0.7); }
+    30% { opacity: 1; transform: scale(1); }
+  }
+
+  /* Wordmark */
+  .wordmark {
+    font: 200 24px var(--body);
+    letter-spacing: -0.01em;
+    color: var(--warm-white);
+    display: inline-flex;
+    align-items: flex-start;
+  }
+  .wordmark .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--fuchsia);
+    margin: 6px 0 0 3px;
+    animation: pulse-il 4s var(--ease-breath) infinite;
+    flex-shrink: 0;
+  }
+  .wordmark.large { font-size: 40px; }
+  .wordmark.large .dot { width: 9px; height: 9px; margin-top: 11px; }
+  .wordmark.s { font-size: 18px; }
+  .wordmark.s .dot { width: 4px; height: 4px; margin: 4px 0 0 2px; }
+  .wordmark.xs { font-size: 14px; }
+  .wordmark.xs .dot { width: 3px; height: 3px; margin: 3px 0 0 2px; }
+  .wordmark.m { font-size: 16px; }
+  .wordmark.m .dot { width: 4px; height: 4px; margin: 4px 0 0 2px; }
+
+  /* Shared screen utilities */
+  .scr { width: 100%; height: 100%; position: relative; overflow: hidden; }
+  .eyebrow {
+    font: 500 9px var(--body);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(255, 245, 238, 0.4);
+  }
+  .eyebrow.fuchsia { color: rgba(255, 4, 114, calc(0.85 * var(--fuchsia-mix))); }
+  .eyebrow.ember  { color: rgba(196, 128, 106, calc(0.95 * var(--ember-mix))); }
+
+  /* ─────────────────────────────────────────────────────────────
+     CONCEPT A — Chunky Sanctuary
+     ───────────────────────────────────────────────────────────── */
+  .a-welcome {
+    background: var(--void);
+    height: 100%;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+  }
+  .a-welcome .slab {
+    background: var(--surface);
+    border-radius: 28px;
+    padding: 22px 22px 26px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+  .a-welcome .slab::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      120% 60% at 50% 0%,
+      rgba(196, 128, 106, calc(0.18 * var(--ember-mix))) 0%,
+      transparent 60%
+    );
+    pointer-events: none;
+  }
+  .a-welcome .slab > * { position: relative; z-index: 1; }
+  .a-welcome .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 28px;
+  }
+  .pill-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px 6px 8px;
+    border-radius: 999px;
+    background: rgba(255, 245, 238, 0.05);
+    border: 1px solid rgba(255, 245, 238, 0.08);
+    font: 500 9px var(--body);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 245, 238, 0.7);
+  }
+  .pill-tag::before {
+    content: "";
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--ember);
+    box-shadow: 0 0 8px rgba(196, 128, 106, calc(0.6 * var(--ember-mix)));
+  }
+  .a-welcome h1 {
+    margin: auto 0;
+    font: 400 calc(54px * var(--type-contrast)) var(--display);
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+  }
+  .a-welcome h1 .l { display: block; }
+  .a-welcome h1 .it { font-style: italic; font-weight: 500; }
+  .a-welcome h1 .em { color: var(--ember); }
+  .a-welcome .footer {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .a-welcome .trust {
+    font: 300 11px var(--body);
+    color: rgba(255, 245, 238, 0.5);
+    line-height: 1.4;
+  }
+  .cta-pill {
+    appearance: none;
+    border: 0;
+    background: var(--fuchsia);
+    color: var(--warm-white);
+    font: 500 14px var(--body);
+    letter-spacing: 0.02em;
+    padding: 16px 22px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    cursor: pointer;
+    width: 100%;
+    transition: transform 160ms var(--ease-breath);
+    opacity: calc(0.6 + 0.4 * var(--fuchsia-mix));
+  }
+  .cta-pill:active { transform: scale(0.97); }
+  .cta-pill .arrow {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: rgba(255, 245, 238, 0.18);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+
+  .a-home {
+    background: var(--void);
+    padding: 12px 14px 18px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .a-home .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px 4px;
+  }
+  .a-home .greeting-card,
+  .a-home .insight-card {
+    background: var(--surface);
+    border-radius: 24px;
+    padding: 20px 22px 22px;
+    position: relative;
+    overflow: hidden;
+  }
+  .a-home .greeting-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(80% 50% at 100% 0%, rgba(196, 128, 106, calc(0.18 * var(--ember-mix))) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .a-home .greeting-card .bonjour {
+    font: 500 9px var(--body);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(255, 245, 238, 0.45);
+    margin-bottom: 10px;
+  }
+  .a-home .greeting-card h2 {
+    margin: 0;
+    font: 400 38px var(--display);
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
+  .a-home .greeting-card h2 .it { font-style: italic; color: var(--ember); }
+  .a-home .insight-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .a-home .insight-card .ribbon {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .a-home .insight-card .body {
+    font: 400 24px var(--display);
+    line-height: 1.18;
+    color: var(--warm-white);
+  }
+  .a-home .insight-card .body em {
+    font-style: italic;
+    color: var(--ember);
+  }
+  .a-home .insight-card .meta {
+    font: 300 12px var(--body);
+    color: rgba(255, 245, 238, 0.5);
+    margin-top: 12px;
+    line-height: 1.5;
+  }
+  .a-home .insight-card .progress {
+    height: 2px;
+    background: rgba(255, 245, 238, 0.08);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 18px;
+    position: relative;
+  }
+  .a-home .insight-card .progress::after {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 62%;
+    background: linear-gradient(90deg, var(--fuchsia), var(--ember));
+    border-radius: 999px;
+    opacity: calc(0.7 + 0.3 * var(--fuchsia-mix));
+  }
+  .a-home .insight-card .cta-pill { margin-top: auto; margin-top: 18px; }
+
+  .a-chat {
+    background: var(--void);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .a-chat .topbar {
+    padding: 8px 22px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 245, 238, 0.05);
+  }
+  .a-chat .topbar .back {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--surface);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: rgba(255, 245, 238, 0.7);
+  }
+  .a-chat .topbar .title {
+    font: 200 18px var(--body);
+    letter-spacing: -0.01em;
+  }
+  .a-chat .topbar .title .dot {
+    display: inline-block;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--fuchsia);
+    margin-left: 3px;
+    transform: translateY(-7px);
+    animation: pulse-il 4s var(--ease-breath) infinite;
+  }
+  .a-chat .stream {
+    flex: 1;
+    padding: 18px 16px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow: hidden;
+  }
+  .a-chat .bubble {
+    max-width: 84%;
+    padding: 16px 18px;
+    border-radius: 22px;
+    line-height: 1.42;
+  }
+  .a-chat .b-anoqi {
+    background: var(--surface);
+    border-bottom-left-radius: 8px;
+    align-self: flex-start;
+  }
+  .a-chat .b-anoqi .body {
+    font: 400 18px var(--display);
+    line-height: 1.25;
+  }
+  .a-chat .b-anoqi .body em { color: var(--ember); font-style: italic; }
+  .a-chat .b-user {
+    background: rgba(255, 4, 114, calc(0.78 * var(--fuchsia-mix)));
+    color: var(--warm-white);
+    border-bottom-right-radius: 8px;
+    align-self: flex-end;
+    font: 400 13px var(--body);
+    padding: 12px 16px;
+  }
+  .a-chat .source-chip {
+    margin-top: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: rgba(196, 128, 106, calc(0.12 * var(--ember-mix)));
+    border: 1px solid rgba(196, 128, 106, calc(0.3 * var(--ember-mix)));
+    font: 500 9px var(--body);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ember);
+  }
+  .a-chat .source-chip::before {
+    content: "";
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--ember);
+  }
+  .a-chat .typing {
+    align-self: flex-start;
+    display: inline-flex;
+    gap: 4px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-radius: 22px;
+    border-bottom-left-radius: 8px;
+  }
+  .a-chat .typing span {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--ember);
+    animation: typing-dot 1.4s var(--ease-breath) infinite;
+  }
+  .a-chat .typing span:nth-child(2) { animation-delay: 0.18s; }
+  .a-chat .typing span:nth-child(3) { animation-delay: 0.36s; }
+  .a-chat .input-bar {
+    padding: 10px 14px 18px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .a-chat .input-bar .field {
+    flex: 1;
+    background: var(--surface);
+    border-radius: 999px;
+    padding: 14px 18px;
+    font: 300 13px var(--body);
+    color: rgba(255, 245, 238, 0.45);
+    border: 1px solid rgba(255, 245, 238, 0.06);
+  }
+  .a-chat .input-bar .send {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--fuchsia);
+    color: var(--warm-white);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    border: 0;
+    cursor: pointer;
+    opacity: calc(0.55 + 0.45 * var(--fuchsia-mix));
+  }
+  .a-chat .input-bar .send:active { transform: scale(0.95); }
+
+  /* ─────────────────────────────────────────────────────────────
+     CONCEPT B — Iridescent
+     ───────────────────────────────────────────────────────────── */
+  .b-bg {
+    position: absolute;
+    inset: 0;
+    background: var(--void);
+    overflow: hidden;
+  }
+  .b-bg::before {
+    content: "";
+    position: absolute;
+    width: 120%; height: 60%;
+    top: -10%; left: -10%;
+    background: radial-gradient(
+      closest-side,
+      rgba(196, 128, 106, calc(0.32 * var(--ember-mix))) 0%,
+      rgba(196, 128, 106, 0) 70%
+    );
+    filter: blur(40px);
+    animation: breathe-form 7s var(--ease-breath) infinite;
+  }
+  .b-bg::after {
+    content: "";
+    position: absolute;
+    width: 90%; height: 50%;
+    bottom: -10%; right: -10%;
+    background: radial-gradient(
+      closest-side,
+      rgba(255, 4, 114, calc(0.18 * var(--fuchsia-mix))) 0%,
+      rgba(255, 4, 114, 0) 70%
+    );
+    filter: blur(50px);
+    animation: breathe-form 7s var(--ease-breath) infinite reverse;
+  }
+  .b-content {
+    position: relative;
+    z-index: 1;
+    height: 100%;
+    padding: 14px 18px 24px;
+    display: flex;
+    flex-direction: column;
+  }
+  .glass {
+    background: rgba(255, 245, 238, 0.05);
+    border: 1px solid rgba(255, 245, 238, 0.09);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border-radius: 22px;
+  }
+
+  .b-welcome .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+  }
+  .b-welcome .lang-toggle {
+    font: 500 10px var(--body);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(255, 245, 238, 0.55);
+  }
+  .b-welcome .lang-toggle .active { color: var(--warm-white); }
+  .b-welcome .hero-glass {
+    flex: 1;
+    margin-top: auto;
+    padding: 28px 26px 26px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    overflow: hidden;
+    position: relative;
+  }
+  .b-welcome .hero-glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      rgba(196, 128, 106, calc(0.08 * var(--ember-mix))) 0%,
+      rgba(255, 4, 114, calc(0.05 * var(--fuchsia-mix))) 100%
+    );
+    pointer-events: none;
+  }
+  .b-welcome .hero-glass > * { position: relative; }
+  .b-welcome h1 {
+    margin: 0 0 22px;
+    font: 400 calc(46px * var(--type-contrast)) var(--display);
+    font-style: italic;
+    line-height: 0.98;
+    letter-spacing: -0.01em;
+  }
+  .b-welcome h1 .l { display: block; }
+  .b-welcome h1 .em { color: var(--ember); }
+  .b-welcome .trust-row {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 22px;
+    font: 400 9px var(--body);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255, 245, 238, 0.55);
+  }
+  .b-welcome .trust-row span { position: relative; }
+  .b-welcome .trust-row span + span::before {
+    content: "·";
+    margin-right: 14px;
+    color: rgba(255, 245, 238, 0.3);
+    position: absolute;
+    left: -14px;
+  }
+  .glass-cta {
+    appearance: none;
+    background: rgba(255, 245, 238, 0.07);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 245, 238, 0.16);
+    color: var(--warm-white);
+    font: 500 13px var(--body);
+    padding: 16px 22px;
+    border-radius: 999px;
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: transform 160ms var(--ease-breath);
+  }
+  .glass-cta:active { transform: scale(0.97); }
+  .glass-cta .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--fuchsia);
+    margin-right: 10px;
+    box-shadow: 0 0 16px rgba(255, 4, 114, calc(0.5 * var(--fuchsia-mix)));
+    animation: pulse-il 4s var(--ease-breath) infinite;
+    display: inline-block;
+  }
+
+  .b-home .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    padding: 4px 4px 0;
+  }
+  .b-home .head-eyebrow {
+    font: 500 10px var(--body);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 245, 238, 0.55);
+  }
+  .b-home .greeting { margin: 4px 4px 18px; }
+  .b-home .greeting h2 {
+    margin: 0;
+    font: 400 36px var(--display);
+    line-height: 1;
+    letter-spacing: -0.01em;
+  }
+  .b-home .greeting h2 em {
+    font-style: italic;
+    color: var(--ember);
+  }
+  .b-home .greeting .sub {
+    margin-top: 6px;
+    font: 300 12px var(--body);
+    color: rgba(255, 245, 238, 0.6);
+  }
+  .b-home .insight {
+    padding: 22px;
+    margin-bottom: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .b-home .insight::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 4, 114, calc(0.06 * var(--fuchsia-mix))) 0%,
+      transparent 60%
+    );
+    pointer-events: none;
+  }
+  .b-home .insight .ribbon {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .b-home .insight .body {
+    font: 400 22px var(--display);
+    font-style: italic;
+    line-height: 1.18;
+    color: var(--warm-white);
+  }
+  .b-home .insight .meta {
+    margin-top: 10px;
+    font: 300 12px var(--body);
+    color: rgba(255, 245, 238, 0.55);
+    line-height: 1.5;
+  }
+  .b-home .insight .actions {
+    margin-top: 16px;
+    display: flex;
+    gap: 8px;
+  }
+  .b-home .insight .actions .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(255, 245, 238, 0.06);
+    border: 1px solid rgba(255, 245, 238, 0.1);
+    font: 500 10px var(--body);
+    letter-spacing: 0.06em;
+    color: var(--warm-white);
+  }
+  .b-home .insight .actions .chip.fuchsia {
+    background: rgba(255, 4, 114, calc(0.18 * var(--fuchsia-mix)));
+    border-color: rgba(255, 4, 114, calc(0.4 * var(--fuchsia-mix)));
+    color: var(--warm-white);
+  }
+  .b-home .tracker {
+    padding: 18px 22px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .b-home .tracker .label {
+    font: 500 10px var(--body);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(255, 245, 238, 0.45);
+    margin-bottom: 10px;
+  }
+  .b-home .tracker .cycle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+  }
+  .b-home .tracker .cycle .day {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(255, 245, 238, 0.06);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font: 500 9px var(--body);
+    color: rgba(255, 245, 238, 0.4);
+  }
+  .b-home .tracker .cycle .day.now {
+    background: var(--fuchsia);
+    color: var(--warm-white);
+    opacity: calc(0.55 + 0.45 * var(--fuchsia-mix));
+  }
+  .b-home .tracker .cycle .day.past {
+    background: rgba(196, 128, 106, calc(0.18 * var(--ember-mix)));
+    color: rgba(196, 128, 106, calc(0.85 * var(--ember-mix)));
+  }
+  .b-home .tracker .phase {
+    font: 400 14px var(--display);
+    font-style: italic;
+    color: var(--ember);
+    margin-top: 14px;
+    text-align: center;
+  }
+
+  .b-chat .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 6px 14px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 245, 238, 0.06);
+  }
+  .b-chat .topbar .ai {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(255, 245, 238, 0.05);
+    border: 1px solid rgba(255, 245, 238, 0.08);
+    font: 500 11px var(--body);
+    letter-spacing: 0.08em;
+  }
+  .b-chat .topbar .ai .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--fuchsia);
+    animation: pulse-il 4s var(--ease-breath) infinite;
+    display: inline-block;
+  }
+  .b-chat .topbar .settings {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 245, 238, 0.05);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: rgba(255, 245, 238, 0.7);
+  }
+  .b-chat .stream {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 0 14px;
+    overflow: hidden;
+  }
+  .b-chat .bubble {
+    max-width: 86%;
+    padding: 14px 18px;
+    border-radius: 24px;
+    line-height: 1.42;
+  }
+  .b-chat .b-anoqi {
+    background: rgba(255, 245, 238, 0.05);
+    border: 1px solid rgba(255, 245, 238, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    align-self: flex-start;
+    border-bottom-left-radius: 6px;
+  }
+  .b-chat .b-anoqi .body {
+    font: 400 17px var(--display);
+    font-style: italic;
+    line-height: 1.28;
+  }
+  .b-chat .b-anoqi .body em {
+    font-style: normal;
+    color: var(--ember);
+  }
+  .b-chat .b-user {
+    background: rgba(255, 4, 114, calc(0.85 * var(--fuchsia-mix)));
+    color: var(--warm-white);
+    align-self: flex-end;
+    border-bottom-right-radius: 6px;
+    font: 400 13px var(--body);
+  }
+  .b-chat .source-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .b-chat .source-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: rgba(255, 245, 238, 0.05);
+    border: 1px solid rgba(196, 128, 106, calc(0.32 * var(--ember-mix)));
+    font: 500 9px var(--body);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ember);
+  }
+  .b-chat .input-bar {
+    margin-top: auto;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 4px 0;
+  }
+  .b-chat .field {
+    flex: 1;
+    padding: 13px 18px;
+    border-radius: 999px;
+    background: rgba(255, 245, 238, 0.05);
+    border: 1px solid rgba(255, 245, 238, 0.08);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    font: 300 13px var(--body);
+    color: rgba(255, 245, 238, 0.45);
+  }
+  .b-chat .send {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    background: var(--fuchsia);
+    color: var(--warm-white);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    box-shadow: 0 0 24px rgba(255, 4, 114, calc(0.45 * var(--fuchsia-mix)));
+    opacity: calc(0.55 + 0.45 * var(--fuchsia-mix));
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     CONCEPT C — Pure Brand Deck
+     ───────────────────────────────────────────────────────────── */
+  .c-bg {
+    position: absolute;
+    inset: 0;
+    background: var(--void);
+    overflow: hidden;
+  }
+  .c-bg .form-wrap {
+    position: absolute;
+    right: -10%;
+    bottom: 6%;
+    width: 460px;
+    height: 380px;
+    opacity: 0.85;
+    animation: breathe-form 7s var(--ease-breath) infinite;
+  }
+  .c-bg .form-wrap.deep {
+    right: -40%;
+    bottom: -20%;
+    opacity: 0.5;
+  }
+  .c-bg .form-wrap.deeper {
+    right: -30%;
+    bottom: -25%;
+    opacity: 0.4;
+  }
+  .c-bg .form-wrap svg { width: 100%; height: 100%; }
+
+  .c-content {
+    position: relative;
+    z-index: 1;
+    height: 100%;
+    padding: 14px 28px 28px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .c-welcome .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .c-welcome .lang {
+    font: 500 9px var(--body);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255, 245, 238, 0.45);
+  }
+  .c-welcome .lang .active { color: var(--warm-white); }
+  .c-welcome .copy-block { margin-top: auto; margin-bottom: 36px; }
+  .c-welcome .wordmark.large { margin-bottom: 32px; }
+  .c-welcome h1 {
+    margin: 0;
+    font: 400 calc(28px * var(--type-contrast)) var(--display);
+    font-style: italic;
+    line-height: 1.35;
+  }
+  .c-welcome h1 .l { display: block; }
+  .c-welcome h1 .em { color: var(--ember); }
+  .c-welcome .trust {
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 245, 238, 0.08);
+    font: 400 9px var(--body);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 245, 238, 0.45);
+    line-height: 1.6;
+  }
+  .c-welcome .start {
+    margin-top: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    font: 400 14px var(--display);
+    font-style: italic;
+    color: var(--warm-white);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    align-self: flex-start;
+  }
+  .c-welcome .start::after {
+    content: "→";
+    color: var(--fuchsia);
+    font-style: normal;
+    font-size: 16px;
+    font-family: var(--body);
+    transition: transform 200ms var(--ease-breath);
+  }
+  .c-welcome .start:hover::after { transform: translateX(4px); }
+
+  .c-home .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+  .c-home .greeting { margin-bottom: 26px; }
+  .c-home .greeting .eyebrow { margin-bottom: 8px; display: block; }
+  .c-home .greeting h2 {
+    margin: 0;
+    font: 400 38px var(--display);
+    font-style: italic;
+    line-height: 1;
+    letter-spacing: -0.01em;
+  }
+  .c-home .insight-block {
+    padding: 22px 0 24px;
+    border-top: 1px solid rgba(255, 245, 238, 0.08);
+    border-bottom: 1px solid rgba(255, 245, 238, 0.08);
+    margin-bottom: 24px;
+  }
+  .c-home .insight-block .eyebrow { margin-bottom: 12px; display: block; }
+  .c-home .insight-block .body {
+    font: 400 22px var(--display);
+    font-style: italic;
+    line-height: 1.25;
+    color: var(--warm-white);
+  }
+  .c-home .insight-block .body em {
+    font-style: normal;
+    color: var(--ember);
+  }
+  .c-home .insight-block .meta {
+    margin-top: 12px;
+    font: 300 12px var(--body);
+    color: rgba(255, 245, 238, 0.5);
+    line-height: 1.55;
+  }
+  .c-home .insight-block .source {
+    margin-top: 14px;
+    font: 500 9px var(--body);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ember);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .c-home .insight-block .source::before {
+    content: "";
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--ember);
+  }
+  .c-home .progress-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: auto;
+  }
+  .c-home .progress-row .label {
+    font: 500 9px var(--body);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(255, 245, 238, 0.45);
+    white-space: nowrap;
+  }
+  .c-home .progress-row .track {
+    flex: 1;
+    height: 1px;
+    background: rgba(255, 245, 238, 0.1);
+    position: relative;
+  }
+  .c-home .progress-row .track::after {
+    content: "";
+    position: absolute;
+    left: 0; top: -1px; bottom: -1px;
+    width: 62%;
+    background: var(--fuchsia);
+    opacity: calc(0.6 + 0.4 * var(--fuchsia-mix));
+  }
+  .c-home .progress-row .day {
+    font: 400 13px var(--display);
+    font-style: italic;
+    color: var(--ember);
+    white-space: nowrap;
+  }
+  .c-home .start {
+    margin-top: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    font: 400 16px var(--display);
+    font-style: italic;
+    color: var(--warm-white);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    align-self: flex-start;
+  }
+  .c-home .start::after {
+    content: "→";
+    color: var(--fuchsia);
+    font-style: normal;
+    font-size: 18px;
+    font-family: var(--body);
+  }
+
+  .c-chat .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 16px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid rgba(255, 245, 238, 0.06);
+  }
+  .c-chat .topbar .back {
+    font: 500 10px var(--body);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255, 245, 238, 0.55);
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+  .c-chat .topbar .back::before {
+    content: "← ";
+    color: var(--fuchsia);
+  }
+  .c-chat .stream {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    overflow: hidden;
+  }
+  .c-chat .msg {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .c-chat .msg .who {
+    font: 500 9px var(--body);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255, 245, 238, 0.4);
+  }
+  .c-chat .msg.anoqi .who { color: var(--fuchsia); opacity: calc(0.6 + 0.4 * var(--fuchsia-mix)); }
+  .c-chat .msg.user .who { text-align: right; color: rgba(255, 245, 238, 0.5); }
+  .c-chat .msg .body {
+    font: 400 18px var(--display);
+    font-style: italic;
+    line-height: 1.3;
+  }
+  .c-chat .msg .body em {
+    font-style: normal;
+    color: var(--ember);
+  }
+  .c-chat .msg.user .body {
+    font: 300 14px var(--body);
+    font-style: normal;
+    text-align: right;
+    color: rgba(255, 245, 238, 0.8);
+  }
+  .c-chat .source-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font: 500 9px var(--body);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ember);
+    margin-top: 6px;
+  }
+  .c-chat .source-line::before {
+    content: "";
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--ember);
+  }
+  .c-chat .input-bar {
+    margin-top: auto;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 245, 238, 0.06);
+  }
+  .c-chat .field {
+    flex: 1;
+    background: none;
+    border: 0;
+    font: 300 13px var(--body);
+    color: rgba(255, 245, 238, 0.45);
+    font-style: italic;
+  }
+  .c-chat .send {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--fuchsia);
+    box-shadow: 0 0 20px rgba(255, 4, 114, calc(0.5 * var(--fuchsia-mix)));
+    animation: pulse-il 4s var(--ease-breath) infinite;
+    flex-shrink: 0;
+    margin-right: 6px;
+    display: inline-block;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     Prompt output
+     ───────────────────────────────────────────────────────────── */
+  footer.prompt-zone {
+    padding: 28px 40px 40px;
+    border-top: 1px solid rgba(255, 245, 238, 0.06);
+    background: rgba(0, 0, 0, 0.2);
+  }
+  .prompt-card {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: var(--surface);
+    border: 1px solid rgba(255, 245, 238, 0.06);
+    border-radius: 18px;
+    padding: 24px 26px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: start;
+  }
+  .prompt-card pre {
+    margin: 0;
+    font: 400 13px var(--body);
+    color: rgba(255, 245, 238, 0.78);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .prompt-card .copy {
+    appearance: none;
+    border: 0;
+    background: var(--fuchsia);
+    color: var(--warm-white);
+    padding: 12px 18px;
+    border-radius: 999px;
+    font: 500 12px var(--body);
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: transform 160ms var(--ease-breath), background 200ms var(--ease-breath);
+    align-self: flex-start;
+    white-space: nowrap;
+  }
+  .prompt-card .copy:active { transform: scale(0.97); }
+  .prompt-card .copy.copied { background: var(--ember); }
+</style>
+</head>
+<body>
+
+<!-- Reusable breathing-form SVG, referenced via <use> -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <radialGradient id="bf-fill" cx="55%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="rgba(46,32,48,0.55)" />
+      <stop offset="100%" stop-color="rgba(46,32,48,0)" />
+    </radialGradient>
+    <radialGradient id="bf-spot" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="rgba(255,245,238,0.5)" />
+      <stop offset="100%" stop-color="rgba(196,128,106,0.05)" />
+    </radialGradient>
+    <symbol id="breathing-form" viewBox="0 0 460 380">
+      <ellipse cx="260" cy="220" rx="220" ry="140" fill="url(#bf-fill)" />
+      <ellipse cx="260" cy="220" rx="200" ry="120" fill="none"
+               stroke="rgba(255,4,114,0.18)" stroke-width="0.7" />
+      <ellipse cx="260" cy="220" rx="165" ry="100" fill="none"
+               stroke="rgba(255,4,114,0.13)" stroke-width="0.7" />
+      <circle cx="220" cy="195" r="32" fill="url(#bf-spot)" />
+      <circle cx="218" cy="194" r="6" fill="rgba(255,245,238,0.75)" />
+    </symbol>
+  </defs>
+</svg>
+
+<div class="page">
+
+  <header class="bar">
+    <div>
+      <div class="bar-title">anoqi<span class="dot"></span> <em>concepts</em></div>
+      <div class="bar-subtitle">Three directions · Sanctuary Palette · Pick before redesign</div>
+    </div>
+    <nav class="concepts" role="tablist">
+      <button class="concept-pill" data-concept="a">A · Chunky Sanctuary</button>
+      <button class="concept-pill" data-concept="b">B · Iridescent</button>
+      <button class="concept-pill" data-concept="c">C · Pure Deck</button>
+    </nav>
+  </header>
+
+  <main class="body">
+
+    <aside class="controls">
+      <h3>Fine tune</h3>
+      <div class="sub">Live · adjusts all 3 phones</div>
+
+      <div class="control">
+        <label>Fuchsia intensity <span class="val" id="val-fuchsia">1.00</span></label>
+        <input type="range" id="ctrl-fuchsia" min="0.4" max="1.2" step="0.05" value="1" />
+      </div>
+
+      <div class="control">
+        <label>Ember warmth <span class="val" id="val-ember">1.00</span></label>
+        <input type="range" id="ctrl-ember" min="0" max="1.5" step="0.05" value="1" />
+      </div>
+
+      <div class="control">
+        <label>Display contrast <span class="val" id="val-contrast">1.00</span></label>
+        <input type="range" id="ctrl-contrast" min="0.8" max="1.3" step="0.05" value="1" />
+      </div>
+
+      <div class="concept-note">
+        <div class="note-variant" data-concept="a">
+          <div class="label">Concept A</div>
+          <div class="name">Chunky Sanctuary</div>
+          <div class="desc">Translates the box-format reference into the Sanctuary palette. Chunky Surface cards, huge italic Cormorant display, fuchsia signal at low frequency, Ember warmth in radial sheens. Decisive, almost editorial-poster.</div>
+        </div>
+        <div class="note-variant" data-concept="b">
+          <div class="label">Concept B</div>
+          <div class="name">Iridescent Sanctuary</div>
+          <div class="desc">Brings the soft glassmorphic AI-assistant aesthetic onto Void canvas. Surfaces are frosted with subtle ember/fuchsia gradients underneath. Lighter, dreamier, less committed than A. Best for evening / quiet moments.</div>
+        </div>
+        <div class="note-variant" data-concept="c">
+          <div class="label">Concept C</div>
+          <div class="name">Pure Brand Deck</div>
+          <div class="desc">Faithful to the PDF: Void canvas, generous space, italic Cormorant copy, the breathing-form ellipse low and right, fuchsia used only as a 6–8px dot and one arrow. Quietest of the three; most editorial.</div>
+        </div>
+      </div>
+    </aside>
+
+    <section class="phones">
+
+      <!-- ═══════════════════════════════════════════════════════════
+           PHONE 1 — Welcome
+           ═══════════════════════════════════════════════════════════ -->
+      <div class="phone-wrap">
+        <span class="phone-label">Welcome · First launch</span>
+        <div class="phone">
+          <div class="phone-status">
+            <span>9:41</span>
+            <span class="status-icons">●●●● ⌃ ▮</span>
+          </div>
+          <div class="phone-screen">
+
+            <!-- A — Welcome -->
+            <div class="screen-variant" data-concept="a">
+              <div class="scr a-welcome">
+                <div class="slab">
+                  <div class="top">
+                    <span class="wordmark">anoqi<span class="dot"></span></span>
+                    <span class="pill-tag">Jour 1 · FR</span>
+                  </div>
+                  <h1>
+                    <span class="l">Mieux</span>
+                    <span class="l it">informée.</span>
+                    <span class="l" style="margin-top:6px">Mieux</span>
+                    <span class="l it em">entendue.</span>
+                  </h1>
+                  <div class="footer">
+                    <div class="trust">Privé. Sourcé. Centré sur vous.<br />Aucun jugement, jamais.</div>
+                    <button class="cta-pill">Commencer<span class="arrow">→</span></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- B — Welcome -->
+            <div class="screen-variant" data-concept="b">
+              <div class="scr b-welcome">
+                <div class="b-bg"></div>
+                <div class="b-content">
+                  <div class="top">
+                    <span class="wordmark">anoqi<span class="dot"></span></span>
+                    <span class="lang-toggle"><span class="active">FR</span> · EN</span>
+                  </div>
+                  <div class="hero-glass glass">
+                    <h1>
+                      <span class="l">Mieux</span>
+                      <span class="l em">informée.</span>
+                      <span class="l">Mieux</span>
+                      <span class="l em">entendue.</span>
+                    </h1>
+                    <div class="trust-row">
+                      <span>Précision</span>
+                      <span>Biology-first</span>
+                      <span>Privé</span>
+                    </div>
+                    <button class="glass-cta">
+                      <span><span class="dot"></span>Commencer</span>
+                      <span>→</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- C — Welcome -->
+            <div class="screen-variant" data-concept="c">
+              <div class="scr c-welcome">
+                <div class="c-bg">
+                  <div class="form-wrap"><svg><use href="#breathing-form" /></svg></div>
+                </div>
+                <div class="c-content">
+                  <div class="top">
+                    <span class="wordmark">anoqi<span class="dot"></span></span>
+                    <span class="lang"><span class="active">FR</span> · EN</span>
+                  </div>
+                  <div class="copy-block">
+                    <span class="wordmark large">anoqi<span class="dot"></span></span>
+                    <h1>
+                      <span class="l">Mieux informée.</span>
+                      <span class="l em">Mieux entendue.</span>
+                    </h1>
+                    <button class="start">Commencer</button>
+                  </div>
+                  <div class="trust">Precision women health · Full lifecycle · Biology-first</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════════
+           PHONE 2 — Home / Your Day
+           ═══════════════════════════════════════════════════════════ -->
+      <div class="phone-wrap">
+        <span class="phone-label">Your day · Home</span>
+        <div class="phone">
+          <div class="phone-status">
+            <span>9:41</span>
+            <span class="status-icons">●●●● ⌃ ▮</span>
+          </div>
+          <div class="phone-screen">
+
+            <!-- A — Home -->
+            <div class="screen-variant" data-concept="a">
+              <div class="scr a-home">
+                <div class="head">
+                  <span class="wordmark s">anoqi<span class="dot"></span></span>
+                  <span class="pill-tag">Jour 18 · Lutéale</span>
+                </div>
+                <div class="greeting-card">
+                  <div class="bonjour">Bonjour · Marie</div>
+                  <h2>Aujourd'<span class="it">hui.</span></h2>
+                </div>
+                <div class="insight-card">
+                  <div class="ribbon">
+                    <span class="eyebrow fuchsia">Votre insight</span>
+                    <span class="eyebrow">Source · NHS</span>
+                  </div>
+                  <div class="body">Votre œstrogène baisse. C'est votre <em>phase lutéale</em>.</div>
+                  <div class="meta">Énergie plus basse cette semaine — c'est attendu, pas de la fatigue.</div>
+                  <div class="progress"></div>
+                  <button class="cta-pill">Préparer ma consultation<span class="arrow">→</span></button>
+                </div>
+              </div>
+            </div>
+
+            <!-- B — Home -->
+            <div class="screen-variant" data-concept="b">
+              <div class="scr b-home">
+                <div class="b-bg"></div>
+                <div class="b-content">
+                  <div class="head">
+                    <span class="wordmark s">anoqi<span class="dot"></span></span>
+                    <span class="head-eyebrow">Jour 18 · Lutéale</span>
+                  </div>
+                  <div class="greeting">
+                    <h2>Bonjour, <em>Marie</em>.</h2>
+                    <div class="sub">Voici ce que votre corps vous dit aujourd'hui.</div>
+                  </div>
+                  <div class="insight glass">
+                    <div class="ribbon">
+                      <span class="eyebrow fuchsia">Votre insight</span>
+                      <span class="eyebrow">11:24</span>
+                    </div>
+                    <div class="body">Votre œstrogène baisse — c'est votre <em>phase lutéale</em>.</div>
+                    <div class="meta">Énergie plus basse cette semaine. Source : NHS · HAS.</div>
+                    <div class="actions">
+                      <span class="chip fuchsia">Préparer une consultation</span>
+                      <span class="chip">En savoir plus</span>
+                    </div>
+                  </div>
+                  <div class="tracker glass">
+                    <div class="label">Cycle · 28 jours</div>
+                    <div class="cycle">
+                      <span class="day past">14</span>
+                      <span class="day past">15</span>
+                      <span class="day past">16</span>
+                      <span class="day past">17</span>
+                      <span class="day now">18</span>
+                      <span class="day">19</span>
+                      <span class="day">20</span>
+                      <span class="day">21</span>
+                      <span class="day">22</span>
+                    </div>
+                    <div class="phase">Lutéale tardive</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- C — Home -->
+            <div class="screen-variant" data-concept="c">
+              <div class="scr c-home">
+                <div class="c-bg">
+                  <div class="form-wrap deep"><svg><use href="#breathing-form" /></svg></div>
+                </div>
+                <div class="c-content">
+                  <div class="head">
+                    <span class="wordmark m">anoqi<span class="dot"></span></span>
+                    <span class="eyebrow">Jour 18 · Lutéale</span>
+                  </div>
+                  <div class="greeting">
+                    <span class="eyebrow">Bonjour, Marie</span>
+                    <h2>Aujourd'hui.</h2>
+                  </div>
+                  <div class="insight-block">
+                    <span class="eyebrow fuchsia">Votre insight</span>
+                    <div class="body">Votre œstrogène baisse. C'est votre <em>phase lutéale</em>, pas de la fatigue.</div>
+                    <div class="meta">L'énergie peut être plus basse cette semaine. C'est attendu.</div>
+                    <div class="source">Source · NHS · HAS</div>
+                  </div>
+                  <div class="progress-row">
+                    <span class="label">Cycle</span>
+                    <span class="track"></span>
+                    <span class="day">Jour 18</span>
+                  </div>
+                  <button class="start">Préparer ma consultation</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════════
+           PHONE 3 — Chat with Anoqi
+           ═══════════════════════════════════════════════════════════ -->
+      <div class="phone-wrap">
+        <span class="phone-label">Chat with Anoqi</span>
+        <div class="phone">
+          <div class="phone-status">
+            <span>9:41</span>
+            <span class="status-icons">●●●● ⌃ ▮</span>
+          </div>
+          <div class="phone-screen">
+
+            <!-- A — Chat -->
+            <div class="screen-variant" data-concept="a">
+              <div class="scr a-chat">
+                <div class="topbar">
+                  <span class="back">←</span>
+                  <span class="title">anoqi<span class="dot"></span></span>
+                  <span class="back" style="font-size:16px">⋯</span>
+                </div>
+                <div class="stream">
+                  <div class="bubble b-anoqi">
+                    <div class="body">Votre cortisol était élevé — <em>votre corps est sous stress</em>. Voyons ce que ça signifie.</div>
+                    <span class="source-chip">Source · HAS</span>
+                  </div>
+                  <div class="bubble b-user">Qu'est-ce que je peux faire ce soir ?</div>
+                  <div class="bubble b-anoqi" style="max-width:78%">
+                    <div class="body">Trois pistes très concrètes, on peut commencer par <em>celle qui vous parle</em>.</div>
+                  </div>
+                  <div class="typing"><span></span><span></span><span></span></div>
+                </div>
+                <div class="input-bar">
+                  <div class="field">Posez votre question…</div>
+                  <button class="send">↑</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- B — Chat -->
+            <div class="screen-variant" data-concept="b">
+              <div class="scr b-chat">
+                <div class="b-bg"></div>
+                <div class="b-content">
+                  <div class="topbar">
+                    <span class="ai"><span class="dot"></span> anoqi · médicale</span>
+                    <span class="settings">⚙</span>
+                  </div>
+                  <div class="stream">
+                    <div class="bubble b-anoqi">
+                      <div class="body">Votre cortisol était élevé. Votre corps est <em>sous stress</em>. Voyons ce que ça signifie pour vous.</div>
+                      <div class="source-row">
+                        <span class="source-chip">NHS</span>
+                        <span class="source-chip">HAS</span>
+                      </div>
+                    </div>
+                    <div class="bubble b-user">Qu'est-ce que je peux faire ce soir ?</div>
+                    <div class="bubble b-anoqi" style="max-width:80%">
+                      <div class="body">Trois pistes, douces, à essayer dans l'ordre <em>qui vous parle</em>.</div>
+                    </div>
+                  </div>
+                  <div class="input-bar">
+                    <div class="field">Posez votre question…</div>
+                    <button class="send">↑</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- C — Chat -->
+            <div class="screen-variant" data-concept="c">
+              <div class="scr c-chat">
+                <div class="c-bg">
+                  <div class="form-wrap deeper"><svg><use href="#breathing-form" /></svg></div>
+                </div>
+                <div class="c-content">
+                  <div class="topbar">
+                    <button class="back">Retour</button>
+                    <span class="wordmark xs">anoqi<span class="dot"></span></span>
+                    <span style="width:42px"></span>
+                  </div>
+                  <div class="stream">
+                    <div class="msg anoqi">
+                      <span class="who">Anoqi · 11:24</span>
+                      <div class="body">Votre cortisol était élevé — <em>votre corps est sous stress</em>. Voyons ce que ça signifie pour vous.</div>
+                      <span class="source-line">Source · HAS · NHS</span>
+                    </div>
+                    <div class="msg user">
+                      <span class="who">Vous · 11:25</span>
+                      <div class="body">Qu'est-ce que je peux faire ce soir ?</div>
+                    </div>
+                    <div class="msg anoqi">
+                      <span class="who">Anoqi · maintenant</span>
+                      <div class="body">Trois pistes — douces, dans l'ordre <em>qui vous parle</em>.</div>
+                    </div>
+                  </div>
+                  <div class="input-bar">
+                    <div class="field">Posez votre question…</div>
+                    <span class="send"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer class="prompt-zone">
+    <div class="prompt-card">
+      <pre id="prompt"></pre>
+      <button class="copy" id="copy-btn">Copy prompt</button>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  // ─────────────────────────────────────────────────────────────
+  // State (no innerHTML usage anywhere; only attrs + textContent)
+  // ─────────────────────────────────────────────────────────────
+  const state = {
+    concept: 'a',
+    fuchsia: 1,
+    ember: 1,
+    contrast: 1,
+  };
+  const DEFAULTS = { fuchsia: 1, ember: 1, contrast: 1 };
+
+  const CONCEPT_TEXT = {
+    a: {
+      name: 'Chunky Sanctuary',
+      desc: 'Translates the box-format reference into the Sanctuary palette. Chunky Surface cards, huge italic Cormorant display, fuchsia signal at low frequency, Ember warmth in radial sheens. Decisive, almost editorial-poster.',
+    },
+    b: {
+      name: 'Iridescent Sanctuary',
+      desc: 'Brings the soft glassmorphic AI-assistant aesthetic onto Void canvas. Surfaces are frosted with subtle ember/fuchsia gradients underneath. Lighter, dreamier, less committed than A. Best for evening / quiet moments.',
+    },
+    c: {
+      name: 'Pure Brand Deck',
+      desc: 'Faithful to the PDF: Void canvas, generous space, italic Cormorant copy, the breathing-form ellipse low and right, fuchsia used only as a small dot and one arrow. Quietest of the three; most editorial.',
+    },
+  };
+
+  const root = document.documentElement;
+  const promptEl = document.getElementById('prompt');
+  const copyBtn = document.getElementById('copy-btn');
+
+  function applyState() {
+    root.setAttribute('data-concept', state.concept);
+    root.style.setProperty('--fuchsia-mix', state.fuchsia);
+    root.style.setProperty('--ember-mix', state.ember);
+    root.style.setProperty('--type-contrast', state.contrast);
+
+    document.getElementById('val-fuchsia').textContent = state.fuchsia.toFixed(2);
+    document.getElementById('val-ember').textContent = state.ember.toFixed(2);
+    document.getElementById('val-contrast').textContent = state.contrast.toFixed(2);
+
+    updatePrompt();
+  }
+
+  function updatePrompt() {
+    const c = CONCEPT_TEXT[state.concept];
+    const parts = [];
+
+    if (Math.abs(state.fuchsia - DEFAULTS.fuchsia) > 0.01) {
+      const phrase = state.fuchsia < 0.8
+        ? 'a more whispered fuchsia signal'
+        : state.fuchsia > 1.1
+        ? 'a more emphatic fuchsia signal'
+        : 'fuchsia intensity at ' + state.fuchsia.toFixed(2);
+      parts.push(phrase);
+    }
+    if (Math.abs(state.ember - DEFAULTS.ember) > 0.01) {
+      const phrase = state.ember < 0.5
+        ? 'almost no ember warmth (let void carry the room)'
+        : state.ember > 1.2
+        ? 'more ember warmth than the deck suggests'
+        : 'ember warmth at ' + state.ember.toFixed(2);
+      parts.push(phrase);
+    }
+    if (Math.abs(state.contrast - DEFAULTS.contrast) > 0.01) {
+      const phrase = state.contrast < 0.95
+        ? 'a quieter display size'
+        : state.contrast > 1.1
+        ? 'a more dramatic display size'
+        : 'display contrast at ' + state.contrast.toFixed(2);
+      parts.push(phrase);
+    }
+
+    const tuning = parts.length ? ' Apply these tunings: ' + parts.join('; ') + '.' : '';
+
+    const text =
+      'Build the Anoqi production redesign as Concept ' + state.concept.toUpperCase() + ' — ' +
+      c.name + '. ' + c.desc + ' ' +
+      'Lock to the Sanctuary Palette from /Users/marcelo/Downloads/anoqi-brand-system.pdf: ' +
+      'Void #0D0D12 canvas, Surface #16161E cards, Fuchsia #FF0472 as the signal (ghosted, not structural), ' +
+      'Warm White #FFF5EE for type, Ember #C4806A as the warmth wash, Dusk #2E2030 for ghost borders. ' +
+      'Display font: Cormorant Garamond (italic for hero copy). Body: Inter Light/Regular. ' +
+      'Tone: "the precise friend who went to medical school" — Calm-not-flat, Warm-not-soft, Precise-not-cold, Confident-not-loud. ' +
+      'French primary, English secondary. The fuchsia logo dot pulses on a 4s breath cycle.' +
+      tuning;
+
+    promptEl.textContent = text;
+  }
+
+  // Events
+  document.querySelectorAll('.concept-pill').forEach(function (pill) {
+    pill.addEventListener('click', function () {
+      state.concept = pill.dataset.concept;
+      applyState();
+    });
+  });
+
+  document.getElementById('ctrl-fuchsia').addEventListener('input', function (e) {
+    state.fuchsia = parseFloat(e.target.value);
+    applyState();
+  });
+  document.getElementById('ctrl-ember').addEventListener('input', function (e) {
+    state.ember = parseFloat(e.target.value);
+    applyState();
+  });
+  document.getElementById('ctrl-contrast').addEventListener('input', function (e) {
+    state.contrast = parseFloat(e.target.value);
+    applyState();
+  });
+
+  copyBtn.addEventListener('click', async function () {
+    try {
+      await navigator.clipboard.writeText(promptEl.textContent);
+      copyBtn.textContent = 'Copied';
+      copyBtn.classList.add('copied');
+      setTimeout(function () {
+        copyBtn.textContent = 'Copy prompt';
+        copyBtn.classList.remove('copied');
+      }, 1400);
+    } catch (err) {
+      copyBtn.textContent = 'Copy failed';
+      setTimeout(function () { copyBtn.textContent = 'Copy prompt'; }, 1400);
+    }
+  });
+
+  // First render
+  applyState();
+</script>
+
+</body>
+</html>

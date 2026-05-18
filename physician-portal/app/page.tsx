@@ -1,23 +1,10 @@
 import Link from 'next/link'
-import { getSupabase, type ClinicalPathway, type PathwayStatus } from '../lib/supabase'
+import { getSupabase, type ClinicalPathway } from '../lib/supabase'
+import { Card } from '../components/Card'
+import { Badge } from '../components/Badge'
+import { EmptyState } from '../components/EmptyState'
 
 export const dynamic = 'force-dynamic'
-
-const STATUS_STYLES: Record<PathwayStatus, string> = {
-  draft: 'bg-amber-100 text-amber-900 ring-amber-200',
-  in_review: 'bg-sky-100 text-sky-900 ring-sky-200',
-  approved: 'bg-emerald-100 text-emerald-900 ring-emerald-200',
-  live: 'bg-fuchsia-100 text-fuchsia-900 ring-fuchsia-300',
-  archived: 'bg-zinc-200 text-zinc-700 ring-zinc-300',
-}
-
-const STATUS_LABELS: Record<PathwayStatus, string> = {
-  draft: 'Brouillon',
-  in_review: 'En revue',
-  approved: 'Approuvé',
-  live: 'En production',
-  archived: 'Archivé',
-}
 
 async function loadPathways(): Promise<ClinicalPathway[]> {
   const { data, error } = await getSupabase()
@@ -39,13 +26,16 @@ export default async function HomePage() {
   return (
     <main className="mx-auto max-w-4xl px-6 py-12">
       <header className="mb-10">
-        <p className="text-sm font-medium uppercase tracking-wide text-fuchsia-600">
+        <p className="text-sm font-medium uppercase tracking-[0.18em] text-peony-600">
           Anoqi
         </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-zinc-900">
+        <h1
+          className="mt-2 text-4xl tracking-tight text-ink-900"
+          style={{ fontFamily: 'var(--font-display)', fontWeight: 800, lineHeight: 1.05 }}
+        >
           Parcours cliniques
         </h1>
-        <p className="mt-2 text-sm text-zinc-600">
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-teal-700">
           Aperçu en lecture seule des parcours en revue clinique.{' '}
           Les modifications passent par un workflow d&apos;approbation
           (v1, à venir).
@@ -53,40 +43,52 @@ export default async function HomePage() {
       </header>
 
       {pathways.length === 0 ? (
-        <p className="rounded-lg border border-zinc-200 bg-zinc-50 p-6 text-sm text-zinc-600">
-          Aucun parcours actif pour l&apos;instant.
-        </p>
+        <EmptyState
+          title="Aucun parcours actif"
+          body="Aucun parcours n'est en revue clinique pour l'instant. Revenez bientôt — les premières fiches arrivent."
+        />
       ) : (
         <ul className="space-y-3">
           {pathways.map((p) => (
             <li key={p.id}>
-              <Link
-                href={`/pathways/${p.id}`}
-                className="block rounded-lg border border-zinc-200 bg-white p-5 transition hover:border-fuchsia-300 hover:shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="font-mono text-xs uppercase tracking-wide text-zinc-500">
-                      {p.pathway_key} · v{p.version}
-                    </p>
-                    <h2 className="mt-1 text-lg font-medium text-zinc-900">
-                      {p.title}
-                    </h2>
-                    {p.description && (
-                      <p className="mt-1 text-sm text-zinc-600">{p.description}</p>
-                    )}
+              <Card variant="quiet" className="pathway-card overflow-hidden">
+                <Link href={`/pathways/${p.id}`} className="block p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="font-mono text-xs uppercase tracking-[0.14em] text-teal-700">
+                        {p.pathway_key} · v{p.version}
+                      </p>
+                      <h2
+                        className="mt-2 text-lg tracking-tight text-ink-900"
+                        style={{ fontFamily: 'var(--font-display)', fontWeight: 800 }}
+                      >
+                        {p.title}
+                      </h2>
+                      {p.description && (
+                        <p className="mt-1.5 text-sm leading-relaxed text-teal-700">
+                          {p.description}
+                        </p>
+                      )}
+                    </div>
+                    <Badge status={p.status} />
                   </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${STATUS_STYLES[p.status]}`}
-                  >
-                    {STATUS_LABELS[p.status]}
-                  </span>
-                </div>
-              </Link>
+                </Link>
+              </Card>
             </li>
           ))}
         </ul>
       )}
+
+      <style>{`
+        .pathway-card {
+          transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+        }
+        .pathway-card:hover {
+          border-color: var(--border-strong) !important;
+          box-shadow: var(--shadow-md) !important;
+          background-color: var(--rose-100) !important;
+        }
+      `}</style>
     </main>
   )
 }
