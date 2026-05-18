@@ -1,14 +1,20 @@
-// Anoqi — HomeScreen (iridescent register).
+// Anoqi — HomeScreen (v2.0 Bloom register).
 //
-// Void canvas. A glass insight card with LiquidEmber breathing underneath
-// carries the day's main message ("Votre œstrogène baisse. C'est votre phase
-// lutéale."). Beneath it sits a glass cycle tracker, then editorial lists for
-// summaries and documents (kept lightweight — the insight is the moment).
+// White canvas. A low-intensity apricot bloom in the top-right. A prominent
+// "Commencer une conversation" fuchsia CTA — the home screen's reason to
+// exist is to get the user into chat. Below it: Insight, Documents,
+// Summaries, Cycle (coming soon) — in that order, per the v2.1 visual
+// review.
 //
-// Greeting is set in italic Cormorant Garamond with the user's name in
-// Ember; everything else is Inter for precision.
+// This screen wraps itself in <ThemeProvider mode="light"> so it picks up
+// the v2.0 tokens while the rest of the app (still on the v1.0 Sanctuary
+// dark theme) keeps rendering as it did. When App.tsx flips its default
+// mode to "light", the wrapper can come out.
+//
+// Mockup reference: Marion's home-screen mockup (2026-05-18). Layout
+// ordering is from that mockup; visual register is from BRAND.md.
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
   Platform,
   Pressable,
@@ -16,643 +22,437 @@ import {
   ScrollView,
   StatusBar,
   View,
+  useWindowDimensions,
 } from 'react-native'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated'
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import { useOnboarding, type HealthObjective } from '../../context/OnboardingContext'
-import { listDocuments } from '../../lib/documentStore'
-import { supabase } from '../../lib/supabase'
-import { hover, palette, useTheme } from '../../theme'
-import {
-  GoalSheet,
-  Icon,
-  type IconName,
-  LiquidEmber,
-  SectionTitle,
-  Text,
-  Wordmark,
-} from '../../components'
+import { ThemeProvider, useTheme, palette } from '../../theme'
+import { Text } from '../../components'
+import { listDocuments, type DocumentIndexEntry } from '../../lib/documentStore'
 
-const CHAT_INTENT_KEY = 'anoqi_chat_intent'
-
+// ─── COPY ──────────────────────────────────────────────────────────────────
 const COPY = {
   fr: {
     greetingMorning:   'Bonjour',
     greetingAfternoon: 'Bon après-midi',
     greetingEvening:   'Bonsoir',
-    todayLabel:        "Aujourd'hui",
-    focusAreaLabel:    'Ton focus',
-    changeFocus:       'Changer',
-    insightEyebrow:    'Votre insight',
+    waveEmoji:         '👋',
+    subtitle:          'Prête pour ta consultation ?',
+    cta:               'Commencer une conversation →',
+    insightEyebrow:    'Ton insight',
+    insightSource:     'NHS',
+    summariesTitle:    'Mes résumés',
+    summariesEmpty:    'Aucun résumé pour l\'instant',
+    summariesView:     'Voir →',
+    documentsTitle:    'Documents',
+    documentsEmpty:    'Ajoute tes ordonnances, analyses…',
+    documentsAdd:      'Ajouter →',
+    documentsCount:    (n: number) => `${n} document${n > 1 ? 's' : ''} en mémoire`,
     cycleTitle:        'Cycle',
-    phase:             'Bientôt disponible',
-    prepareConsult:    'Préparer une consultation',
-    learnMore:         'En savoir plus',
-    subhead:           "Pose-moi une question. Sans détour.",
-    talkCta:           "Parler à Anoqi",
-    summariesTitle:    'Tes résumés',
-    summariesEmpty:    "Tes résumés apparaîtront ici après quelques échanges.",
-    documentsTitle:    'Tes documents',
-    documentsUnit:     'document',
-    documentsView:     'Voir',
-    insightSourceLbl:  'Source',
-    knowledgeEyebrow:  'Savoir du jour',
-    knowledgeBody:     'Les fluctuations hormonales tout au long du cycle influencent ton énergie, ton humeur, et ta concentration. Comprendre ton schéma t\'aide à en tirer le meilleur.',
-    knowledgeSource:   'Cochrane',
+    cycleSoon:         'Bientôt disponible',
   },
   en: {
     greetingMorning:   'Good morning',
     greetingAfternoon: 'Good afternoon',
     greetingEvening:   'Good evening',
-    todayLabel:        'Today',
-    focusAreaLabel:    'Your focus',
-    changeFocus:       'Change',
+    waveEmoji:         '👋',
+    subtitle:          'Ready for your consultation?',
+    cta:               'Start a conversation →',
     insightEyebrow:    'Your insight',
+    insightSource:     'NHS',
+    summariesTitle:    'My summaries',
+    summariesEmpty:    'No summaries yet',
+    summariesView:     'View →',
+    documentsTitle:    'Documents',
+    documentsEmpty:    'Add prescriptions, lab results…',
+    documentsAdd:      'Add →',
+    documentsCount:    (n: number) => `${n} document${n > 1 ? 's' : ''} in memory`,
     cycleTitle:        'Cycle',
-    phase:             'Coming soon',
-    prepareConsult:    'Prepare a consultation',
-    learnMore:         'Learn more',
-    subhead:           "Ask me anything. No detours.",
-    talkCta:           "Talk to Anoqi",
-    summariesTitle:    'Your summaries',
-    summariesEmpty:    "Your summaries will appear here after a few exchanges.",
-    documentsTitle:    'Your documents',
-    documentsUnit:     'document',
-    documentsView:     'View',
-    insightSourceLbl:  'Source',
-    knowledgeEyebrow:  'Knowledge of the day',
-    knowledgeBody:     'Hormonal fluctuations throughout your cycle influence your energy, mood, and concentration. Understanding your pattern helps you make the most of it.',
-    knowledgeSource:   'Cochrane',
+    cycleSoon:         'Coming soon',
   },
 } as const
 
-const OBJECTIVE_LABELS: Record<HealthObjective, { fr: string; en: string; icon: IconName }> = {
-  symptoms:      { fr: 'Mes symptômes',  en: 'My symptoms',      icon: 'Stethoscope' },
-  contraception: { fr: 'Contraception',  en: 'Contraception',    icon: 'Pill' },
-  menopause:     { fr: 'Ménopause',      en: 'Menopause',        icon: 'Sunset' },
-  fertility:     { fr: 'Fertilité',      en: 'Fertility',        icon: 'Sprout' },
-  general:       { fr: 'Santé générale', en: 'General health',   icon: 'MessageCircle' },
-}
-
-type Insight = { text: string; emphasis?: string; source: string }
-const INSIGHTS: Record<HealthObjective, { fr: Insight; en: Insight }> = {
+// Per-objective insight headline — keeps the existing structure simple.
+const INSIGHTS: Record<HealthObjective | 'general', { fr: string; en: string }> = {
   symptoms: {
-    en: { text: 'Tracking your symptoms across 2–3 cycles gives your doctor a much clearer picture.', emphasis: 'much clearer picture', source: 'NHS' },
-    fr: { text: 'Suivre tes symptômes sur 2 à 3 cycles donne à ton médecin une image beaucoup plus claire.', emphasis: 'beaucoup plus claire', source: 'NHS' },
-  },
-  contraception: {
-    en: { text: 'Taking the pill at the same time daily drops the failure rate under 1%.', emphasis: 'under 1%', source: 'FSRH' },
-    fr: { text: 'Prendre la pilule à la même heure réduit le taux d\'échec à moins de 1 %.', emphasis: 'moins de 1 %', source: 'FSRH' },
+    fr: 'Suivre tes symptômes sur 2 à 3 cycles donne à ton médecin une image beaucoup plus claire.',
+    en: 'Tracking your symptoms across 2–3 cycles gives your doctor a much clearer picture.',
   },
   menopause: {
-    en: { text: 'Perimenopause can begin up to 10 years before your last period — changes in cycle length are often the first sign.', emphasis: 'first sign', source: 'BMS' },
-    fr: { text: 'La périménopause peut commencer 10 ans avant tes dernières règles — les changements de cycle sont souvent le premier signe.', emphasis: 'premier signe', source: 'BMS' },
+    fr: 'La périménopause peut commencer 10 ans avant tes dernières règles — les changements de cycle sont souvent le premier signe.',
+    en: 'Perimenopause can begin up to 10 years before your last period — changes in cycle length are often the first sign.',
+  },
+  contraception: {
+    fr: 'Choisir une contraception, c\'est trouver l\'équilibre entre efficacité, effets, et ton mode de vie.',
+    en: 'Choosing contraception is about balancing effectiveness, side effects, and your lifestyle.',
   },
   fertility: {
-    en: { text: 'Your fertile window spans roughly six days — the five before ovulation and the day itself.', emphasis: 'six days', source: 'NHS' },
-    fr: { text: 'Ta fenêtre de fertilité dure environ six jours — les cinq avant l\'ovulation et le jour J.', emphasis: 'six jours', source: 'NHS' },
+    fr: 'La fenêtre fertile dure environ 6 jours par cycle — connaître la tienne te donne du pouvoir d\'agir.',
+    en: 'Your fertile window is about 6 days per cycle — knowing yours gives you agency.',
   },
   general: {
-    en: { text: 'Your œstrogen drops in the late luteal phase — energy shifts this week are expected, not fatigue.', emphasis: 'not fatigue', source: 'NHS · HAS' },
-    fr: { text: "Ton œstrogène baisse — c'est ta phase lutéale, pas de la fatigue.", emphasis: 'pas de la fatigue', source: 'NHS · HAS' },
+    fr: 'Les fluctuations hormonales tout au long du cycle influencent ton énergie, ton humeur, et ta concentration.',
+    en: 'Hormonal fluctuations throughout your cycle influence your energy, mood, and concentration.',
   },
 }
 
-type Summary = { id: string; topic: string; date: string }
-const STUB_SUMMARIES: Summary[] = []
-
-function getGreeting(copy: {
-  greetingMorning: string
-  greetingAfternoon: string
-  greetingEvening: string
-}): string {
-  const hour = new Date().getHours()
-  if (hour >= 5 && hour < 12)  return copy.greetingMorning
-  if (hour >= 12 && hour < 18) return copy.greetingAfternoon
+function getGreeting(hour: number, copy: typeof COPY[keyof typeof COPY]): string {
+  if (hour < 12) return copy.greetingMorning
+  if (hour < 18) return copy.greetingAfternoon
   return copy.greetingEvening
 }
 
-// Render an Inter italic-style accent inside a Cormorant body, by splitting
-// on the configured emphasis substring.
-function renderWithEmphasis(text: string, emphasis: string | undefined) {
-  if (!emphasis || !text.includes(emphasis)) {
-    return <Text variant="h3Italic" style={{ color: palette.warmWhite[100] }}>{text}</Text>
-  }
-  const [before, after] = text.split(emphasis)
+// ─── PUBLIC ENTRY ──────────────────────────────────────────────────────────
+export function HomeScreen() {
   return (
-    <Text variant="h3Italic" style={{ color: palette.warmWhite[100] }}>
-      {before}
-      <Text variant="h3" style={{ color: palette.ember[400] }}>{emphasis}</Text>
-      {after}
-    </Text>
+    <ThemeProvider mode="light">
+      <HomeScreenInner />
+    </ThemeProvider>
   )
 }
 
-export function HomeScreen() {
+// ─── INNER ─────────────────────────────────────────────────────────────────
+function HomeScreenInner() {
   const navigation = useNavigation<any>()
-  const { language, objective, setObjective } = useOnboarding()
+  const { language, objective } = useOnboarding()
+  const { width } = useWindowDimensions()
   const theme = useTheme()
   const copy = COPY[language]
 
-  const greeting = useMemo(() => getGreeting(copy), [copy])
-  const objKey = objective ?? 'general'
-  const objMeta = OBJECTIVE_LABELS[objKey]
-  const objectiveLabel = objMeta[language]
-  const [goalSheetOpen, setGoalSheetOpen] = useState(false)
-  const insight = INSIGHTS[objKey][language]
-  const summaries = STUB_SUMMARIES
-  const [documentCount, setDocumentCount] = useState(0)
-  // Incognito = no Supabase session (user chose "Continue anonymously" in
-  // AccountScreen). We hide the personal greeting name in that case.
-  const [isIncognito, setIsIncognito] = useState(true)
+  const isCompact = width < 480
+  const bloomSize = isCompact ? 320 : 420   // ~60% of WelcomeScreen size per BRAND.md §4.3
+  const greeting  = getGreeting(new Date().getHours(), copy)
+  const objKey    = (objective ?? 'general') as HealthObjective | 'general'
+  const insight   = INSIGHTS[objKey][language]
 
-  useEffect(() => {
-    AsyncStorage.getItem(CHAT_INTENT_KEY).then((v) => {
-      if (v === 'true') {
-        AsyncStorage.removeItem(CHAT_INTENT_KEY)
-        navigation.navigate('Chat')
-      }
-    })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const [documents, setDocuments] = useState<DocumentIndexEntry[]>([])
 
-  useEffect(() => {
-    let mounted = true
-    supabase.auth.getSession().then(({ data }) => {
-      if (mounted) setIsIncognito(!data.session)
-    })
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
-      if (mounted) setIsIncognito(!session)
-    })
-    return () => {
-      mounted = false
-      sub.subscription.unsubscribe()
-    }
-  }, [])
-
+  // Refresh the document index whenever the screen regains focus.
   useFocusEffect(
     useCallback(() => {
       listDocuments()
-        .then((docs) => setDocumentCount(docs.length))
-        .catch((err) => console.warn('Failed to load documents:', err))
+        .then(setDocuments)
+        .catch(() => { /* silent — the empty state is fine */ })
     }, []),
   )
 
+  const goChat      = () => navigation.navigate('Chat')
+  const goDocuments = () => navigation.navigate('Documents')
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
-      <StatusBar barStyle="light-content" backgroundColor={theme.colors.bg.canvas} />
+    <View style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
+      <StatusBar barStyle="dark-content" backgroundColor={theme.colors.bg.canvas} />
 
-      {/* Faint Ember corner glow opposite the breathing form — gives the top
-          of the screen warmth without a card chrome */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          right: -120,
-          top: -80,
-          width: 360,
-          height: 360,
-          opacity: 0.7,
-        }}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(196, 128, 106, 0.32)',
-            borderRadius: 9999,
-            ...(Platform.OS === 'web' ? ({ filter: 'blur(80px)' } as any) : null),
+      {/* Apricot bloom — low intensity (~60%) per BRAND.md §4.3 for inner
+          screens. Same geometry as the WelcomeScreen, smaller canvas. */}
+      <Bloom size={bloomSize} intensity={0.6} />
+
+      <SafeAreaView style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: isCompact ? 24 : 40,
+            paddingTop: isCompact ? 28 : 36,
+            paddingBottom: 120, // clear the bottom tab bar
+            maxWidth: 640,
+            width: '100%',
+            alignSelf: 'center',
           }}
-        />
-      </View>
-
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: theme.spacing[6],
-          paddingTop: theme.spacing[3],
-          paddingBottom: theme.spacing[2],
-        }}
-      >
-        <Pressable
-          accessibilityRole="link"
-          accessibilityLabel="Home"
-          onPress={() => navigation.navigate('Home')}
-          hitSlop={8}
-          style={({ pressed, hovered }: any) => ({
-            opacity: pressed ? 0.6 : hovered ? 0.85 : 1,
-            transform: pressed ? [{ scale: 0.97 }] : undefined,
-          })}
+          showsVerticalScrollIndicator={false}
         >
-          <Wordmark size={20} />
-        </Pressable>
-      </View>
-
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: theme.spacing[24] }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Greeting */}
-        <View
-          style={{
-            paddingHorizontal: theme.spacing[6],
-            paddingTop: theme.spacing[8],
-            paddingBottom: theme.spacing[6],
-          }}
-        >
-          <Text variant="eyebrow" style={{ color: 'rgba(255, 245, 238, 0.5)', marginBottom: 8 }}>
-            {copy.todayLabel.toUpperCase()}
-          </Text>
-          <Text variant="h1Italic" style={{ color: palette.warmWhite[100] }}>
-            {isIncognito ? `${greeting}.` : `${greeting},`}
-          </Text>
-          {isIncognito ? null : (
-            <Text variant="h1Italic" style={{ color: palette.ember[400], marginTop: -4 }}>
-              Marie.
-            </Text>
-          )}
+          {/* Greeting block */}
           <Text
-            variant="bodyLight"
+            variant="h1"
             style={{
-              color: 'rgba(255, 245, 238, 0.65)',
-              marginTop: theme.spacing[3],
-              maxWidth: 420,
+              color: theme.colors.text.primary,
+              fontSize: isCompact ? 32 : 38,
+              lineHeight: isCompact ? 36 : 42,
+              marginBottom: 8,
             }}
           >
-            {copy.subhead}
+            {greeting} {copy.waveEmoji}
+          </Text>
+          <Text
+            variant="body"
+            style={{
+              color: theme.colors.text.secondary,
+              marginBottom: isCompact ? 24 : 28,
+            }}
+          >
+            {copy.subtitle}
           </Text>
 
-          {/* Focus pill — opens the goal sheet so the user can switch what
-              Anoqi is conditioning on. Mirrored in the Chat header. */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${copy.focusAreaLabel}: ${objectiveLabel}`}
-            onPress={() => setGoalSheetOpen(true)}
-            style={({ pressed }) => ({
-              marginTop: theme.spacing[5],
-              alignSelf: 'flex-start',
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: pressed
-                ? 'rgba(196, 128, 106, 0.20)'
-                : 'rgba(196, 128, 106, 0.12)',
-              borderWidth: 1,
-              borderColor: 'rgba(196, 128, 106, 0.28)',
-              paddingHorizontal: 14,
-              paddingVertical: 7,
-              borderRadius: theme.radii.pill,
-              gap: 8,
-            })}
-          >
-            <Icon name={objMeta.icon} size={14} color={palette.ember[300]} strokeWidth={1.8} />
-            <Text variant="label" style={{ color: palette.ember[200] }}>
-              {objectiveLabel}
-            </Text>
-            <Icon name="ChevronDown" size={12} color={palette.ember[300]} strokeWidth={1.8} />
-          </Pressable>
-        </View>
+          {/* The hero CTA — get me into chat. */}
+          <PrimaryCTA label={copy.cta} onPress={goChat} />
 
-        {/* Insight glass card — main daily moment */}
-        <View style={{ paddingHorizontal: theme.spacing[6], marginBottom: theme.spacing[5] }}>
-          <View
-            style={{
-              borderRadius: 24,
-              overflow: 'hidden',
-              position: 'relative',
-            }}
-          >
-            <LiquidEmber intensity={1.2} blur={52} borderRadius={24} />
-
-            <View
-              style={[
-                {
-                  backgroundColor: 'rgba(255, 245, 238, 0.05)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(255, 245, 238, 0.09)',
-                  borderRadius: 24,
-                  padding: theme.spacing[6],
-                },
-                Platform.OS === 'web'
-                  ? ({
-                      backdropFilter: 'blur(22px) saturate(140%)',
-                      WebkitBackdropFilter: 'blur(22px) saturate(140%)',
-                    } as any)
-                  : null,
-              ]}
-            >
+          {/* Insight card — Petal-tinted, fuchsia eyebrow, source tag. */}
+          <View style={{ marginTop: 28 }}>
+            <Card tone="petal">
               <View
                 style={{
                   flexDirection: 'row',
                   justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: theme.spacing[3],
+                  alignItems: 'baseline',
+                  marginBottom: 12,
                 }}
               >
-                <Text variant="eyebrow" style={{ color: palette.fuchsia[400] }}>
+                <Text variant="eyebrow" style={{ color: palette.fuchsia[500] }}>
                   {copy.insightEyebrow.toUpperCase()}
                 </Text>
-                <Text variant="eyebrow" style={{ color: 'rgba(255, 245, 238, 0.4)' }}>
-                  {insight.source}
+                <Text variant="caption" style={{ color: theme.colors.text.secondary }}>
+                  {copy.insightSource}
                 </Text>
               </View>
-
-              {renderWithEmphasis(insight.text, insight.emphasis)}
-
-              <View
-                style={{
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  gap: 8,
-                  marginTop: theme.spacing[5],
-                }}
-              >
-                <Pressable
-                  onPress={() => navigation.navigate('Chat')}
-                  style={({ hovered }: any) => [
-                    {
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                      paddingHorizontal: 14,
-                      paddingVertical: 9,
-                      borderRadius: 999,
-                      backgroundColor: 'rgba(255, 4, 114, 0.22)',
-                      borderWidth: 1,
-                      borderColor: 'rgba(255, 4, 114, 0.42)',
-                    },
-                    hover.transition,
-                    hovered && hover.lift,
-                    hovered && hover.glow('rgba(255, 4, 114, 0.45)'),
-                    hovered && { borderColor: 'rgba(255, 4, 114, 0.62)' },
-                  ]}
-                >
-                  <Text variant="label" style={{ color: palette.warmWhite[100] }}>
-                    {copy.prepareConsult}
-                  </Text>
-                  <Icon name="ArrowRight" size={13} color={palette.warmWhite[100]} strokeWidth={2} />
-                </Pressable>
-
-                <Pressable
-                  style={({ hovered }: any) => [
-                    {
-                      paddingHorizontal: 14,
-                      paddingVertical: 9,
-                      borderRadius: 999,
-                      backgroundColor: 'rgba(255, 245, 238, 0.06)',
-                      borderWidth: 1,
-                      borderColor: 'rgba(255, 245, 238, 0.10)',
-                    },
-                    hover.transition,
-                    hovered && hover.lift,
-                    hovered && {
-                      backgroundColor: 'rgba(255, 245, 238, 0.10)',
-                      borderColor: 'rgba(255, 245, 238, 0.22)',
-                    },
-                  ]}
-                >
-                  <Text variant="label" style={{ color: palette.warmWhite[100] }}>
-                    {copy.learnMore}
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Cycle tracker glass card */}
-        <View style={{ paddingHorizontal: theme.spacing[6], marginBottom: theme.spacing[6] }}>
-          <View
-            style={{
-              borderRadius: 22,
-              overflow: 'hidden',
-              position: 'relative',
-            }}
-          >
-            <LiquidEmber intensity={0.7} fuchsia={false} blur={48} borderRadius={22} />
-
-            <View
-              style={[
-                {
-                  backgroundColor: 'rgba(255, 245, 238, 0.04)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(255, 245, 238, 0.08)',
-                  borderRadius: 22,
-                  paddingHorizontal: theme.spacing[6],
-                  paddingVertical: theme.spacing[5],
-                },
-                Platform.OS === 'web'
-                  ? ({
-                      backdropFilter: 'blur(18px) saturate(140%)',
-                      WebkitBackdropFilter: 'blur(18px) saturate(140%)',
-                    } as any)
-                  : null,
-              ]}
-            >
-              <Text variant="eyebrow" style={{ color: 'rgba(255, 245, 238, 0.5)', marginBottom: 12 }}>
-                {copy.cycleTitle.toUpperCase()}
-              </Text>
               <Text
-                variant="h4Italic"
                 style={{
-                  color: palette.ember[400],
-                  paddingVertical: theme.spacing[3],
-                  textAlign: 'center',
+                  fontFamily: 'BricolageGrotesque-Bold',
+                  fontSize: 20,
+                  lineHeight: 28,
+                  letterSpacing: -0.3,
+                  color: theme.colors.text.primary,
                 }}
               >
-                {copy.phase}
+                {insight}
               </Text>
-            </View>
+            </Card>
           </View>
-        </View>
 
-        {/* Summaries — editorial list */}
-        <View style={{ paddingHorizontal: theme.spacing[6], marginTop: theme.spacing[6] }}>
-          <SectionTitle label={copy.summariesTitle} />
-          {summaries.length === 0 ? (
-            <Text
-              variant="bodyLight"
-              style={{ color: 'rgba(255, 245, 238, 0.5)', maxWidth: 420 }}
-            >
-              {copy.summariesEmpty}
-            </Text>
-          ) : (
-            summaries.map((s, i) => (
-              <View
-                key={s.id}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingVertical: theme.spacing[3],
-                  borderTopWidth: i === 0 ? 0 : 1,
-                  borderTopColor: theme.colors.border.subtle,
-                }}
-              >
-                <View
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: 4,
-                    backgroundColor: palette.ember[400],
-                    marginRight: theme.spacing[3],
-                  }}
-                />
-                <Text variant="bodyMed" style={{ color: palette.warmWhite[100], flex: 1 }}>
-                  {s.topic}
-                </Text>
-                <Text variant="caption" style={{ color: 'rgba(255, 245, 238, 0.5)' }}>
-                  {s.date}
-                </Text>
-              </View>
-            ))
-          )}
-        </View>
-
-        {/* Documents */}
-        {documentCount > 0 ? (
-          <View style={{ paddingHorizontal: theme.spacing[6], marginTop: theme.spacing[10] }}>
-            <SectionTitle
-              label={copy.documentsTitle}
-              rightSlot={
-                <Pressable
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  onPress={() => navigation.navigate('Documents')}
-                  style={({ hovered, pressed }: any) => [
-                    hover.transition,
-                    hovered && hover.lift,
-                    pressed && { transform: [{ scale: 0.97 }] },
-                  ]}
-                >
-                  {({ hovered, pressed }: any) => (
-                    <Text
-                      variant="label"
-                      style={{
-                        color: hovered ? palette.fuchsia[300] : palette.fuchsia[400],
-                        opacity: pressed ? 0.6 : 1,
-                      }}
-                    >
-                      {copy.documentsView} →
-                    </Text>
-                  )}
-                </Pressable>
-              }
-            />
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => navigation.navigate('Documents')}
-              style={({ pressed, hovered }: any) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingVertical: theme.spacing[3],
-                paddingHorizontal: theme.spacing[2],
-                marginHorizontal: -theme.spacing[2],
-                borderRadius: theme.radii.md,
-                backgroundColor: hovered
-                  ? 'rgba(255, 245, 238, 0.04)'
-                  : 'transparent',
-                opacity: pressed ? 0.7 : 1,
-                transform: pressed ? [{ scale: 0.99 }] : undefined,
-              })}
-            >
-              <Icon
-                name="FileText"
-                size={18}
-                color={palette.ember[300]}
-                strokeWidth={1.6}
+          {/* Documents card */}
+          <View style={{ marginTop: 16 }}>
+            <Card>
+              <RowHeader
+                title={copy.documentsTitle}
+                action={documents.length > 0 ? copy.documentsAdd : undefined}
+                onAction={goDocuments}
               />
               <Text
-                variant="bodyMed"
-                style={{ color: palette.warmWhite[100], marginLeft: theme.spacing[3], flex: 1 }}
+                variant="body"
+                style={{ color: theme.colors.text.secondary, marginTop: 6 }}
               >
-                {documentCount} {copy.documentsUnit}
-                {documentCount > 1 ? 's' : ''}
+                {documents.length > 0
+                  ? copy.documentsCount(documents.length)
+                  : copy.documentsEmpty}
               </Text>
-              <Icon
-                name="ChevronRight"
-                size={18}
-                color="rgba(255, 245, 238, 0.4)"
-                strokeWidth={1.6}
-              />
-            </Pressable>
+            </Card>
           </View>
-        ) : null}
 
-        {/* Knowledge of the day — quieter glass card at the foot of the
-            scroll. Lower LiquidEmber intensity so it doesn't compete with
-            the main insight up top. */}
-        <View style={{ paddingHorizontal: theme.spacing[6], marginTop: theme.spacing[10] }}>
-          <View
-            style={{
-              borderRadius: 22,
-              overflow: 'hidden',
-              position: 'relative',
-            }}
-          >
-            <LiquidEmber intensity={0.55} fuchsia={false} blur={44} borderRadius={22} />
-
-            <View
-              style={[
-                {
-                  backgroundColor: 'rgba(255, 245, 238, 0.04)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(255, 245, 238, 0.08)',
-                  borderRadius: 22,
-                  padding: theme.spacing[6],
-                },
-                Platform.OS === 'web'
-                  ? ({
-                      backdropFilter: 'blur(18px) saturate(140%)',
-                      WebkitBackdropFilter: 'blur(18px) saturate(140%)',
-                    } as any)
-                  : null,
-              ]}
-            >
-              <Text variant="eyebrow" style={{ color: palette.ember[400], marginBottom: 12 }}>
-                {copy.knowledgeEyebrow.toUpperCase()}
-              </Text>
+          {/* Summaries card */}
+          <View style={{ marginTop: 16 }}>
+            <Card>
+              <RowHeader title={copy.summariesTitle} />
               <Text
-                variant="h3Italic"
-                style={{
-                  color: palette.warmWhite[100],
-                  lineHeight: 32,
-                }}
+                variant="body"
+                style={{ color: theme.colors.text.secondary, marginTop: 6 }}
               >
-                {copy.knowledgeBody}
+                {copy.summariesEmpty}
               </Text>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  marginTop: theme.spacing[4],
-                  gap: 8,
-                }}
-              >
-                <View
-                  style={{
-                    width: 4,
-                    height: 4,
-                    borderRadius: 999,
-                    backgroundColor: palette.ember[400],
-                  }}
-                />
-                <Text variant="eyebrow" style={{ color: palette.ember[400] }}>
-                  {copy.insightSourceLbl} · {copy.knowledgeSource}
-                </Text>
-              </View>
-            </View>
+            </Card>
           </View>
-        </View>
-      </ScrollView>
 
-      <GoalSheet
-        visible={goalSheetOpen}
-        selected={objective}
-        language={language}
-        onSelect={setObjective}
-        onClose={() => setGoalSheetOpen(false)}
+          {/* Cycle — coming soon */}
+          <View style={{ marginTop: 16 }}>
+            <Card>
+              <RowHeader title={copy.cycleTitle} badge={copy.cycleSoon} />
+            </Card>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  )
+}
+
+// ─── BLOOM ─────────────────────────────────────────────────────────────────
+//
+// Reduced-intensity variant of the WelcomeScreen bloom. The geometry is
+// identical (locked in BRAND.md §4.1); only the opacity scale changes.
+function Bloom({ size, intensity }: { size: number; intensity: number }) {
+  const t = useSharedValue(0)
+  useEffect(() => {
+    t.value = withRepeat(
+      withTiming(1, { duration: 4000, easing: Easing.bezier(0.45, 0, 0.55, 1) }),
+      -1,
+      true,
+    )
+  }, [t])
+  const dotStyle = useAnimatedStyle(() => ({
+    opacity: (0.92 - 0.57 * t.value) * intensity,
+    transform: [{ scale: 1 - 0.38 * t.value }],
+  }))
+
+  const dotX  = size * 0.76
+  const dotY  = size * 0.21
+  const stop0 = Math.max(0, 0.7  * intensity)
+  const stop1 = Math.max(0, 0.38 * intensity)
+  const stop2 = Math.max(0, 0.10 * intensity)
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{ position: 'absolute', top: 0, right: 0, width: size, height: size }}
+    >
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <Defs>
+          <RadialGradient id="apricotHome" cx="72%" cy="10%" r="55%" fx="72%" fy="10%">
+            <Stop offset="0%"   stopColor={palette.apricot[400]} stopOpacity={stop0} />
+            <Stop offset="35%"  stopColor={palette.apricot[400]} stopOpacity={stop1} />
+            <Stop offset="70%"  stopColor={palette.apricot[400]} stopOpacity={stop2} />
+            <Stop offset="100%" stopColor={palette.apricot[400]} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Rect width={size} height={size} fill="url(#apricotHome)" />
+      </Svg>
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            left: dotX - 5,
+            top:  dotY - 5,
+            width: 10,
+            height: 10,
+            borderRadius: 999,
+            backgroundColor: palette.fuchsia[500],
+            ...(Platform.OS === 'web'
+              ? ({ boxShadow: '0 0 14px rgba(255, 4, 114, 0.45)' } as any)
+              : {
+                  shadowColor: palette.fuchsia[500],
+                  shadowOpacity: 0.45,
+                  shadowRadius: 6,
+                  shadowOffset: { width: 0, height: 0 },
+                }),
+          },
+          dotStyle,
+        ]}
       />
-    </SafeAreaView>
+    </View>
+  )
+}
+
+// ─── PRIMARY CTA ───────────────────────────────────────────────────────────
+//
+// The hero "Commencer une conversation" button. Fuchsia fill, white text,
+// Bricolage 500, radius 14, Emil press rule.
+function PrimaryCTA({ label, onPress }: { label: string; onPress: () => void }) {
+  const scale = useSharedValue(1)
+  const ease  = Easing.bezier(0.22, 1, 0.36, 1)
+  const scaleStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
+
+  return (
+    <Animated.View style={scaleStyle}>
+      <Pressable
+        onPressIn={() => { scale.value = withTiming(0.97, { duration: 100, easing: ease }) }}
+        onPressOut={() => { scale.value = withTiming(1,    { duration: 200, easing: ease }) }}
+        onPress={onPress}
+        style={({ hovered }: any) => [
+          {
+            backgroundColor: palette.fuchsia[500],
+            borderRadius: 14,
+            paddingVertical: 18,
+            alignItems: 'center',
+            justifyContent: 'center',
+          },
+          Platform.OS === 'web' && hovered
+            ? ({ boxShadow: '0 8px 24px rgba(255, 4, 114, 0.35)' } as any)
+            : null,
+        ]}
+      >
+        <Text
+          style={{
+            fontFamily: 'BricolageGrotesque-Medium',
+            fontSize: 15,
+            letterSpacing: 0.3,
+            color: '#ffffff',
+          }}
+        >
+          {label}
+        </Text>
+      </Pressable>
+    </Animated.View>
+  )
+}
+
+// ─── CARD ──────────────────────────────────────────────────────────────────
+//
+// Inlined here to avoid coupling to the v1.0 Card component (which still
+// uses the dark register). Once Card.tsx itself migrates to v2.0 this can
+// be replaced with the shared component.
+function Card({
+  children,
+  tone = 'white',
+}: {
+  children: React.ReactNode
+  tone?: 'white' | 'petal'
+}) {
+  return (
+    <View
+      style={{
+        backgroundColor: tone === 'petal' ? palette.petal[100] : '#ffffff',
+        borderWidth: 1.5,
+        borderColor: tone === 'petal' ? 'transparent' : palette.sand[300],
+        borderRadius: 14,
+        padding: 18,
+      }}
+    >
+      {children}
+    </View>
+  )
+}
+
+function RowHeader({
+  title,
+  action,
+  onAction,
+  badge,
+}: {
+  title:    string
+  action?:  string
+  onAction?: () => void
+  badge?:   string
+}) {
+  const theme = useTheme()
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: 'BricolageGrotesque-Bold',
+          fontSize: 16,
+          color: theme.colors.text.primary,
+          letterSpacing: -0.2,
+        }}
+      >
+        {title}
+      </Text>
+      {action ? (
+        <Pressable hitSlop={8} onPress={onAction}>
+          <Text variant="caption" style={{ color: palette.fuchsia[500] }}>
+            {action}
+          </Text>
+        </Pressable>
+      ) : null}
+      {badge ? (
+        <Text
+          variant="caption"
+          style={{
+            color: theme.colors.text.secondary,
+            fontStyle: 'italic',
+          }}
+        >
+          {badge}
+        </Text>
+      ) : null}
+    </View>
   )
 }
