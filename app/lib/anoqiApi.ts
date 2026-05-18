@@ -1,13 +1,13 @@
 // Anoqi — tiny fetch wrapper for the CF Worker BE.
 //
-// Single endpoint right now: POST /chat. Mirrors the request/response shape
-// declared in workers/be/src/handlers/chat.ts so the FE and the contract stay
-// in sync. Treat this as the source of truth on the client side — keep types
-// here when the BE schema evolves.
+// Endpoints:
+//   POST /chat       — buffered or streamed; mirrors workers/be/src/handlers/chat.ts
+//   POST /summaries  — physician-ready summary of a conversation; requires auth
 //
-// Anonymous auth: the BE requires EITHER a Bearer token OR a sessionId in the
-// body. We always pass sessionId (lives in OnboardingContext). When real auth
-// lands, swap in the access token via the optional `accessToken` arg.
+// Anonymous auth: /chat accepts EITHER a Bearer token OR a sessionId in the
+// body. /summaries REQUIRES a Bearer token (it writes per-user rows). We
+// always pass sessionId for chat; for summaries the caller must supply
+// accessToken or the call 401s.
 
 import type { HealthObjective, Language } from '../context/OnboardingContext'
 
@@ -315,4 +315,92 @@ export async function postChatStream(
   } finally {
     try { reader.releaseLock?.() } catch { /* noop */ }
   }
+}
+
+// ─── POST /summaries ─────────────────────────────────────────────────────
+//
+// Generates a physician-ready summary from a conversation. The BE pulls all
+// the user + assistant messages, asks Gemini for structured JSON, validates
+// it, writes a row to `summaries` plus per-symptom rows to `symptoms`, and
+// returns the full summary content.
+//
+// Requires auth — pass the user's Supabase JWT as accessToken. Anonymous
+// callers get 401.
+//
+// Source of truth for the response shape: api/lib/summaryParser.ts.
+
+export type Symptom = {
+  nom: string
+  duree?: string
+  frequence?: string
+  intensite?: 'légère' | 'modérée' | 'importante'
+  declencheurs?: string[]
+  evolution?: 'stable' | 'aggravation' | 'amélioration'
+  impact_quotidien?: string
+}
+
+export type SummaryContent = {
+  motif:             string
+  symptomes:         Symptom[]
+  questions:         string[]
+  traitements:       string[]
+  points_cles:       string[]
+  prochaines_etapes: string[]
+  langue:            'fr' | 'en'
+  genere_le:         string   // ISO timestamp
+}
+
+export type SummaryResponse = {
+  summary: {
+    id:          string
+    title:       string
+    journeyType: string
+    createdAt:   string
+    content:     SummaryContent
+  }
+}
+
+export type SummaryRequest = {
+  conversationId: string
+  language:       Language
+  accessToken:    string   // required — /summaries is auth-only
+}
+
+export async function postSummary(req: SummaryRequest): Promise<SummaryResponse> {
+  if (!API_URL) {
+    throw new AnoqiApiError(
+      'EXPO_PUBLIC_ANOQI_API_URL is not set. Add it to .env and restart Metro.',
+      0,
+      null,
+    )
+  }
+  if (!req.accessToken) {
+    throw new AnoqiApiError(
+      'Sign in to generate a summary.',
+      401,
+      null,
+    )
+  }
+
+  const res = await fetch(`${API_URL}/summaries`, {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${req.accessToken}`,
+    },
+    body: JSON.stringify({
+      conversationId: req.conversationId,
+      language:       req.language,
+    }),
+  })
+
+  const text = await res.text()
+  let parsed: any = null
+  try { parsed = text ? JSON.parse(text) : null } catch { /* keep null */ }
+
+  if (!res.ok) {
+    const reason = parsed?.error ?? `HTTP ${res.status}`
+    throw new AnoqiApiError(reason, res.status, parsed ?? text)
+  }
+  return parsed as SummaryResponse
 }
