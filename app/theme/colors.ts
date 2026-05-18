@@ -1,32 +1,41 @@
-// Anoqi — Sanctuary Palette
+// Anoqi — colour tokens.
 //
-// Six decisions, locked from the brand deck:
-//   Void         #0D0D12   primary canvas
-//   Surface      #16161E   cards & UI layers
-//   Fuchsia      #FF0472   signal — used as a single dot or a sparse accent
-//   Warm White   #FFF5EE   primary type
-//   Ember        #C4806A   warmth & depth wash
-//   Dusk         #2E2030   ghost borders
+// Two themes live in this file:
 //
-// Anoqi is dark-only. Both lightColors and darkColors map to the same dark
-// values so OS-level light mode does not bleed through into the app.
+//   darkColors  — v1.0 Sanctuary. Dark canvas, ember warmth, warm-white type.
+//                 Still the app default; existing screens render on this.
+//
+//   lightColors — v2.0 (the rebrand). White canvas, fuchsia signal, soft
+//                 apricot as decoration only. See BRAND.md.
+//
+// Screens migrating to v2.0 wrap themselves in <ThemeProvider mode="light">
+// and they pick up the new tokens. App.tsx will flip its default mode to
+// "light" once all screens are migrated.
+//
+// Both modes share the SAME ColorTokens shape, so component code that reads
+// theme.colors.bg.canvas / .text.primary / etc. just works in either mode.
 
 export const palette = {
-  // Void — the room. Surface and cards step up from here.
+  // ── v1.0 Sanctuary scales — kept for backwards compatibility ────────────
+  // Direct palette references in legacy components still resolve. These
+  // remain accurate values for the dark theme.
+
+  // Void — the dark canvas. Also the v2.0 primary text colour on white.
   void: {
     50:  '#52525a',
     100: '#3d3d44',
     200: '#28282f',
     300: '#1e1e28',
-    400: '#16161e', // Surface
-    500: '#0d0d12', // anchor — Void canvas
+    400: '#16161e', // Surface (dark)
+    500: '#0d0d12', // anchor — Void
     600: '#0a0a0e',
     700: '#070709',
     800: '#040406',
     900: '#020203',
   },
 
-  // Fuchsia — the signal. Ghosted, never structural.
+  // Fuchsia — the signal. Carried into v2.0 unchanged; this is the bridge
+  // colour between the two themes.
   fuchsia: {
     50:  '#fff0f6',
     100: '#ffdce9',
@@ -41,8 +50,8 @@ export const palette = {
     950: '#2a0212',
   },
 
-  // Ember — the warmth. Dusty rose / terracotta, used for em, source chips,
-  // the slow-moving liquid glow under cards.
+  // Ember — v1.0 warmth wash. Deprecated in v2.0; replaced by apricot
+  // (decoration only) and warmGray (secondary text).
   ember: {
     50:  '#faf1eb',
     100: '#f1dcce',
@@ -57,7 +66,7 @@ export const palette = {
     950: '#231510',
   },
 
-  // Warm white — primary type. Cream tone, never pure white.
+  // Warm white — v1.0 primary type. Still used as v1.0 text on dark.
   warmWhite: {
     50:  '#fffcf9',
     100: '#fff5ee', // anchor
@@ -71,7 +80,7 @@ export const palette = {
     900: '#382c24',
   },
 
-  // Dusk — ghost borders + deep mauve corners.
+  // Dusk — v1.0 ghost borders on dark.
   dusk: {
     100: '#5e4761',
     200: '#4e3a51',
@@ -84,12 +93,60 @@ export const palette = {
     900: '#080308',
   },
 
-  // Burgundy — restrained danger (not fire-engine red).
+  // Burgundy — restrained danger. Kept in v2.0 for now (status pill rework
+  // pending, see BRAND.md §10).
   burgundy: {
     100: '#f7e2e6',
     400: '#b94a64',
     500: '#9c3654',
     700: '#6e2238',
+  },
+
+  // ── v2.0 additions ──────────────────────────────────────────────────────
+
+  // Soft Apricot — v2.0 decoration only. Radial-gradient bloom in hero and
+  // empty-state moments. Never text, never UI, never status colour.
+  apricot: {
+    50:  '#fff6eb',
+    100: '#feedd1',
+    200: '#fed7a8',
+    300: '#fdc283',
+    400: '#fdba74', // anchor — the bloom colour
+    500: '#f8a35a',
+    600: '#e08a45',
+    700: '#b56b35',
+    800: '#854e26',
+    900: '#553118',
+  },
+
+  // Petal — v2.0 subtle warmth. Pill backgrounds, soft card tints, hover
+  // surfaces. Never text, never strong containers.
+  petal: {
+    50:  '#fffafc',
+    100: '#fef0f4', // anchor — the standard pill tint
+    200: '#fde0ea',
+    300: '#fbcad7',
+    400: '#f8a8bf',
+  },
+
+  // Sand — v2.0 quiet structure. Secondary button outlines (1.5px), hairline
+  // dividers, very-subtle separators. Never text, never fills.
+  sand: {
+    100: '#f5f0eb',
+    200: '#ece3da',
+    300: '#e8e0d8', // anchor — secondary-button outline colour
+    400: '#dccfc1',
+    500: '#c8b8a8',
+  },
+
+  // Warm gray — v2.0 secondary body copy. Softer than full Void; for
+  // subtitles, captions, helper text where Void would compete with the
+  // headline.
+  warmGray: {
+    100: '#878088',
+    300: '#5c5460',
+    500: '#3a3040', // anchor — the standard subtitle colour
+    700: '#231b27',
   },
 } as const
 
@@ -153,8 +210,9 @@ export type ColorTokens = {
   }
 }
 
-// Anoqi's dark mode (the only mode). Surfaces sit just barely above Void so
-// the breathing-form and liquid-ember layers underneath can register.
+// ─────────────────────────────────────────────────────────────────────────────
+// v1.0 Sanctuary — dark theme (unchanged).
+// ─────────────────────────────────────────────────────────────────────────────
 export const darkColors: ColorTokens = {
   bg: {
     canvas:         palette.void[500],
@@ -214,6 +272,74 @@ export const darkColors: ColorTokens = {
   },
 }
 
-// Locked dark. lightColors is an alias so consumers that expect both
-// continue to work without rewriting downstream.
-export const lightColors: ColorTokens = darkColors
+// ─────────────────────────────────────────────────────────────────────────────
+// v2.0 — light theme (the rebrand). See BRAND.md.
+//
+// To migrate a screen onto v2.0, wrap it in <ThemeProvider mode="light">.
+// All theme.colors.* keys resolve to the v2.0 values below.
+//
+// Status pill values below are a "good-enough" mapping for now. The proper
+// re-derivation of status colour theory against the white canvas is open
+// (BRAND.md §10.1). Treat anything in status.* as provisional.
+// ─────────────────────────────────────────────────────────────────────────────
+export const lightColors: ColorTokens = {
+  bg: {
+    // White is the canvas. Cards live directly on white with a hairline,
+    // not on a tinted surface. Petal serves as a soft tint for pills only.
+    canvas:         '#ffffff',
+    surface:        '#ffffff',
+    surfaceMuted:   palette.petal[100],                  // #FEF0F4
+    surfaceWarm:    'rgba(253, 186, 116, 0.10)',         // apricot at 10% alpha
+    surfaceInverse: palette.void[500],
+    overlay:        'rgba(13, 13, 18, 0.55)',            // lighter scrim than dark mode
+  },
+  text: {
+    primary:     palette.void[500],                      // #0D0D12 — headlines, body
+    secondary:   palette.warmGray[500],                  // #3A3040 — subtitles, captions
+    tertiary:    'rgba(13, 13, 18, 0.50)',
+    inverse:     '#ffffff',
+    accent:      palette.fuchsia[500],                   // signal, not apricot
+    danger:      palette.burgundy[500],
+    placeholder: 'rgba(13, 13, 18, 0.38)',
+  },
+  border: {
+    subtle:  'rgba(13, 13, 18, 0.06)',
+    default: palette.sand[300],                          // #E8E0D8 — secondary buttons
+    strong:  'rgba(13, 13, 18, 0.20)',
+    focus:   palette.fuchsia[500],
+    danger:  palette.burgundy[500],
+  },
+  accent: {
+    primary:        palette.fuchsia[500],                // #FF0472 — primary CTA fill
+    primaryHover:   palette.fuchsia[400],
+    primaryActive:  palette.fuchsia[600],
+    primaryOnText:  '#ffffff',                           // text on top of fuchsia button
+    celebration:    palette.fuchsia[400],
+    success:        palette.fuchsia[500],                // provisional — see BRAND.md §10.1
+    successSurface: palette.petal[100],
+    warning:        palette.apricot[600],                // provisional
+    warningSurface: 'rgba(253, 186, 116, 0.18)',
+    danger:         palette.burgundy[500],
+    dangerSurface:  'rgba(156, 54, 84, 0.10)',
+    info:           palette.fuchsia[500],
+    infoSurface:    palette.petal[100],
+  },
+  // Status — provisional v2.0 mapping. Pending the rework in BRAND.md §10.1.
+  status: {
+    draftBg:        palette.sand[100],
+    draftText:      palette.warmGray[500],
+    draftRing:      palette.sand[400],
+    inReviewBg:     palette.petal[100],
+    inReviewText:   palette.fuchsia[700],
+    inReviewRing:   palette.fuchsia[300],
+    approvedBg:     palette.petal[200],
+    approvedText:   palette.fuchsia[700],
+    approvedRing:   palette.fuchsia[400],
+    liveBg:         palette.fuchsia[500],
+    liveText:       '#ffffff',
+    liveRing:       palette.fuchsia[600],
+    archivedBg:     palette.sand[200],
+    archivedText:   palette.warmGray[500],
+    archivedRing:   palette.sand[400],
+  },
+}
