@@ -6,9 +6,6 @@
  *   POST /documents  — store de-identified document payloads (auth required)
  *   POST /summaries  — generate physician-ready summaries (auth required)
  *   GET  /health     — liveness probe
- *
- * CORS: wide-open for now to mirror the current Supabase Edge Function behaviour.
- * Tighten to `app.anoqi.com` (and the workers.dev FE URL) post-cutover.
  */
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
@@ -31,20 +28,42 @@ export type Env = {
   // ANOQI_RAG_ENABLED is false. Used to run a closed pilot while
   // public traffic stays off. Anonymous sessions never qualify.
   ANOQI_RAG_PILOT_USERS?: string
+
+  // Comma-separated list of extra origins to allow in CORS, beyond the
+  // defaults baked in below. Set when standing up a new preview build
+  // (e.g. a PR-deploy URL) without redeploying.
+  ANOQI_CORS_EXTRA_ORIGINS?: string
 }
 
 const app = new Hono<{ Bindings: Env }>()
 
-// CORS — mirror the Edge Function behaviour exactly.
-// Tighten origin to app.anoqi.com (+ staging worker URL) once the FE cutover is verified.
-app.use(
-  '*',
-  cors({
-    origin: '*',
+// CORS — allowlist of known origins. The baked-in list covers staging FE +
+// expected production hosts; extra origins can be added at runtime via the
+// ANOQI_CORS_EXTRA_ORIGINS env var (comma-separated). Anything not on the
+// list gets no Access-Control-Allow-Origin header — the browser blocks.
+//
+// localhost is included so `expo start --web` can call this API in dev.
+const STATIC_ALLOWED_ORIGINS = [
+  'https://anoqi-app-staging.marion-8c0.workers.dev',
+  'https://app.anoqi.com',
+  'https://anoqi.com',
+  'https://www.anoqi.com',
+  'http://localhost:8081',
+  'http://localhost:19006',
+]
+
+app.use('*', (c, next) => {
+  const extra = (c.env.ANOQI_CORS_EXTRA_ORIGINS ?? '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+  const allowed = [...STATIC_ALLOWED_ORIGINS, ...extra]
+  return cors({
+    origin: (origin) => (allowed.includes(origin) ? origin : null),
     allowHeaders: ['authorization', 'x-client-info', 'apikey', 'content-type'],
     allowMethods: ['POST', 'OPTIONS', 'GET'],
-  }),
-)
+  })(c, next)
+})
 
 app.get('/health', (c) =>
   c.json({
