@@ -409,6 +409,109 @@ Things the new system needs but doesn't yet specify. Each is a separate task.
 3. **Dark-mode contingency.** If iOS users force dark mode at the OS level, the brand currently breaks. Decision: keep white-only with a system override (`color-scheme: light`), or design a v2.0-faithful dark variant.
 4. **Logo on non-white surfaces.** Press, partner docs, third-party embeds. Out of scope here but will need a brand-asset pack.
 5. **The Bloom component.** This doc describes the visual; a `Bloom.tsx` component should replace BreathingForm with the new geometry. Could be one component with props for size + position + intensity.
-6. **Physician portal alignment.** The portal currently follows v1.0 Sanctuary. Needs its own migration plan against this spec.
 
 Pick these up in order as the rebrand rolls into more surfaces.
+
+Physician-portal alignment is addressed in [§11](#11-physician-portal-adaptation) below.
+
+---
+
+## 11. Physician portal adaptation
+
+The physician portal (`physician-portal/`, Next.js app) is a different surface with a different user. Where the patient app is a sanctuary, the portal is a workshop — clinicians using it want a tool, not a brand moment. The portal adopts the v2.0 **palette and typography unchanged**, but its compositional register is calmer: no decorative blooms, no two-tone headlines, no editorial drama. Density is slightly higher and the fuchsia signal is held back even further than in the patient app.
+
+The goal is "clearly the same family of products" without making clinicians feel like they're working inside a marketing surface.
+
+### 11.1 What stays exactly the same
+
+- All seven palette tokens (Void, White, Fuchsia, Soft Apricot, Warm Gray, Petal, Sand) — same values, same `Allowed`/`Never` rules.
+- Bricolage Grotesque for display, Inter for body, JetBrains Mono for code/data.
+- Press feedback: `transform: scale(0.97)` over 160ms with `cubic-bezier(0.22, 1, 0.36, 1)`. The Emil rule applies everywhere.
+- The 4px spacing base and the radii system.
+- `prefers-reduced-motion` behaviour.
+
+### 11.2 What changes for the portal
+
+| Concern | Patient app | Physician portal |
+|---|---|---|
+| **Apricot bloom** | One per hero / empty-state moment | **Never**. The portal is a workshop, not a sanctuary. Apricot is reserved for the "no pathways yet" empty state at very low intensity, and nowhere else. |
+| **Two-tone headlines** | Top half Void, bottom half Fuchsia. Editorial drama. | **Never**. Page titles are single-tone Void, single line where possible. Bricolage 800 only on the page-title row. |
+| **Fuchsia coverage** | 2–8% of viewport | Closer to 1–4%. Fuchsia is reserved for: save/publish actions, the wordmark dot, the "currently active" indicator, the focus ring. Not for section eyebrows, not for routine UI accents. |
+| **Body weight** | Inter 300 (light, breathable) | Inter 400 (regular) for the default body. Inter 300 is reserved for long-form helper text and footnotes. Better readability at smaller sizes and across longer reading sessions. |
+| **Body size** | 13px @ 1.75 leading | 14px @ 1.5 leading. The portal is read on desktop monitors at arm's length; the patient app on phones held closer. |
+| **Card weight** | `quiet` (flat + hairline) is the default | `lifted` (Sand-coloured 1px border + subtle shadow) is the default for content containers. Data needs visible boundaries. |
+| **Density** | Generous padding, large hit targets | Tighter — list rows ~44px tall instead of 56–64px. Internal padding scales 4→3 (16px → 12px) for table rows and sidebar items. |
+| **Eyebrow colour** | Fuchsia at 80% opacity | Warm Gray. The fuchsia eyebrow reads as marketing in a clinical context. |
+| **Status pills** | Used occasionally | The portal's most-used component. Every pathway row carries one. Treat the pill colour theory rework (§10.1) as portal-led — the portal's status mapping is the canonical one. |
+| **Wordmark** | Bricolage 800 at 20–56px, pulsing dot | Bricolage 800 at 18px in the app header, pulsing dot at lower visibility (opacity 0.6 baseline, drops to 0.3 mid-pulse). The dot is present but not actively drawing the eye away from the work surface. |
+
+### 11.3 Page composition
+
+A portal page is built from these zones, top to bottom:
+
+```
+┌────────────────────────────────────────────┐
+│  Wordmark · breadcrumbs · author / actions │  Inter 400 14px, Sand divider below
+├────────────────────────────────────────────┤
+│  Page title (Bricolage 800, 28px, Void)    │  ~24px vertical breathing
+│  Subtitle (Inter 400, 14px, Warm Gray)     │
+├────────────────────────────────────────────┤
+│                                            │
+│   Content cards (lifted, Sand border)      │  16px gap between cards
+│   Data tables / forms / editors            │  14px body, 12px labels
+│                                            │
+├────────────────────────────────────────────┤
+│  Footer: footnote + version, Warm Gray     │
+└────────────────────────────────────────────┘
+```
+
+No floating bloom. No background gradient. The work surface is white, full stop.
+
+### 11.4 Components — portal-specific decisions
+
+For each portal component, what the v2.0 adaptation looks like. Implementation lives in `physician-portal/components/`.
+
+**`PathwayHeader`** — the page-title row for a single pathway under edit. Pathway title (Bricolage 800 28px), pathway-key + version in mono (`contraception · v1.2`), status pill, save/publish action. No eyebrow. No fuchsia in the title.
+
+**`Card`** — keep the three variants (`quiet`, `lifted`, `glass`) but change the default. Lifted is default for content cards. Glass is removed from this surface — there's no ember layer below to glass over.
+
+**`Badge`** — drives the status pills. Five variants: draft / in_review / approved / live / archived. The colour mapping per BRAND.md §10.1 (still open at time of writing; the portal team should drive this).
+
+**`EmptyState`** — peony glyph (low-intensity apricot bloom is allowed here), Bricolage 500 24px headline, Inter 400 body, optional fuchsia CTA. The one place apricot shows up in the portal.
+
+**`JsonViewer`** — JetBrains Mono 13px, Sand-bordered card, syntax highlighting via Fuchsia (keys), Warm Gray (values), Void (structure). No rainbow palettes.
+
+**`PeonyBloom`** — currently in the portal as a brand mark. After the rebrand, replace with the new `Bloom` component (low intensity) for empty states only. The standalone glyph goes away.
+
+### 11.5 Density / spacing scale for portal
+
+The portal can use the same spacing tokens (`s-1` through `s-16`) but its defaults skew tighter:
+
+| Context | Patient app | Portal |
+|---|---|---|
+| Section vertical rhythm | `s-8` (32px) | `s-6` (24px) |
+| Card internal padding | `s-5` (20px) | `s-4` (16px) |
+| List-row padding | `s-3` (12px) | `s-2` to `s-3` |
+| Button padding (primary) | `16px 0` full-width | `10px 16px` inline default |
+| Form-field gap | `s-3` (12px) | `s-2` (8px) |
+
+### 11.6 What this gives you
+
+Two surfaces that share a palette, a typeface, a press feel, and a vocabulary of tokens — but read differently to the people who use them. The patient encounters a confident editorial moment ("Mieux entendue."). The clinician encounters a competent workshop. Both are obviously Anoqi.
+
+### 11.7 Implementation map for the portal
+
+A separate-PR-per-concern migration, parallel to §8 but inside `physician-portal/`:
+
+| File | What changes |
+|---|---|
+| `physician-portal/app/globals.css` | Replace the v1.0 dark CSS variables with the v2.0 token values. White canvas, Void body, Bricolage display via `--font-display`, Inter via `--font-body`. |
+| `physician-portal/app/layout.tsx` | Load Bricolage Grotesque + Inter via `next/font/google`. Remove any Cormorant references. |
+| `physician-portal/components/Card.tsx` | Change default variant from `quiet` to `lifted`. Drop the `glass` variant. |
+| `physician-portal/components/Badge.tsx` | New status mapping per §10.1 once derived. |
+| `physician-portal/components/PathwayHeader.tsx` | Bricolage 800 title, no fuchsia accent on the title. |
+| `physician-portal/components/PeonyBloom.tsx` | **Delete** after `EmptyState` migrates to the shared `Bloom` component. |
+| `physician-portal/components/EmptyState.tsx` | Adopt the shared `Bloom` (low intensity), Bricolage 500 title. |
+| `physician-portal/components/JsonViewer.tsx` | New syntax-highlight palette: Fuchsia keys, Warm Gray values, Void structure. |
+
+Pick these up in the same order: tokens + typography first, components second, page-level edits third.
