@@ -1,9 +1,13 @@
 # Anoqi — System Handover
 
-Last updated: 2026-05-18 (Option C posture + privacy/safety PRs)
+Last updated: 2026-05-18 (Option C posture + privacy/safety PRs + brand v2.0)
 Supersedes (does not delete): [`PHASE_1_RAG.md`](./PHASE_1_RAG.md), which covers Phase 1 RAG only.
 
-**Looking for *how* to do something** (deploy, rotate keys, flip a flag, fix an error you just hit)? See [`RUNBOOK.md`](./RUNBOOK.md). This file explains *what* the system is and *why*; RUNBOOK is operational.
+**Looking for *how* to do something?**
+- [`RUNBOOK.md`](./RUNBOOK.md) — deploy, rotate keys, flip flags, fix common errors
+- [`BRAND.md`](./BRAND.md) — visual identity: palette, type, the form, component anchors
+
+This file explains *what* the system is and *why*. The other two cover *how to operate it* and *how it should look*.
 
 ---
 
