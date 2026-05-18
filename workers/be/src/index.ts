@@ -24,6 +24,11 @@ export type Env = {
   SUPABASE_SERVICE_ROLE_KEY: string
   SUPABASE_JWT_JWKS_URL?: string  // reserved for future JWKS-based local verification
 
+  // Comma-separated list of user UUIDs that get RAG even when
+  // ANOQI_RAG_ENABLED is false. Used to run a closed pilot while
+  // public traffic stays off. Anonymous sessions never qualify.
+  ANOQI_RAG_PILOT_USERS?: string
+
   // Comma-separated list of extra origins to allow in CORS, beyond the
   // defaults baked in below. Set when standing up a new preview build
   // (e.g. a PR-deploy URL) without redeploying.

@@ -50,6 +50,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useNavigation } from '@react-navigation/native'
 import { useOnboarding, type HealthObjective, type Language } from '../../context/OnboardingContext'
 import { supabase } from '../../lib/supabase'
+import { pseudonymise } from '../../lib/pseudonymise'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -508,9 +509,15 @@ export function ChatScreen() {
         await AsyncStorage.setItem('anoqi_session_id', sessionId)
       }
 
+      // Pseudonymise BEFORE leaving the device. The user's own bubble
+      // (userMessage.text above) still shows the raw `content` they typed —
+      // pseudonymisation is for what goes server-side, not what they see.
+      // See app/lib/pseudonymise.ts for the pattern set.
+      const { pseudonymisedText } = pseudonymise(content)
+
       const { data, error } = await supabase.functions.invoke<ChatApiResponse>('chat', {
         body: {
-          message:        content,
+          message:        pseudonymisedText,
           conversationId: conversationIdRef.current,
           sessionId,
           journeyType:    objective ?? 'free_chat',
