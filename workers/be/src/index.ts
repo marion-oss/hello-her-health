@@ -26,6 +26,11 @@ export type Env = {
   SUPABASE_URL: string
   SUPABASE_SERVICE_ROLE_KEY: string
   SUPABASE_JWT_JWKS_URL?: string  // reserved for future JWKS-based local verification
+
+  // Comma-separated list of user UUIDs that get RAG even when
+  // ANOQI_RAG_ENABLED is false. Used to run a closed pilot while
+  // public traffic stays off. Anonymous sessions never qualify.
+  ANOQI_RAG_PILOT_USERS?: string
 }
 
 const app = new Hono<{ Bindings: Env }>()

@@ -180,8 +180,19 @@ export async function chatHandler(c: Context<{ Bindings: Env }>): Promise<Respon
     { role: 'user' as const, content: message.trim() },
   ]
 
-  // Retrieval (gated)
-  const ragEnabled = (c.env.ANOQI_RAG_ENABLED ?? '').toLowerCase() === 'true'
+  // Retrieval (gated). Two ways RAG turns on:
+  //   1. Global: ANOQI_RAG_ENABLED='true' (everyone, including anon sessions).
+  //   2. Pilot:  the authenticated userId is in ANOQI_RAG_PILOT_USERS (a
+  //      comma-separated allowlist of UUIDs). Anonymous sessions never
+  //      qualify — pilot is auth-gated by design.
+  const ragGlobal = (c.env.ANOQI_RAG_ENABLED ?? '').toLowerCase() === 'true'
+  const pilotList = (c.env.ANOQI_RAG_PILOT_USERS ?? '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+  const ragPilot   = userId !== null && pilotList.includes(userId)
+  const ragEnabled = ragGlobal || ragPilot
+
   let snippets: Snippet[] = []
   if (ragEnabled) {
     try {
