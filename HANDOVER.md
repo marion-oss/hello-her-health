@@ -3,6 +3,8 @@
 Last updated: 2026-05-18 (Option C posture + privacy/safety PRs)
 Supersedes (does not delete): [`PHASE_1_RAG.md`](./PHASE_1_RAG.md), which covers Phase 1 RAG only.
 
+**Looking for *how* to do something** (deploy, rotate keys, flip a flag, fix an error you just hit)? See [`RUNBOOK.md`](./RUNBOOK.md). This file explains *what* the system is and *why*; RUNBOOK is operational.
+
 ---
 
 ## TL;DR
