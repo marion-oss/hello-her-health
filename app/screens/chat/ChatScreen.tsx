@@ -50,10 +50,13 @@ import { STARTERS } from './starters'
 import { StarterCard } from './StarterCard'
 import {
   postChatStream,
+  postSummary,
   AnoqiApiError,
   type ChatRequestDocument,
   type SourceDisplay,
 } from '../../lib/anoqiApi'
+import { Alert } from 'react-native'
+import { supabase } from '../../lib/supabase'
 import {
   BackHeader,
   BreathingForm,
@@ -480,6 +483,94 @@ export function ChatScreen() {
 
   const starters = STARTERS[objective ?? 'general'][language]
   const showSummaryBanner = userMessageCount >= 3
+  const [summaryLoading, setSummaryLoading] = useState(false)
+
+  // Wired to the "Générer un résumé pour ton médecin" banner. Calls
+  // POST /summaries on the BE, which returns a structured physician-ready
+  // summary. Auth is required — for anon users we surface a clear message.
+  //
+  // For now the result lands in a native Alert. A proper SummarySheet
+  // (mirroring ConsentSheet / GoalSheet) is a follow-up — see BRAND.md §10.
+  const handleGenerateSummary = useCallback(async () => {
+    if (summaryLoading) return
+    if (!conversationIdRef.current) {
+      Alert.alert(
+        language === 'fr' ? 'Pas encore de conversation' : 'No conversation yet',
+        language === 'fr'
+          ? 'Envoie quelques messages avant de générer un résumé.'
+          : 'Send a few messages before generating a summary.',
+      )
+      return
+    }
+    setSummaryLoading(true)
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData.session?.access_token
+      if (!accessToken) {
+        Alert.alert(
+          language === 'fr' ? 'Connexion requise' : 'Sign-in required',
+          language === 'fr'
+            ? 'Crée un compte ou connecte-toi pour générer un résumé.'
+            : 'Create an account or sign in to generate a summary.',
+        )
+        return
+      }
+      const { summary } = await postSummary({
+        conversationId: conversationIdRef.current,
+        language,
+        accessToken,
+      })
+
+      // Crude display for now — the structured summary as scrollable text.
+      // A proper SummarySheet replaces this once the UI lands.
+      const lines: string[] = []
+      lines.push(`${summary.title}`, '')
+      if (summary.content.motif) {
+        lines.push(language === 'fr' ? 'Motif :' : 'Chief complaint:')
+        lines.push(summary.content.motif, '')
+      }
+      if (summary.content.points_cles?.length) {
+        lines.push(language === 'fr' ? 'Points clés :' : 'Key points:')
+        for (const p of summary.content.points_cles) lines.push(`• ${p}`)
+        lines.push('')
+      }
+      if (summary.content.questions?.length) {
+        lines.push(language === 'fr' ? 'Questions pour le médecin :' : 'Questions for the doctor:')
+        for (const q of summary.content.questions) lines.push(`• ${q}`)
+        lines.push('')
+      }
+      if (summary.content.prochaines_etapes?.length) {
+        lines.push(language === 'fr' ? 'Prochaines étapes :' : 'Next steps:')
+        for (const s of summary.content.prochaines_etapes) lines.push(`• ${s}`)
+      }
+      Alert.alert(
+        language === 'fr' ? 'Résumé prêt' : 'Summary ready',
+        lines.join('\n').trim(),
+      )
+    } catch (err) {
+      if (__DEV__) console.warn('[chat] postSummary failed:', err)
+      const status = err instanceof AnoqiApiError ? err.status : 0
+      const message =
+        status === 401
+          ? language === 'fr'
+            ? 'Connexion requise pour générer un résumé.'
+            : 'Sign-in required to generate a summary.'
+          : status === 409
+            ? language === 'fr'
+              ? 'Un résumé existe déjà pour cette conversation.'
+              : 'A summary already exists for this conversation.'
+            : status === 400
+              ? language === 'fr'
+                ? 'La conversation est trop courte pour être résumée.'
+                : 'The conversation is too short to summarise.'
+              : language === 'fr'
+                ? 'Impossible de générer le résumé. Réessaie dans un instant.'
+                : 'Could not generate the summary. Please try again.'
+      Alert.alert(language === 'fr' ? 'Erreur' : 'Error', message)
+    } finally {
+      setSummaryLoading(false)
+    }
+  }, [language, summaryLoading])
 
   // Streaming typewriter. Single interval driven by `streamingId` only — never
   // by `messages` — so each setMessages tick does NOT re-fire this effect.
@@ -1053,9 +1144,8 @@ export function ChatScreen() {
         {showSummaryBanner && messages.length > 0 ? (
           <Pressable
             accessibilityRole="button"
-            onPress={() => {
-              /* navigate to SummaryScreen */
-            }}
+            onPress={handleGenerateSummary}
+            disabled={summaryLoading}
             style={{
               marginHorizontal: theme.spacing[5],
               marginBottom: theme.spacing[2],
