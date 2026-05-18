@@ -71,6 +71,12 @@ interface ChatResponse {
 // ─────────────────────────────────────────────────────────────
 const INPUT_BLOCKED_RESPONSE = `Je ne peux pas poser de diagnostic ni prescrire de traitement — c'est le rôle de ton médecin. Ce que je peux faire, c'est t'aider à préparer les bonnes questions pour ton prochain rendez-vous. Tu veux qu'on commence ?`
 
+// Returned when the LLM cited a source we did not provide. Stripping the
+// invalid [Sn] token would leave the surrounding claim unsupported but
+// visible — worse than refusing. Better to ask the user to rephrase.
+const CITATION_HALLUCINATION_FALLBACK_FR = `Je n'ai pas trouvé de source fiable pour répondre à cette question avec confiance. Tu peux reformuler, ou je peux t'orienter vers une consultation médicale.`
+const CITATION_HALLUCINATION_FALLBACK_EN = `I couldn't find a reliable source to answer this confidently. Try rephrasing, or I can suggest a medical consultation.`
+
 // ─────────────────────────────────────────────────────────────
 // MAIN HANDLER
 // ─────────────────────────────────────────────────────────────
@@ -279,14 +285,47 @@ serve(async (req: Request) => {
       aiResponse.content,
       snippets,
     )
-    const citationFlags = hallucinatedLabels.length > 0
-      ? [{
-          rule: 'hallucinated_citation',
-          severity: 'warn' as const,
-          message: `Model cited unknown labels: ${hallucinatedLabels.join(', ')}`,
-        }]
-      : []
-    const combinedFlags = [...aiResponse.policyResult.flags, ...citationFlags]
+
+    // Hallucinated [Sn] tokens mean the model made claims grounded in sources
+    // we did not provide. The parser strips the tokens but the claim itself
+    // remains in cleanContent — refusing is safer than showing an unsupported
+    // medical statement with its citation quietly removed.
+    if (hallucinatedLabels.length > 0) {
+      const fallbackContent = language === 'fr'
+        ? CITATION_HALLUCINATION_FALLBACK_FR
+        : CITATION_HALLUCINATION_FALLBACK_EN
+      const blockFlag = {
+        rule: 'hallucinated_citation',
+        severity: 'block' as const,
+        message: `Model cited unknown labels: ${hallucinatedLabels.join(', ')}`,
+      }
+      await persistMessages(supabase, {
+        conversationId: activeConversationId,
+        userId,
+        userMessage: message.trim(),
+        assistantContent: fallbackContent,
+        policyFlags: [...aiResponse.policyResult.flags, blockFlag],
+        sources: [],
+        tokensUsed: aiResponse.tokensUsed,
+        modelUsed: aiResponse.modelUsed,
+      })
+      const responsePayload: ChatResponse = {
+        message: {
+          id:              crypto.randomUUID(),
+          content:         fallbackContent,
+          role:            'assistant',
+          sources:         [],
+          sources_display: [],
+          policyFlags:     [...aiResponse.policyResult.flags, blockFlag],
+          createdAt:       new Date().toISOString(),
+        },
+        conversationId: activeConversationId,
+        blocked: true,
+      }
+      return jsonResponse(200, responsePayload)
+    }
+
+    const combinedFlags = aiResponse.policyResult.flags
 
     // ── 7.6 Enrich citations with display data ───────────────
     // Join cited rows against source_library / clinical_pathways /
