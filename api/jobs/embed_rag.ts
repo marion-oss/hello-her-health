@@ -6,7 +6,9 @@
  *      entries, and active pathway_red_flags.
  *   2. Chunks each into retrieval-sized pieces (~400 tokens, often shorter
  *      because seeded content is small).
- *   3. Embeds each chunk via Gemini text-embedding-004 (taskType=RETRIEVAL_DOCUMENT).
+ *   3. Embeds each chunk via Gemini gemini-embedding-001 at 768 dims
+ *      (taskType=RETRIEVAL_DOCUMENT). EMBEDDING_MODEL below is the
+ *      source of truth — older comments may reference text-embedding-004.
  *   4. Upserts into public.rag_chunks (PK: source_kind + source_ref + chunk_index).
  *   5. Calls public.delete_stale_rag_chunks() to drop chunks whose source is
  *      no longer live/active.
