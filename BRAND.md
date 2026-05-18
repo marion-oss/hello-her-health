@@ -4,7 +4,7 @@ The brand canon. **What** the visual identity is, **what** rules govern it, and 
 
 Companion to [`HANDOVER.md`](./HANDOVER.md) (architecture) and [`RUNBOOK.md`](./RUNBOOK.md) (operations). If those tell you the system, this tells you how it should *feel*.
 
-> **Version:** 2.0 — Light theme rebrand. Supersedes the v1.0 Sanctuary dark palette. See [§9 What changed from Sanctuary](#9-what-changed-from-sanctuary) for the migration.
+> **Version:** 2.1 — Welcome screen locked. Apricot bloom geometry finalised. Candy Pink added as eighth palette token. Headline rhythm simplified. See [§9 What changed from Sanctuary](#9-what-changed-from-sanctuary) for the full v1.0→v2.0 migration.
 
 ---
 
@@ -29,6 +29,7 @@ Seven tokens. Every rule about what colours can go where is encoded as a "Allowe
 | **Warm Gray** | `#3A3040` | Secondary copy: subtitles, captions, body that should recede |
 | **Petal** | `#FEF0F4` | Subtle warmth: pill backgrounds, status surfaces, card tints |
 | **Sand** | `#E8E0D8` | Quiet structure: secondary button outlines, hairline dividers |
+| **Candy Pink** | `#FFB0CC` | Reserved: future status tints, deeper warm surface if needed — not in active use in v2.1 |
 
 ### 2.2 Rules per token
 
@@ -106,7 +107,7 @@ Modular ratio **1.33** off a 15px body base. Final values are the rounded ones b
 
 The Anoqi headline carries the brand. It earns the weight by colour, not by adding emphasis.
 
-**Two-tone block, horizontal split.** A four-line headline breaks into two halves: top half Void, bottom half Fuchsia. The split is visual, not grammatical — it lands on the line break, not on the sentence boundary.
+**Single fuchsia accent — the second line only.** The canonical hero uses a four-line headline where the final two lines ("Mieux entendue.") are in Fuchsia. Everything above is Void. The split is always at "Mieux entendue." — it is the brand's single emotional line and earns the signal colour.
 
 The canonical hero:
 
@@ -117,19 +118,21 @@ Mieux                      ← Fuchsia
 entendue.                  ← Fuchsia
 ```
 
-For shorter headlines (two lines), promote a single fuchsia word:
+For shorter headlines (two lines), one fuchsia word only:
 
 ```
-Mieux informée. Mieux entendue.      ← all Void
-                ───────────────
+Mieux informée. Mieux entendue.
+                         ↑
                 only "entendue." in Fuchsia
 ```
 
 Never:
 - All-fuchsia headline (it stops being a signal)
-- Diagonal stripe alternation (Mieux/informée./Mieux/entendue. each a different colour — feels arbitrary)
+- Diagonal stripe alternation (e.g. alternating line colours — feels arbitrary and clashes)
+- Apricot in headline text (we tried it — it clashes with fuchsia at display size)
 - Italic display (we use weight to land, not slant)
 - Cormorant Garamond or any serif italic (deprecated from v1.0 Sanctuary)
+- Two competing accent colours in the same headline
 
 ### 3.4 Body copy
 
@@ -165,6 +168,8 @@ Reference geometry (300×610 phone canvas):
 <rect width="300" height="610" fill="url(#apricot)"/>
 <circle cx="228" cy="85" r="6.5" fill="#FF0472" opacity="0.90" filter="url(#dotGlow)"/>
 ```
+
+> **Locked in v2.1.** The SVG above is the exact production reference. Do not change `cx`, `cy`, `r` or dot position without a brand review.
 
 ### 4.2 What it isn't
 
@@ -211,7 +216,8 @@ anoqi●
 - Letter-spacing `-0.5px` (tight)
 - Colour Void `#0D0D12`
 - Dot: 7px (at 20px wordmark) / 10px (at 56px), Fuchsia, margin-left 2px, margin-top 2px from the baseline, animated with `dotPulse` 4s
-- Never on a non-white background. If you need to use it on dark, use a different mark (TBD — out of scope for v2.0).
+- On white or warm-white backgrounds: Void wordmark, Fuchsia dot (see `anoqi-logo-white.svg`, `anoqi-logo-light.svg`).
+- On dark backgrounds: White wordmark, Fuchsia dot (see `anoqi-logo-dark.svg`). This is now defined — the "TBD" from v2.0 is resolved.
 
 ### 5.2 Eyebrow
 
@@ -392,6 +398,7 @@ For anyone returning to the codebase, the v1.0 → v2.0 delta in one table:
 | **Warmth** | Ember `#C4806A` wash everywhere | Soft Apricot `#FDBA74` in one bloom only |
 | **Brand mark** | Six-element BreathingForm + PeonyBloom + LiquidEmber | Single fuchsia dot + single apricot bloom |
 | **Pill backgrounds** | rgba(255,245,238,0.06) | Petal `#FEF0F4` |
+| **Candy Pink** | Not present | `#FFB0CC` added as eighth token (reserved for future status surfaces) |
 | **Secondary buttons** | Dusk-bordered ghost | Sand-bordered outline |
 | **Headline italics** | Italic by default | Upright always |
 | **Headline rhythm** | Single accent word | Two-tone horizontal split |
@@ -408,7 +415,7 @@ Things the new system needs but doesn't yet specify. Each is a separate task.
 2. **Markdown accents.** Inline `[Sn]` citations, code fragments, bold, em — all need a re-derivation against white.
 3. **Dark-mode contingency.** If iOS users force dark mode at the OS level, the brand currently breaks. Decision: keep white-only with a system override (`color-scheme: light`), or design a v2.0-faithful dark variant.
 4. **Logo on non-white surfaces.** Press, partner docs, third-party embeds. Out of scope here but will need a brand-asset pack.
-5. **The Bloom component.** This doc describes the visual; a `Bloom.tsx` component should replace BreathingForm with the new geometry. Could be one component with props for size + position + intensity.
+5. **The Bloom component.** ~~This doc describes the visual; a `Bloom.tsx` component should replace BreathingForm with the new geometry.~~ **Partially resolved in v2.1.** The geometry is locked in §4.1. Implementation: a `Bloom` component with props `intensity` (0–1, default 1) and `position` (default `top-right`). The SVG in §4.1 is the full-intensity reference. Dot is always present except on splash/loading (intensity < 0.5).
 
 Pick these up in order as the rebrand rolls into more surfaces.
 
@@ -515,3 +522,39 @@ A separate-PR-per-concern migration, parallel to §8 but inside `physician-porta
 | `physician-portal/components/JsonViewer.tsx` | New syntax-highlight palette: Fuchsia keys, Warm Gray values, Void structure. |
 
 Pick these up in the same order: tokens + typography first, components second, page-level edits third.
+
+
+---
+
+## 12. Welcome screen reference
+
+The locked production mockup for the patient app welcome screen is in `anoqi-welcome-screen.html`. This is the single source of truth for the hero composition until the native implementation is complete.
+
+### 12.1 What's locked
+
+| Element | Value |
+|---|---|
+| Canvas | `#FFFFFF` |
+| Bloom gradient | `cx="72%" cy="10%" r="55%"` · `#FDBA74` → transparent |
+| Dot position | `cx="228" cy="85"` · `r="6.5"` · Fuchsia at 90% opacity |
+| Dot animation | `dotPulse` 4s ease-in-out · opacity .92→.35 · scale 1→.62 |
+| Wordmark size | Bricolage 800 · 20px · Void |
+| Headline | H1 · 38px · Void + Fuchsia on "Mieux entendue." only |
+| Eyebrow | "POUR LA SANTÉ DES FEMMES" · Inter 500 · 9px · Fuchsia at 80% |
+| Subtitle | Inter 300 · 13px · Warm Gray `#3A3040` |
+| Pills | Petal `#FEF0F4` background · no border · Fuchsia pip |
+| Primary button | Fuchsia fill · White Bricolage 500 · border-radius 14px |
+| Secondary button | White fill · Void text · Sand border 1.5px · border-radius 14px |
+
+### 12.2 What must not change without brand review
+
+- The bloom position and radius (`cx`, `cy`, `r`)
+- The dot position relative to the bloom
+- The two-tone headline split ("Mieux entendue." = Fuchsia, everything above = Void)
+- The pill background colour (Petal only — not Candy Pink, not Apricot)
+
+### 12.3 What can be adjusted per screen
+
+- Bloom intensity — reduce to ~60% on inner screens and empty states
+- Bloom position — can move to bottom-left or bottom-right on secondary screens for variety
+- Dot size — scales proportionally with bloom intensity
