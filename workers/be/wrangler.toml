@@ -15,6 +15,10 @@ ANOQI_RAG_ENABLED = "true"
 #   SUPABASE_SERVICE_ROLE_KEY     — bypasses RLS; required by chat / documents / summaries
 #   SUPABASE_JWT_JWKS_URL         — https://xulemxvfufwvewvtwwcv.supabase.co/auth/v1/keys
 #                                   (used by auth.ts to verify mobile-app JWTs)
+#   ANOQI_RAG_PILOT_USERS         — comma-separated user UUIDs that get RAG
+#                                   even when ANOQI_RAG_ENABLED=false. Used
+#                                   to run a closed pilot while public traffic
+#                                   stays off. Anonymous sessions never qualify.
 
 # Optional: KV namespace for RAG embedding cache.
 # Skips the Gemini embedding round-trip (~150 ms) when the same query has been

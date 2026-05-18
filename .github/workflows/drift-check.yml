@@ -1,0 +1,61 @@
+name: drift-check
+
+# Asserts that files duplicated for the Supabase Edge / Cloudflare Worker
+# parallel-run window stay in sync. Two pairs are *intentionally* identical
+# byte-for-byte (modulo the `.ts` import suffix Deno requires) — drift
+# between them means a safety rule or citation handling has changed on one
+# backend but not the other. That's a regression we want to fail loudly.
+#
+# Pairs deliberately NOT checked here:
+#   api/lib/gemini.ts        <-> workers/be/src/lib/gemini.ts
+#   api/lib/retrieval.ts     <-> workers/be/src/lib/retrieval.ts
+#   api/lib/pseudonymise.ts  <-> workers/be/src/lib/pseudonymise.ts
+#   api/lib/summaryParser.ts <-> workers/be/src/lib/summaryParser.ts
+# These differ in env access (Deno.env vs c.env) and import style. To pull
+# them into this check, factor the env-touching surface into a small adapter
+# and make the rest pure.
+
+on:
+  pull_request:
+    paths:
+      - 'api/lib/citationParser.ts'
+      - 'workers/be/src/lib/citationParser.ts'
+      - 'api/policy/policyChecker.ts'
+      - 'workers/be/src/policy/policyChecker.ts'
+      - '.github/workflows/drift-check.yml'
+  push:
+    branches: [main, cloudflare-workers]
+
+jobs:
+  pair-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare canonical pairs (ignoring `.ts` import-suffix)
+        run: |
+          set -e
+          fail=0
+
+          # Normalise the Deno side by stripping `.ts` from relative imports,
+          # which is the only legitimate difference between the two copies.
+          normalise() {
+            sed -E "s/from '(\.[^']*)\.ts'/from '\1'/g" "$1"
+          }
+
+          compare() {
+            local left="$1"
+            local right="$2"
+            if ! diff <(normalise "$left") "$right" >/dev/null; then
+              echo "::error::DRIFT between $left and $right"
+              echo "--- diff ---"
+              diff <(normalise "$left") "$right" || true
+              echo "------------"
+              fail=1
+            fi
+          }
+
+          compare api/lib/citationParser.ts   workers/be/src/lib/citationParser.ts
+          compare api/policy/policyChecker.ts workers/be/src/policy/policyChecker.ts
+
+          exit $fail

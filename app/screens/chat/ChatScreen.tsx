@@ -38,6 +38,7 @@ import {
   type LocalDocument,
 } from '../../lib/documentStore'
 import { setPendingFile } from '../../lib/pendingFile'
+import { pseudonymise } from '../../lib/pseudonymise'
 
 import {
   useOnboarding,
@@ -560,9 +561,15 @@ export function ChatScreen() {
       if (__DEV__) console.warn('[chat] failed to load in-context documents:', err)
     }
 
+    // Pseudonymise BEFORE leaving the device. The user's own bubble
+    // (set in handleSend above) still shows the raw text they typed —
+    // pseudonymisation is for the server-bound payload only.
+    // See app/lib/pseudonymise.ts for the pattern set.
+    const { pseudonymisedText } = pseudonymise(userContent)
+
     await postChatStream(
       {
-        message:        userContent,
+        message:        pseudonymisedText,
         language,
         sessionId,
         objective,
