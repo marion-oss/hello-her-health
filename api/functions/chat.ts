@@ -245,12 +245,24 @@ serve(async (req: Request) => {
     // rules. A retrieval failure MUST NOT block the chat: log it and
     // continue with no snippets (the LLM falls back to its base behaviour).
     //
-    // Feature gate: ANOQI_RAG_ENABLED must be 'true' for retrieval to run.
-    // This is intentional — RAG-grounded chat is closer to the EU-MDR /
-    // medical-device threshold than free conversation (see ROADMAP.md →
-    // "Clinical governance angle"). Default OFF until regulatory sign-off
-    // is recorded.
-    const ragEnabled = (Deno.env.get('ANOQI_RAG_ENABLED') ?? '').toLowerCase() === 'true'
+    // Feature gate: RAG runs when EITHER the global flag is on OR the
+    // authenticated user is in the pilot allowlist. Anonymous sessions
+    // never qualify for pilot — pilot is auth-gated by design.
+    //
+    //   ANOQI_RAG_ENABLED       'true' | 'false'   — global flag
+    //   ANOQI_RAG_PILOT_USERS   'uuid,uuid,...'    — pilot allowlist
+    //
+    // RAG-grounded chat is closer to the EU-MDR / medical-device threshold
+    // than free conversation (see ROADMAP.md → "Clinical governance
+    // angle"). Default global=OFF; pilot list named individually.
+    const ragGlobal = (Deno.env.get('ANOQI_RAG_ENABLED') ?? '').toLowerCase() === 'true'
+    const pilotList = (Deno.env.get('ANOQI_RAG_PILOT_USERS') ?? '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+    const ragPilot   = userId !== null && pilotList.includes(userId)
+    const ragEnabled = ragGlobal || ragPilot
+
     let snippets: Snippet[] = []
     if (ragEnabled) {
       try {
