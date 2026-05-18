@@ -79,20 +79,29 @@ const DISCLAIMER_TRIGGER_PATTERNS = [
 // ─────────────────────────────────────────────────────────────
 // SAFE FALLBACK — replaces blocked diagnostic content
 // ─────────────────────────────────────────────────────────────
-const DIAGNOSIS_FALLBACK = `Je ne suis pas en mesure de poser un diagnostic. Ce que je peux faire, c'est vous aider à comprendre vos symptômes et à préparer les bonnes questions à poser à votre médecin. Voulez-vous que je génère un résumé pour votre prochain rendez-vous ?`
+const DIAGNOSIS_FALLBACK: Record<'fr' | 'en', string> = {
+  fr: `Je ne suis pas en mesure de poser un diagnostic. Ce que je peux faire, c'est vous aider à comprendre vos symptômes et à préparer les bonnes questions à poser à votre médecin. Voulez-vous que je génère un résumé pour votre prochain rendez-vous ?`,
+  en: `I'm not able to make a diagnosis. What I can do is help you understand your symptoms and prepare the right questions for your doctor. Would you like me to generate a summary for your next appointment?`,
+}
 
-const PRESCRIPTION_FALLBACK = `Je ne peux pas recommander de médicaments spécifiques ou modifier votre traitement actuel — c'est le rôle de votre médecin. Je peux vous aider à préparer vos questions pour votre prochain rendez-vous.`
+const PRESCRIPTION_FALLBACK: Record<'fr' | 'en', string> = {
+  fr: `Je ne peux pas recommander de médicaments spécifiques ou modifier votre traitement actuel — c'est le rôle de votre médecin. Je peux vous aider à préparer vos questions pour votre prochain rendez-vous.`,
+  en: `I can't recommend specific medications or change your current treatment — that's your doctor's role. I can help you prepare questions for your next appointment.`,
+}
 
 // ─────────────────────────────────────────────────────────────
 // DISCLAIMER — appended when warning patterns fire
 // ─────────────────────────────────────────────────────────────
-const PHYSICIAN_DISCLAIMER = `\n\n⚠️ *Ces informations sont fournies à titre informatif uniquement. Parlez-en avec votre médecin avant de prendre toute décision concernant votre santé.*`
+const PHYSICIAN_DISCLAIMER: Record<'fr' | 'en', string> = {
+  fr: `\n\n⚠️ *Ces informations sont fournies à titre informatif uniquement. Parlez-en avec votre médecin avant de prendre toute décision concernant votre santé.*`,
+  en: `\n\n⚠️ *This information is provided for informational purposes only. Speak with your doctor before making any decisions about your health.*`,
+}
 
 // ─────────────────────────────────────────────────────────────
 // MAIN POLICY CHECKER
 // Call this on every AI response before sending to user
 // ─────────────────────────────────────────────────────────────
-export function checkPolicy(content: string): PolicyResult {
+export function checkPolicy(content: string, language: 'fr' | 'en' = 'fr'): PolicyResult {
   const flags: PolicyFlag[] = []
   let sanitisedContent = content
 
@@ -107,7 +116,7 @@ export function checkPolicy(content: string): PolicyResult {
       return {
         safe: false,
         flags,
-        sanitisedContent: DIAGNOSIS_FALLBACK
+        sanitisedContent: DIAGNOSIS_FALLBACK[language]
       }
     }
   }
@@ -123,7 +132,7 @@ export function checkPolicy(content: string): PolicyResult {
       return {
         safe: false,
         flags,
-        sanitisedContent: PRESCRIPTION_FALLBACK
+        sanitisedContent: PRESCRIPTION_FALLBACK[language]
       }
     }
   }
@@ -136,7 +145,7 @@ export function checkPolicy(content: string): PolicyResult {
         severity: 'warn',
         message: `High-risk content detected: ${pattern.toString()}`
       })
-      sanitisedContent = content + PHYSICIAN_DISCLAIMER
+      sanitisedContent = content + PHYSICIAN_DISCLAIMER[language]
     }
   }
 
