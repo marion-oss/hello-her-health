@@ -2,7 +2,7 @@
  * anoqi — App.tsx
  *
  * Root entry point. Wires together:
- *   • expo-font   — loads Cormorant Garamond (display) + Inter (body)
+ *   • expo-font   — loads Bricolage Grotesque (display) + Inter (body)
  *   • expo-splash-screen — holds splash until fonts are ready
  *   • NavigationContainer — single navigation tree
  *   • OnboardingProvider  — shared language + objective state
@@ -27,11 +27,10 @@ import * as Font from 'expo-font'
 import * as SplashScreen from 'expo-splash-screen'
 
 import {
-  CormorantGaramond_400Regular,
-  CormorantGaramond_400Regular_Italic,
-  CormorantGaramond_500Medium,
-  CormorantGaramond_500Medium_Italic,
-} from '@expo-google-fonts/cormorant-garamond'
+  BricolageGrotesque_500Medium,
+  BricolageGrotesque_700Bold,
+  BricolageGrotesque_800ExtraBold,
+} from '@expo-google-fonts/bricolage-grotesque'
 
 import {
   Inter_300Light,
@@ -73,14 +72,17 @@ export default function App() {
 
   useEffect(() => {
     // Fonts load in the background — we render with system fallbacks first so
-    // first paint isn't blocked on ~3 MB of woff downloads. Brief FOUT on the
-    // very first visit; cached forever after. Display: Cormorant Garamond,
-    // Body: Inter. Generous line-height is enforced in typography.ts.
+    // first paint isn't blocked on ~2 MB of woff downloads. Brief FOUT on the
+    // very first visit; cached forever after. Display: Bricolage Grotesque
+    // (500 / 700 / 800), Body: Inter (300 / 400 / 500 / 600). Generous
+    // line-height is enforced in typography.ts.
+    //
+    // The font family names below must match those declared in
+    // app/theme/typography.ts — RN looks the font up by its registered name.
     Font.loadAsync({
-      'CormorantGaramond-Regular':      CormorantGaramond_400Regular,
-      'CormorantGaramond-Italic':       CormorantGaramond_400Regular_Italic,
-      'CormorantGaramond-Medium':       CormorantGaramond_500Medium,
-      'CormorantGaramond-MediumItalic': CormorantGaramond_500Medium_Italic,
+      'BricolageGrotesque-Medium':     BricolageGrotesque_500Medium,
+      'BricolageGrotesque-Bold':       BricolageGrotesque_700Bold,
+      'BricolageGrotesque-ExtraBold':  BricolageGrotesque_800ExtraBold,
       'Inter-Light':    Inter_300Light,
       'Inter-Regular':  Inter_400Regular,
       'Inter-Medium':   Inter_500Medium,
