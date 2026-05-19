@@ -288,8 +288,13 @@ export const lightColors: ColorTokens = {
     // not on a tinted surface. Petal serves as a soft tint for pills only.
     canvas:         '#ffffff',
     surface:        '#ffffff',
-    surfaceMuted:   palette.petal[100],                  // #FEF0F4
-    surfaceWarm:    'rgba(253, 186, 116, 0.10)',         // apricot at 10% alpha
+    surfaceMuted:   palette.petal[100],                  // #FEF0F4 — soft Petal cards
+    // surfaceWarm is used for disabled-button bg, selected-row tint, and
+    // the segmented-control indicator. Original value (apricot at 10%) was
+    // too pale to register against a Petal card, and violated BRAND.md §2.2
+    // ("apricot never as UI surface"). Petal-300 reads as a clearly pink
+    // tint that's still calm enough to be a non-primary surface.
+    surfaceWarm:    palette.petal[300],                  // #FBCAD7
     surfaceInverse: palette.void[500],
     overlay:        'rgba(13, 13, 18, 0.55)',            // lighter scrim than dark mode
   },
@@ -322,7 +327,9 @@ export const lightColors: ColorTokens = {
     danger:         palette.burgundy[500],
     dangerSurface:  'rgba(156, 54, 84, 0.10)',
     info:           palette.fuchsia[500],
-    infoSurface:    palette.petal[100],
+    // One shade darker than the standard Petal pill so the "Optionnel"
+    // marker on ConsentScreen reads with more presence against white.
+    infoSurface:    palette.petal[200],                  // #FDE0EA
   },
   // Status — provisional v2.0 mapping. Pending the rework in BRAND.md §10.1.
   status: {
