@@ -36,7 +36,7 @@ import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import { useOnboarding, type HealthObjective } from '../../context/OnboardingContext'
 import { ThemeProvider, useTheme, palette } from '../../theme'
-import { Text } from '../../components'
+import { Icon, Text } from '../../components'
 import { listDocuments, type DocumentIndexEntry } from '../../lib/documentStore'
 
 // ─── COPY ──────────────────────────────────────────────────────────────────
@@ -337,44 +337,59 @@ function Bloom({ size, intensity }: { size: number; intensity: number }) {
 
 // ─── PRIMARY CTA ───────────────────────────────────────────────────────────
 //
-// The hero "Commencer une conversation" button. Fuchsia fill, white text,
-// Bricolage 500, radius 14, Emil press rule.
+// Speech-bubble icon + label on a fuchsia fill. Implemented to Marion's
+// alignment spec (2026-05-19):
+//   - alignSelf: 'stretch'              → full width inside its padded parent
+//   - alignItems / justifyContent       → vertically + horizontally centred
+//   - radius 16, paddingV 15, paddingH 20
+//   - Icon style.lineHeight             → pins icon baseline to label
+//   - Text lineHeight + includeFontPadding + textAlignVertical
+//                                       → cross-platform vertical alignment
+//   - press scale via inline style      → no Animated wrapper needed
 function PrimaryCTA({ label, onPress }: { label: string; onPress: () => void }) {
-  const scale = useSharedValue(1)
-  const ease  = Easing.bezier(0.22, 1, 0.36, 1)
-  const scaleStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
-
   return (
-    <Animated.View style={scaleStyle}>
-      <Pressable
-        onPressIn={() => { scale.value = withTiming(0.97, { duration: 100, easing: ease }) }}
-        onPressOut={() => { scale.value = withTiming(1,    { duration: 200, easing: ease }) }}
-        onPress={onPress}
-        style={({ hovered }: any) => [
-          {
-            backgroundColor: palette.fuchsia[500],
-            borderRadius: 14,
-            paddingVertical: 18,
-            alignItems: 'center',
-            justifyContent: 'center',
-          },
-          Platform.OS === 'web' && hovered
-            ? ({ boxShadow: '0 8px 24px rgba(255, 4, 114, 0.35)' } as any)
-            : null,
-        ]}
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed, hovered }: any) => ({
+        backgroundColor: (hovered || pressed) ? palette.fuchsia[600] : palette.fuchsia[500],
+        borderRadius: 16,
+        paddingVertical: 15,
+        paddingHorizontal: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        alignSelf: 'stretch',
+        transform: pressed ? [{ scale: 0.98 }] : undefined,
+        ...(Platform.OS === 'web' && hovered
+          ? ({ boxShadow: '0 8px 24px rgba(255, 4, 114, 0.35)' } as any)
+          : null),
+      })}
+    >
+      {/* Icon vertical alignment is handled by the parent's `alignItems: 'center'`
+          plus the Text's lineHeight + includeFontPadding flags. `style.lineHeight`
+          on an Icon is a web-CSS trick; RN's Icon component doesn't accept it. */}
+      <Icon
+        name="MessageCircle"
+        size={17}
+        color="#ffffff"
+        strokeWidth={2}
+      />
+      <Text
+        style={{
+          fontFamily: 'BricolageGrotesque-Bold',
+          fontSize: 15,
+          fontWeight: '700',
+          color: '#ffffff',
+          lineHeight: 20,
+          includeFontPadding: false,
+          textAlignVertical: 'center',
+        } as any}
       >
-        <Text
-          style={{
-            fontFamily: 'BricolageGrotesque-Medium',
-            fontSize: 15,
-            letterSpacing: 0.3,
-            color: '#ffffff',
-          }}
-        >
-          {label}
-        </Text>
-      </Pressable>
-    </Animated.View>
+        {label}
+      </Text>
+    </Pressable>
   )
 }
 
