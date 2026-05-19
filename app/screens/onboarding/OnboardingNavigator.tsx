@@ -47,7 +47,6 @@
 import React from 'react'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 
-import { useTheme } from '../../theme'
 import { WelcomeScreen }   from './WelcomeScreen'
 import { ObjectiveScreen } from './ObjectiveScreen'
 import { ConsentScreen }   from './ConsentScreen'
@@ -75,14 +74,16 @@ type Props = {
 }
 
 export function OnboardingNavigator(_props: Props) {
-  const theme = useTheme()
+  // All onboarding screens are now v2.0 light. Hardcoding the navigator
+  // background to white avoids a dark flash during slide transitions and
+  // around safe-area edges.
   return (
     <Stack.Navigator
       initialRouteName="Welcome"
       screenOptions={{
         headerShown: false,
         animation: 'slide_from_right',
-        contentStyle: { backgroundColor: theme.colors.bg.canvas },
+        contentStyle: { backgroundColor: '#ffffff' },
       }}
     >
       <Stack.Screen name="Welcome"   component={WelcomeScreen}   />
