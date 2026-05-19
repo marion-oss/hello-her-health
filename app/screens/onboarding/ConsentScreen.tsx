@@ -1,8 +1,12 @@
 // Anoqi — ConsentScreen.
 //
 // Editorial intro explaining WHY consent is asked (it's core to the product,
-// not a hurdle). Three rows with sage-bordered checkboxes (peony check when
-// active). Optional row gets a small teal "Optionnel" pill.
+// not a hurdle). Three rows with checkboxes. Optional row gets a small
+// "Optionnel" pill.
+//
+// v2.0: this screen wraps itself in <ThemeProvider mode="light"> so every
+// theme-aware descendant (Button, Checkbox, Pill, ProgressBar, Text) picks
+// up the v2.0 tokens. The inner screen code is unchanged from v1.0.
 
 import React, { useState } from 'react'
 import { Linking, Pressable, SafeAreaView, ScrollView, View } from 'react-native'
@@ -10,8 +14,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useNavigation } from '@react-navigation/native'
 
 import { useOnboarding } from '../../context/OnboardingContext'
-import { hover, useTheme } from '../../theme'
+import { hover, ThemeProvider, useTheme } from '../../theme'
 import {
+  Bloom,
   Button,
   Checkbox,
   Pill,
@@ -31,6 +36,17 @@ type ConsentState = {
 }
 
 export function ConsentScreen() {
+  return (
+    <ThemeProvider mode="light">
+      <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
+        <Bloom intensity={0.5} />
+        <ConsentScreenInner />
+      </View>
+    </ThemeProvider>
+  )
+}
+
+function ConsentScreenInner() {
   const navigation = useNavigation<any>()
   const { language } = useOnboarding()
   const theme = useTheme()
@@ -55,7 +71,7 @@ export function ConsentScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }}>
       <View
         style={{
           flex: 1,

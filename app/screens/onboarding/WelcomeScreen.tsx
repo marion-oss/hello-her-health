@@ -1,18 +1,18 @@
-// Anoqi — WelcomeScreen (iridescent register).
+// Anoqi — WelcomeScreen (v2.0 Bloom register).
 //
-// Void canvas, a faint breathing-form in the lower-right, a frosted glass
-// hero card centered with italic Cormorant Garamond setting:
-//   "Mieux informée. / Mieux entendue."
+// White canvas, one apricot radial bloom bleeding off the top-right corner,
+// one pulsing fuchsia dot inside it. Two-tone headline: top half Void, bottom
+// half Fuchsia. Petal-tinted pills, fuchsia primary CTA, Sand-outlined
+// secondary. See BRAND.md for the canonical spec.
 //
-// Beneath the glass card, a slow-moving LiquidEmber layer breathes warm ember
-// (and a single fuchsia bloom) so the card feels alive without ever pulling
-// the eye. CTA is a glass pill with a pulsing fuchsia dot — that one dot is
-// the brand's only fully-saturated mark on the screen.
+// This screen is the first surface migrated to v2.0. It wraps itself in
+// <ThemeProvider mode="light"> so the rest of the app (still on the v1.0
+// Sanctuary dark theme) keeps rendering as it did. Once enough screens are
+// migrated, App.tsx flips its default mode and these per-screen wrappers
+// can come out.
 //
-// One layout serves both mobile and desktop; the glass card centres itself
-// and the SafeAreaView caps the top/bottom on native. On web the screen
-// escapes the 60% appShell column via `position: 'fixed'` so the ambient
-// background extends edge to edge.
+// Mockup reference: the HTML in the brand session. Geometry below is ported
+// from there at 300×610 phone scale, then made responsive.
 
 import React, { useEffect } from 'react'
 import {
@@ -23,7 +23,6 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native'
-import { LinearGradient } from 'expo-linear-gradient'
 import { useNavigation } from '@react-navigation/native'
 import Animated, {
   Easing,
@@ -32,310 +31,339 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated'
+import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import { useOnboarding, type Language } from '../../context/OnboardingContext'
-import { hover, useTheme, palette } from '../../theme'
-import { BreathingForm, LiquidEmber, Text, Wordmark } from '../../components'
+import { ThemeProvider, useTheme, palette } from '../../theme'
+import { Text } from '../../components'
 
+// ─── COPY ──────────────────────────────────────────────────────────────────
+//
+// The headline is rendered as four lines on mobile (each word on its own
+// line, two void + two fuchsia). On desktop the headline naturally wraps
+// into the two-tone split.
 const COPY = {
   fr: {
-    trustEyebrow: 'Precision · Biology-first · Privé',
-    headline: ['Mieux informée.', 'Mieux entendue.'],
-    descriptor:
-      "Anoqi est ta compagne santé — pour comprendre tes symptômes, préparer tes consultations, et naviguer le système médical en confiance.",
-    pillars: [
-      { n: '01', label: 'Sources médicales',     detail: 'NHS · HAS · NICE'    },
-      { n: '02', label: 'Étudié sur les femmes', detail: ''                    },
-      { n: '03', label: 'Anonyme',               detail: 'Jamais lié à ton nom' },
+    eyebrow: 'Pour la santé des femmes',
+    headlineTop:    ['Mieux', 'informée.'],
+    headlineBottom: ['Mieux', 'entendue.'],
+    subtitle:
+      'Comprendre votre corps, préparer vos consultations, naviguer en confiance.',
+    pills: [
+      'Sources validées — NHS, HAS, NICE',
+      'Études menées sur les femmes',
+      'Jamais lié à votre identité',
     ],
-    cta: 'Commencer',
+    cta:   'Commencer →',
     login: "J'ai déjà un compte",
   },
   en: {
-    trustEyebrow: 'Precision · Biology-first · Private',
-    headline: ['Better informed.', 'Better heard.'],
-    descriptor:
-      'Anoqi is your health companion — helping you understand your symptoms, prepare for appointments, and navigate the medical system with confidence.',
-    pillars: [
-      { n: '01', label: 'Medical sources',  detail: 'NHS · HAS · NICE'        },
-      { n: '02', label: 'Studied on women', detail: ''                        },
-      { n: '03', label: 'Anonymous',        detail: 'Never linked to your name' },
+    eyebrow: 'For women’s health',
+    headlineTop:    ['Better', 'informed.'],
+    headlineBottom: ['Better', 'heard.'],
+    subtitle:
+      'Understand your body, prepare for appointments, navigate with confidence.',
+    pills: [
+      'Validated sources — NHS, HAS, NICE',
+      'Research conducted on women',
+      'Never linked to your identity',
     ],
-    cta: 'Get started',
+    cta:   'Get started →',
     login: 'I already have an account',
   },
 } as const
 
-type Copy = (typeof COPY)['fr']
-
+// ─── PUBLIC ENTRY ──────────────────────────────────────────────────────────
+//
+// The light-themed inner shell sits behind a ThemeProvider so descendants
+// (Text, etc.) read v2.0 tokens regardless of the app-level mode.
 export function WelcomeScreen() {
+  return (
+    <ThemeProvider mode="light">
+      <WelcomeScreenInner />
+    </ThemeProvider>
+  )
+}
+
+// ─── INNER ─────────────────────────────────────────────────────────────────
+function WelcomeScreenInner() {
   const navigation = useNavigation<any>()
   const { language, setLanguage } = useOnboarding()
   const { width } = useWindowDimensions()
-
+  const theme = useTheme()
   const copy = COPY[language]
-  const isDesktop = Platform.OS === 'web' && width >= 900
+
+  // Compact phones bring the bloom in closer; desktop / iPad scales up.
+  const isCompact = width < 480
+  const bloomSize = isCompact ? 360 : 480
 
   const goObjective = () => navigation.navigate('Objective')
   const goLogin = () => navigation.navigate('Account', { mode: 'login' })
 
-  // On web, escape the 60% appShell column so the ambient backdrop fills
-  // the whole viewport. Native sits inside its normal flex root.
-  const escapeShell = Platform.OS === 'web'
-    ? ({
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-      } as any)
-    : { flex: 1 }
-
   return (
-    <View style={[escapeShell, { backgroundColor: palette.void[500] }]}>
-      <StatusBar barStyle="light-content" backgroundColor={palette.void[500]} />
+    <View style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
+      <StatusBar barStyle="dark-content" backgroundColor={theme.colors.bg.canvas} />
 
-      {/* Breathing form — the brand's signature visual. On desktop web,
-          sits in the right void area, outside the centred glass card so
-          both stay visible. On mobile/native, fills the canvas centred
-          behind everything. */}
-      <View
-        pointerEvents="none"
-        style={
-          isDesktop
-            ? {
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                bottom: 0,
-                width: 810,
-                alignItems: 'center',
-                justifyContent: 'center',
-                transform: [{ translateX: 80 }],
-              }
-            : {
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                alignItems: 'center',
-                justifyContent: 'center',
-                transform: [{ translateX: 80 }],
-              }
-        }
-      >
-        <BreathingForm size={isDesktop ? 765 : 1440} />
-      </View>
-
-      {/* A faint corner glow opposite the breathing form so the canvas is
-          never quite empty. */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: -160,
-          top: -120,
-          width: 480,
-          height: 480,
-        }}
-      >
-        <LinearGradient
-          colors={[
-            'rgba(196, 128, 106, 0.32)',
-            'rgba(196, 128, 106, 0)',
-          ]}
-          locations={[0, 1]}
-          start={{ x: 0.5, y: 0.5 }}
-          end={{ x: 1, y: 1 }}
-          style={{
-            flex: 1,
-            borderRadius: 9999,
-            ...(Platform.OS === 'web' ? ({ filter: 'blur(60px)' } as any) : null),
-          }}
-        />
-      </View>
+      {/* ── Apricot bloom (decoration). Single radial gradient bleeding off
+            the top-right corner. Inside it, a single fuchsia dot — the only
+            saturated mark on the screen, pulsing on a 4s heartbeat. ──── */}
+      <Bloom size={bloomSize} />
 
       <SafeAreaView style={{ flex: 1 }}>
         <View
           style={{
             flex: 1,
-            paddingHorizontal: isDesktop ? 96 : 24,
-            paddingTop: isDesktop ? 32 : 18,
-            paddingBottom: isDesktop ? 48 : 28,
+            paddingHorizontal: isCompact ? 26 : 40,
+            paddingTop: isCompact ? 24 : 32,
+            paddingBottom: isCompact ? 26 : 40,
+            maxWidth: 640,
+            alignSelf: 'center',
+            width: '100%',
           }}
         >
-          {/* Header — wordmark + lang toggle */}
+          {/* Header — wordmark left, language toggle right */}
           <View
             style={{
               flexDirection: 'row',
-              justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: isDesktop ? 32 : 24,
+              justifyContent: 'space-between',
+              marginBottom: 'auto',
             }}
           >
-            <Wordmark size={isDesktop ? 28 : 22} />
+            <BrandWordmark size={isCompact ? 20 : 24} />
             <LangToggle language={language} onChange={setLanguage} />
           </View>
 
-          {/* Hero glass card — centred, holds all the copy + CTA. */}
-          <View
+          {/* Eyebrow */}
+          <Text
+            variant="eyebrow"
             style={{
-              flex: 1,
-              alignItems: 'center',
-              justifyContent: 'center',
+              color: palette.fuchsia[500],
+              opacity: 0.85,
+              marginTop: isCompact ? 12 : 28,
+              marginBottom: isCompact ? 10 : 14,
             }}
           >
-            <View
-              style={{
-                width: '100%',
-                maxWidth: isDesktop ? 720 : 480,
-                borderRadius: 28,
-                overflow: 'hidden',
-                position: 'relative',
-              }}
-            >
-              {/* Slow ember motion under the glass */}
-              <LiquidEmber intensity={1.15} blur={56} borderRadius={28} />
+            {copy.eyebrow.toUpperCase()}
+          </Text>
 
-              {/* The glass surface */}
-              <View
-                style={[
-                  {
-                    backgroundColor: 'rgba(255, 245, 238, 0.05)',
-                    borderWidth: 1,
-                    borderColor: 'rgba(255, 245, 238, 0.10)',
-                    borderRadius: 28,
-                    padding: isDesktop ? 56 : 32,
-                  },
-                  Platform.OS === 'web'
-                    ? ({
-                        backdropFilter: 'blur(22px) saturate(140%)',
-                        WebkitBackdropFilter: 'blur(22px) saturate(140%)',
-                      } as any)
-                    : null,
-                ]}
+          {/* Two-tone headline. Top half Void, bottom half Fuchsia.
+              Each "word" is its own line on compact viewports so the rhythm
+              reads vertically; on wider screens it flows naturally. */}
+          <View style={{ marginBottom: isCompact ? 18 : 24 }}>
+            {copy.headlineTop.map((word) => (
+              <Text
+                key={`top-${word}`}
+                variant="h1"
+                style={{ color: theme.colors.text.primary, lineHeight: isCompact ? 42 : 48 }}
               >
-                <Text
-                  variant="eyebrow"
-                  style={{
-                    color: 'rgba(255, 245, 238, 0.55)',
-                    marginBottom: isDesktop ? 32 : 24,
-                  }}
-                >
-                  {copy.trustEyebrow}
-                </Text>
+                {word}
+              </Text>
+            ))}
+            {copy.headlineBottom.map((word) => (
+              <Text
+                key={`bot-${word}`}
+                variant="h1"
+                style={{ color: palette.fuchsia[500], lineHeight: isCompact ? 42 : 48 }}
+              >
+                {word}
+              </Text>
+            ))}
+          </View>
 
-                <Text
-                  variant={isDesktop ? 'display' : 'h1Italic'}
-                  style={{
-                    color: palette.warmWhite[100],
-                    marginBottom: 4,
-                  }}
-                >
-                  {copy.headline[0]}
-                </Text>
-                <Text
-                  variant={isDesktop ? 'display' : 'h1Italic'}
-                  style={{
-                    color: palette.ember[400],
-                    marginBottom: isDesktop ? 28 : 22,
-                  }}
-                >
-                  {copy.headline[1]}
-                </Text>
+          {/* Subtitle */}
+          <Text
+            variant="body"
+            style={{
+              color: theme.colors.text.secondary,
+              maxWidth: 360,
+              marginBottom: isCompact ? 24 : 32,
+            }}
+          >
+            {copy.subtitle}
+          </Text>
 
-                <Text
-                  variant="bodyLight"
-                  style={{
-                    color: 'rgba(255, 245, 238, 0.7)',
-                    maxWidth: 480,
-                    marginBottom: isDesktop ? 36 : 28,
-                  }}
-                >
-                  {copy.descriptor}
-                </Text>
-
-                {/* Three trust pillars — single row, no numbered eyebrows.
-                    Each column gets a hairline divider and the detail line
-                    is rendered only when present. */}
+          {/* Trust pills — Petal background, fuchsia pip */}
+          <View style={{ gap: 8, marginBottom: isCompact ? 26 : 40 }}>
+            {copy.pills.map((pill) => (
+              <View
+                key={pill}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                  backgroundColor: palette.petal[100],
+                  borderRadius: 40,
+                  paddingHorizontal: 16,
+                  paddingVertical: 9,
+                }}
+              >
                 <View
                   style={{
-                    flexDirection: 'row',
-                    gap: isDesktop ? 24 : 14,
-                    marginBottom: isDesktop ? 40 : 28,
+                    width: 5,
+                    height: 5,
+                    borderRadius: 999,
+                    backgroundColor: palette.fuchsia[500],
+                    opacity: 0.75,
                   }}
-                >
-                  {copy.pillars.map((p) => (
-                    <View
-                      key={p.n}
-                      style={{
-                        flex: 1,
-                        paddingTop: 14,
-                        borderTopWidth: 1,
-                        borderTopColor: 'rgba(255, 245, 238, 0.10)',
-                      }}
-                    >
-                      <Text
-                        variant={isDesktop ? 'labelLg' : 'label'}
-                        style={{
-                          color: palette.warmWhite[100],
-                          marginBottom: p.detail ? 2 : 0,
-                        }}
-                      >
-                        {p.label}
-                      </Text>
-                      {p.detail ? (
-                        <Text
-                          variant="caption"
-                          style={{ color: 'rgba(255, 245, 238, 0.5)' }}
-                        >
-                          {p.detail}
-                        </Text>
-                      ) : null}
-                    </View>
-                  ))}
-                </View>
-
-                <GlassCTA label={copy.cta} onPress={goObjective} />
-
-                <Pressable
-                  onPress={goLogin}
-                  style={({ hovered }: any) => [
-                    {
-                      marginTop: isDesktop ? 22 : 18,
-                      alignSelf: 'center',
-                    },
-                    hover.transition,
-                    hovered && hover.lift,
-                  ]}
-                >
-                  {({ hovered }: any) => (
-                    <Text
-                      variant="label"
-                      style={{
-                        color: hovered
-                          ? palette.warmWhite[100]
-                          : 'rgba(255, 245, 238, 0.6)',
-                        textDecorationLine: 'underline',
-                        textDecorationColor: palette.fuchsia[500],
-                      }}
-                    >
-                      {copy.login}
-                    </Text>
-                  )}
-                </Pressable>
+                />
+                <Text variant="caption" style={{ color: theme.colors.text.primary }}>
+                  {pill}
+                </Text>
               </View>
-            </View>
+            ))}
           </View>
+
+          {/* Primary CTA — fuchsia fill, white text, Bricolage 500. */}
+          <PrimaryButton label={copy.cta} onPress={goObjective} />
+
+          {/* Secondary CTA — white fill, Sand outline, neutral. Hierarchy
+              comes from colour, not weight. */}
+          <SecondaryButton label={copy.login} onPress={goLogin} />
         </View>
       </SafeAreaView>
     </View>
   )
 }
 
-// ─── Small parts ────────────────────────────────────────────────────────────
+// ─── BLOOM (the form) ─────────────────────────────────────────────────────
+//
+// Single apricot radial gradient bleeding off the top-right corner; a single
+// fuchsia dot inside it, pulsing on the same 4-second curve as the wordmark
+// dot. Replaces v1.0's six-element BreathingForm + LiquidEmber + PeonyBloom
+// composition. See BRAND.md §4.
+function Bloom({ size }: { size: number }) {
+  const t = useSharedValue(0)
 
+  useEffect(() => {
+    // Same curve and period as the wordmark dot — they breathe together.
+    t.value = withRepeat(
+      withTiming(1, { duration: 4000, easing: Easing.bezier(0.45, 0, 0.55, 1) }),
+      -1,
+      true,
+    )
+  }, [t])
+
+  // 0% frame: opacity 0.92, scale 1. 50% frame: opacity 0.35, scale 0.62.
+  const dotStyle = useAnimatedStyle(() => ({
+    opacity: 0.92 - 0.57 * t.value,
+    transform: [{ scale: 1 - 0.38 * t.value }],
+  }))
+
+  // The bloom geometry mirrors the mockup HTML at 300-unit canvas width.
+  // Dot anchor is roughly 76% from left, 14% from top of the bloom box.
+  const dotX = size * 0.76
+  const dotY = size * 0.21
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        width: size,
+        height: size,
+      }}
+    >
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <Defs>
+          <RadialGradient id="apricot" cx="72%" cy="10%" r="55%" fx="72%" fy="10%">
+            <Stop offset="0%"   stopColor={palette.apricot[400]} stopOpacity={0.7} />
+            <Stop offset="35%"  stopColor={palette.apricot[400]} stopOpacity={0.38} />
+            <Stop offset="70%"  stopColor={palette.apricot[400]} stopOpacity={0.10} />
+            <Stop offset="100%" stopColor={palette.apricot[400]} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Rect width={size} height={size} fill="url(#apricot)" />
+      </Svg>
+
+      {/* The dot sits as a separate animated View on top of the SVG so we can
+          use Reanimated transforms (Svg circles via Reanimated are tricky on
+          web). The dot is small (~6.5 / 300 = 2.2% of canvas), with a
+          radial-glow shadow to suggest the Gaussian-blur in the mockup. */}
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            left: dotX - 6.5,
+            top:  dotY - 6.5,
+            width: 13,
+            height: 13,
+            borderRadius: 999,
+            backgroundColor: palette.fuchsia[500],
+            ...(Platform.OS === 'web'
+              ? ({ boxShadow: '0 0 16px rgba(255, 4, 114, 0.55)' } as any)
+              : {
+                  shadowColor: palette.fuchsia[500],
+                  shadowOpacity: 0.55,
+                  shadowRadius: 8,
+                  shadowOffset: { width: 0, height: 0 },
+                }),
+          },
+          dotStyle,
+        ]}
+      />
+    </View>
+  )
+}
+
+// ─── BRAND WORDMARK ───────────────────────────────────────────────────────
+//
+// Inlined here (rather than reusing app/components/Wordmark.tsx) because the
+// v1.0 Wordmark is Inter Light and the v2.0 spec calls for Bricolage 800.
+// Once Wordmark.tsx itself is migrated (separate PR), this can be deleted
+// and the import restored.
+function BrandWordmark({ size }: { size: number }) {
+  const t = useSharedValue(0)
+  useEffect(() => {
+    t.value = withRepeat(
+      withTiming(1, { duration: 4000, easing: Easing.bezier(0.45, 0, 0.55, 1) }),
+      -1,
+      true,
+    )
+  }, [t])
+
+  const dotStyle = useAnimatedStyle(() => ({
+    opacity: 0.9 - 0.3 * t.value,
+    transform: [{ scale: 1 - 0.18 * t.value }],
+  }))
+
+  const dotSize       = Math.max(4, Math.round(size * 0.32))
+  const dotMarginTop  = Math.round(size * 0.10)
+  const dotMarginLeft = Math.max(2, Math.round(size * 0.06))
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+      <Text
+        style={{
+          fontFamily: 'BricolageGrotesque-ExtraBold',
+          fontSize: size,
+          letterSpacing: -0.025 * size,
+          color: palette.void[500],
+          lineHeight: size,
+        }}
+      >
+        anoqi
+      </Text>
+      <Animated.View
+        style={[
+          {
+            width: dotSize,
+            height: dotSize,
+            borderRadius: 999,
+            backgroundColor: palette.fuchsia[500],
+            marginTop: dotMarginTop,
+            marginLeft: dotMarginLeft,
+          },
+          dotStyle,
+        ]}
+      />
+    </View>
+  )
+}
+
+// ─── LANG TOGGLE ──────────────────────────────────────────────────────────
 function LangToggle({
   language,
   onChange,
@@ -343,154 +371,120 @@ function LangToggle({
   language: Language
   onChange: (l: Language) => void
 }) {
+  const theme = useTheme()
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      <Pressable
-        onPress={() => onChange('fr')}
-        style={({ hovered }: any) => [hover.transition, hovered && hover.lift]}
-      >
-        {({ hovered }: any) => (
-          <Text
-            variant="eyebrow"
-            style={{
-              color:
-                language === 'fr'
-                  ? palette.warmWhite[100]
-                  : hovered
-                    ? 'rgba(255,245,238,0.85)'
-                    : 'rgba(255,245,238,0.4)',
-            }}
-          >
-            FR
-          </Text>
-        )}
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <Pressable onPress={() => onChange('fr')} hitSlop={8}>
+        <Text
+          variant="eyebrow"
+          style={{
+            color:
+              language === 'fr'
+                ? theme.colors.text.primary
+                : theme.colors.text.tertiary,
+          }}
+        >
+          FR
+        </Text>
       </Pressable>
-      <Text
-        variant="eyebrow"
-        style={{ color: 'rgba(255,245,238,0.3)' }}
-      >
+      <Text variant="eyebrow" style={{ color: theme.colors.text.tertiary }}>
         ·
       </Text>
-      <Pressable
-        onPress={() => onChange('en')}
-        style={({ hovered }: any) => [hover.transition, hovered && hover.lift]}
-      >
-        {({ hovered }: any) => (
-          <Text
-            variant="eyebrow"
-            style={{
-              color:
-                language === 'en'
-                  ? palette.warmWhite[100]
-                  : hovered
-                    ? 'rgba(255,245,238,0.85)'
-                    : 'rgba(255,245,238,0.4)',
-            }}
-          >
-            EN
-          </Text>
-        )}
+      <Pressable onPress={() => onChange('en')} hitSlop={8}>
+        <Text
+          variant="eyebrow"
+          style={{
+            color:
+              language === 'en'
+                ? theme.colors.text.primary
+                : theme.colors.text.tertiary,
+          }}
+        >
+          EN
+        </Text>
       </Pressable>
     </View>
   )
 }
 
-function GlassCTA({ label, onPress }: { label: string; onPress: () => void }) {
-  // Press-down feedback
+// ─── PRIMARY BUTTON ───────────────────────────────────────────────────────
+//
+// Fuchsia fill, white text, Bricolage 500. Press = scale(0.97)/160ms per
+// the Emil rule (BRAND.md §7.3).
+function PrimaryButton({ label, onPress }: { label: string; onPress: () => void }) {
   const scale = useSharedValue(1)
-  const ease = Easing.bezier(0.22, 1, 0.36, 1)
-
-  // Logo-style pulsing dot for the CTA
-  const pulse = useSharedValue(0)
-  useEffect(() => {
-    pulse.value = withRepeat(
-      withTiming(1, { duration: 4000, easing: Easing.bezier(0.45, 0, 0.55, 1) }),
-      -1,
-      true,
-    )
-  }, [pulse])
-
+  const ease  = Easing.bezier(0.22, 1, 0.36, 1)
   const scaleStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
-  const dotStyle = useAnimatedStyle(() => ({
-    opacity: 0.95 - 0.35 * pulse.value,
-    transform: [{ scale: 1 - 0.18 * pulse.value }],
-  }))
 
   return (
     <Animated.View style={scaleStyle}>
       <Pressable
-        onPressIn={() => {
-          scale.value = withTiming(0.97, { duration: 100, easing: ease })
-        }}
-        onPressOut={() => {
-          scale.value = withTiming(1, { duration: 200, easing: ease })
-        }}
+        onPressIn={() => { scale.value = withTiming(0.97, { duration: 100, easing: ease }) }}
+        onPressOut={() => { scale.value = withTiming(1,    { duration: 200, easing: ease }) }}
         onPress={onPress}
         style={({ hovered }: any) => [
           {
-            flexDirection: 'row',
+            backgroundColor: palette.fuchsia[500],
+            borderRadius: 14,
+            paddingVertical: 16,
             alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 22,
-            paddingVertical: 18,
-            borderRadius: 999,
-            backgroundColor: 'rgba(255, 245, 238, 0.08)',
-            borderWidth: 1,
-            borderColor: 'rgba(255, 245, 238, 0.18)',
+            justifyContent: 'center',
+            marginBottom: 10,
           },
-          Platform.OS === 'web'
-            ? ({
-                backdropFilter: 'blur(18px)',
-                WebkitBackdropFilter: 'blur(18px)',
-              } as any)
+          Platform.OS === 'web' && hovered
+            ? ({ boxShadow: '0 8px 24px rgba(255, 4, 114, 0.35)' } as any)
             : null,
-          hover.transition,
-          hovered && hover.lift,
-          hovered && {
-            backgroundColor: 'rgba(255, 245, 238, 0.12)',
-            borderColor: 'rgba(255, 245, 238, 0.30)',
-          },
-          hovered && hover.glow('rgba(255, 4, 114, 0.35)'),
         ]}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Animated.View
-            style={[
-              {
-                width: 10,
-                height: 10,
-                borderRadius: 999,
-                backgroundColor: palette.fuchsia[500],
-                ...(Platform.OS === 'web'
-                  ? ({
-                      boxShadow: '0 0 18px rgba(255, 4, 114, 0.55)',
-                    } as any)
-                  : {
-                      shadowColor: palette.fuchsia[500],
-                      shadowOpacity: 0.55,
-                      shadowRadius: 8,
-                      shadowOffset: { width: 0, height: 0 },
-                    }),
-              },
-              dotStyle,
-            ]}
-          />
-          <Text
-            variant="bodyMed"
-            style={{ color: palette.warmWhite[100], letterSpacing: 0.2 }}
-          >
-            {label}
-          </Text>
-        </View>
+        <Text
+          style={{
+            fontFamily: 'BricolageGrotesque-Medium',
+            fontSize: 14,
+            letterSpacing: 0.28,
+            color: '#ffffff',
+          }}
+        >
+          {label}
+        </Text>
+      </Pressable>
+    </Animated.View>
+  )
+}
+
+// ─── SECONDARY BUTTON ─────────────────────────────────────────────────────
+//
+// White fill, Void text, 1.5px Sand outline. NOT pink — hierarchy comes
+// from the colour contrast with the primary button. Two pink buttons
+// compete; one fuchsia + one neutral is the right pair.
+function SecondaryButton({ label, onPress }: { label: string; onPress: () => void }) {
+  const scale = useSharedValue(1)
+  const ease  = Easing.bezier(0.22, 1, 0.36, 1)
+  const scaleStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
+
+  return (
+    <Animated.View style={scaleStyle}>
+      <Pressable
+        onPressIn={() => { scale.value = withTiming(0.97, { duration: 100, easing: ease }) }}
+        onPressOut={() => { scale.value = withTiming(1,    { duration: 200, easing: ease }) }}
+        onPress={onPress}
+        style={{
+          backgroundColor: '#ffffff',
+          borderWidth: 1.5,
+          borderColor: palette.sand[300],
+          borderRadius: 14,
+          paddingVertical: 14,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
         <Text
           style={{
             fontFamily: 'Inter-Regular',
-            fontSize: 18,
-            color: palette.warmWhite[100],
-            opacity: 0.7,
+            fontSize: 12,
+            color: palette.void[500],
           }}
         >
-          →
+          {label}
         </Text>
       </Pressable>
     </Animated.View>
