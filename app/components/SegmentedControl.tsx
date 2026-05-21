@@ -1,11 +1,15 @@
 // Anoqi — SegmentedControl. Used on the Account screen for signup/login/anon.
 //
-// Sliding Cotton Rose pill behind the selected segment.
+// v2.2 dark-pill register: Plum surface (#2D1A2E) with warm-white labels and
+// an apricot-tinted indicator. The dark surface is the v2.2 "deeper warm
+// surface" introduced by the Path C mockup, and apricot accents inside a
+// dark Plum container are the documented exception to the
+// "apricot is decoration only" brand rule.
 
 import React, { useEffect, useRef, useState } from 'react'
 import { Animated, LayoutRectangle, Pressable, View } from 'react-native'
 
-import { hover, useTheme } from '../theme'
+import { hover, palette, useTheme } from '../theme'
 import { Text } from './Text'
 
 type Option<V extends string> = { value: V; label: string }
@@ -45,10 +49,8 @@ export function SegmentedControl<V extends string>({ value, onChange, options }:
     <View
       style={{
         flexDirection: 'row',
-        backgroundColor: theme.colors.bg.surface,
+        backgroundColor: palette.plum[500],
         borderRadius: theme.radii.pill,
-        borderWidth: 1,
-        borderColor: theme.colors.border.subtle,
         padding: 4,
         position: 'relative',
       }}
@@ -60,7 +62,9 @@ export function SegmentedControl<V extends string>({ value, onChange, options }:
           bottom: 4,
           left: indicatorX,
           width: indicatorW,
-          backgroundColor: theme.colors.bg.surfaceWarm,
+          backgroundColor: 'rgba(253, 186, 116, 0.18)',
+          borderWidth: 1,
+          borderColor: 'rgba(253, 186, 116, 0.28)',
           borderRadius: theme.radii.pill,
         }}
       />
@@ -92,10 +96,10 @@ export function SegmentedControl<V extends string>({ value, onChange, options }:
                 variant="bodyMed"
                 style={{
                   color: active
-                    ? theme.colors.text.primary
+                    ? palette.plum[50]
                     : hovered
-                      ? theme.colors.text.primary
-                      : theme.colors.text.secondary,
+                      ? palette.plum[50]
+                      : 'rgba(240, 228, 216, 0.6)',
                 }}
               >
                 {opt.label}

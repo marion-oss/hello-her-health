@@ -148,6 +148,20 @@ export const palette = {
     500: '#3a3040', // anchor — the standard subtitle colour
     700: '#231b27',
   },
+
+  // Plum — v2.2 dark insight surface. Replaces Candy Pink (which was reserved
+  // but never used). Sits on a light canvas to host inverted-text content —
+  // insight cards, segmented controls, deep-warmth chips. Apricot accents are
+  // ALLOWED inside a Plum surface (documented exception to the
+  // "apricot is decoration only" rule). Not promoted to a role token yet;
+  // see HomeScreen-v2.2 mockup for the canonical usage.
+  //
+  // The 50 shade is the v2.2 companion text colour for content placed on a
+  // Plum surface — Plum has too much chroma to pair with pure white.
+  plum: {
+    50:  '#F0E4D8', // companion text colour for content on Plum surfaces
+    500: '#2D1A2E', // anchor — the v2.2 insight-card dark surface
+  },
 } as const
 
 // Role tokens — what screens actually consume.
