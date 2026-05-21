@@ -2,12 +2,6 @@
 //
 // Five horizontal rows (not a card grid — banned). Selected row: warm
 // surface tint, fuchsia icon disc. Lucide icons per objective, no emoji.
-//
-// v2.0: this screen wraps itself in <ThemeProvider mode="light"> so every
-// theme-aware descendant (Button, ProgressBar, Text, BackHeader, Icon,
-// Pressable styles) picks up the v2.0 tokens. The inner screen code is
-// unchanged from v1.0 — only the colour tokens flip and a Bloom overlay
-// is added at the top-right. See BRAND.md §4 for the bloom spec.
 
 import React, { useState } from 'react'
 import { Pressable, SafeAreaView, ScrollView, View } from 'react-native'
@@ -15,7 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useNavigation, useRoute } from '@react-navigation/native'
 
 import { useOnboarding, type HealthObjective } from '../../context/OnboardingContext'
-import { hover, ThemeProvider, useTheme } from '../../theme'
+import { hover, useTheme } from '../../theme'
 import {
   BackHeader,
   Bloom,
@@ -95,17 +89,6 @@ const PENDING_CONSENT_KEY = 'anoqi_pending_consent'
 const CHAT_PREFILL_KEY = 'anoqi_chat_prefill'
 
 export function ObjectiveScreen() {
-  return (
-    <ThemeProvider mode="light">
-      <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
-        <Bloom intensity={0.5} />
-        <ObjectiveScreenInner />
-      </View>
-    </ThemeProvider>
-  )
-}
-
-function ObjectiveScreenInner() {
   const navigation = useNavigation<any>()
   const route = useRoute<any>()
   const isChangeMode = route.params?.mode === 'change'
@@ -140,7 +123,9 @@ function ObjectiveScreenInner() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }}>
+    <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
+      <Bloom intensity={0.5} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }}>
       {isChangeMode ? <BackHeader onBack={() => navigation.goBack()} /> : null}
 
       <View
@@ -274,6 +259,7 @@ function ObjectiveScreenInner() {
           ) : null}
         </View>
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   )
 }

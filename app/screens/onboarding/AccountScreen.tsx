@@ -3,11 +3,6 @@
 // Segmented control with three tabs (signup / login / anonymous). The
 // selected pill slides between tabs. Anonymous tab shows an info card with
 // a ShieldCheck icon and a CTA.
-//
-// v2.0: this screen wraps itself in <ThemeProvider mode="light"> so every
-// theme-aware descendant (Button, Input, SegmentedControl, ProgressBar,
-// Icon, BackHeader, Text) picks up the v2.0 tokens. The inner screen code
-// is unchanged from v1.0.
 
 import React, { useState } from 'react'
 import {
@@ -22,7 +17,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import { useOnboarding } from '../../context/OnboardingContext'
 import type { OnboardingStackParamList } from './OnboardingNavigator'
 import { supabase } from '../../lib/supabase'
-import { ThemeProvider, useTheme } from '../../theme'
+import { useTheme } from '../../theme'
 import {
   BackHeader,
   Bloom,
@@ -115,17 +110,6 @@ function validateBirthYear(year: string) {
 }
 
 export function AccountScreen() {
-  return (
-    <ThemeProvider mode="light">
-      <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
-        <Bloom intensity={0.5} />
-        <AccountScreenInner />
-      </View>
-    </ThemeProvider>
-  )
-}
-
-function AccountScreenInner() {
   const navigation = useNavigation<any>()
   const route = useRoute<RouteProp<OnboardingStackParamList, 'Account'>>()
   const { language, objective, setBirthYear, setCountry, markDone } = useOnboarding()
@@ -202,7 +186,9 @@ function AccountScreenInner() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }}>
+    <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
+      <Bloom intensity={0.5} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -400,6 +386,7 @@ function AccountScreenInner() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   )
 }

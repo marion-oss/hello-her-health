@@ -1,18 +1,9 @@
-// Anoqi — WelcomeScreen (v2.0 Bloom register).
+// Anoqi — WelcomeScreen.
 //
 // White canvas, one apricot radial bloom bleeding off the top-right corner,
 // one pulsing fuchsia dot inside it. Two-tone headline: top half Void, bottom
 // half Fuchsia. Petal-tinted pills, fuchsia primary CTA, Sand-outlined
 // secondary. See BRAND.md for the canonical spec.
-//
-// This screen is the first surface migrated to v2.0. It wraps itself in
-// <ThemeProvider mode="light"> so the rest of the app (still on the v1.0
-// Sanctuary dark theme) keeps rendering as it did. Once enough screens are
-// migrated, App.tsx flips its default mode and these per-screen wrappers
-// can come out.
-//
-// Mockup reference: the HTML in the brand session. Geometry below is ported
-// from there at 300×610 phone scale, then made responsive.
 
 import React, { useEffect } from 'react'
 import {
@@ -34,7 +25,7 @@ import Animated, {
 import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import { useOnboarding, type Language } from '../../context/OnboardingContext'
-import { ThemeProvider, useTheme, palette } from '../../theme'
+import { useTheme, palette } from '../../theme'
 import { Text } from '../../components'
 
 // ─── COPY ──────────────────────────────────────────────────────────────────
@@ -73,20 +64,7 @@ const COPY = {
   },
 } as const
 
-// ─── PUBLIC ENTRY ──────────────────────────────────────────────────────────
-//
-// The light-themed inner shell sits behind a ThemeProvider so descendants
-// (Text, etc.) read v2.0 tokens regardless of the app-level mode.
 export function WelcomeScreen() {
-  return (
-    <ThemeProvider mode="light">
-      <WelcomeScreenInner />
-    </ThemeProvider>
-  )
-}
-
-// ─── INNER ─────────────────────────────────────────────────────────────────
-function WelcomeScreenInner() {
   const navigation = useNavigation<any>()
   const { language, setLanguage } = useOnboarding()
   const { width } = useWindowDimensions()

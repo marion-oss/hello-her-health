@@ -48,7 +48,7 @@ import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import { useOnboarding, type HealthObjective } from '../../context/OnboardingContext'
 import { supabase } from '../../lib/supabase'
-import { ThemeProvider, useTheme, palette } from '../../theme'
+import { useTheme, palette } from '../../theme'
 import { Icon, Text } from '../../components'
 import { listDocuments, type DocumentIndexEntry } from '../../lib/documentStore'
 
@@ -152,17 +152,7 @@ function deriveDisplayName(email: string | null | undefined): string | null {
   return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
 }
 
-// ─── PUBLIC ENTRY ──────────────────────────────────────────────────────────
 export function HomeScreen() {
-  return (
-    <ThemeProvider mode="light">
-      <HomeScreenInner />
-    </ThemeProvider>
-  )
-}
-
-// ─── INNER ─────────────────────────────────────────────────────────────────
-function HomeScreenInner() {
   const navigation = useNavigation<any>()
   const { language, objective } = useOnboarding()
   const { width } = useWindowDimensions()

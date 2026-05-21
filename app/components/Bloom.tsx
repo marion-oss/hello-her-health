@@ -7,8 +7,7 @@
 // Geometry is locked (BRAND.md §4.1): radialGradient cx="72%" cy="10%"
 // r="55%", dot at (228, 85) on the 300-unit reference canvas.
 //
-// Use it as an absolutely-positioned overlay at the top of any v2.0 screen
-// inside a <ThemeProvider mode="light"> wrap:
+// Use it as an absolutely-positioned overlay at the top of any screen:
 //
 //   <View style={{ flex: 1, backgroundColor: '#fff' }}>
 //     <Bloom intensity={0.5} />

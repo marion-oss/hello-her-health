@@ -1,4 +1,4 @@
-// Anoqi — AddDocumentScreen (v2.2 light register).
+// Anoqi — AddDocumentScreen.
 //
 // Single-stage flow now:
 //   1. On mount, take a pending File (set by a drag-and-drop on Documents
@@ -8,10 +8,6 @@
 //   3. Show the redaction preview with [NOM] / [TELEPHONE] / … chips so the
 //      user sees what was stripped before saving.
 //   4. Save locally + fire-and-forget upload if the user is signed in.
-//
-// v2.2: wraps itself in <ThemeProvider mode="light">. White canvas, white
-// section cards on a Sand hairline, Petal-tinted type pills with fuchsia
-// labels, dark-content status bar.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -34,7 +30,7 @@ import {
   Icon,
   Text,
 } from '../../components'
-import { ThemeProvider, palette, useTheme } from '../../theme'
+import { palette, useTheme } from '../../theme'
 import { useOnboarding } from '../../context/OnboardingContext'
 import {
   loadDocument,
@@ -116,14 +112,6 @@ const PLACEHOLDER_REGEX =
 type Phase = 'importing' | 'preview' | 'error'
 
 export function AddDocumentScreen() {
-  return (
-    <ThemeProvider mode="light">
-      <AddDocumentScreenInner />
-    </ThemeProvider>
-  )
-}
-
-function AddDocumentScreenInner() {
   const theme = useTheme()
   const navigation = useNavigation<any>()
   const { language } = useOnboarding()

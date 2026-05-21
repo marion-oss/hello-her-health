@@ -1,13 +1,9 @@
-// Anoqi — DocumentsListScreen (v2.2 light register).
+// Anoqi — DocumentsListScreen.
 //
 // Lists the user's on-device documents. Empty state is the trust pitch
 // (pseudonymisation lives on device). Each row reads the LocalDocument
 // so we can surface a structured insight ("4 valeurs · ferritine ↓")
 // instead of a generic "saved at" timestamp.
-//
-// v2.2: wraps itself in <ThemeProvider mode="light"> so theme-aware
-// descendants pick up the v2.2 tokens. White canvas, apricot bloom inner-
-// screen intensity, white+Sand document rows, fuchsia accents.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -38,7 +34,7 @@ import {
   type IconName,
   Text,
 } from '../../components'
-import { ThemeProvider, palette, useTheme } from '../../theme'
+import { palette, useTheme } from '../../theme'
 import { useOnboarding } from '../../context/OnboardingContext'
 import {
   deleteDocument,
@@ -215,18 +211,7 @@ function DocumentRow({ entry, doc, index, language, onPress, onLongPress }: RowP
   )
 }
 
-// ─────────────────────────────────────────────────────────────
-// DocumentsListScreen
-// ─────────────────────────────────────────────────────────────
 export function DocumentsListScreen() {
-  return (
-    <ThemeProvider mode="light">
-      <DocumentsListScreenInner />
-    </ThemeProvider>
-  )
-}
-
-function DocumentsListScreenInner() {
   const theme = useTheme()
   const navigation = useNavigation<any>()
   const { language } = useOnboarding()
