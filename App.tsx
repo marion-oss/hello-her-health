@@ -20,7 +20,7 @@
  */
 
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react'
-import { View, StyleSheet, Platform } from 'react-native'
+import { View, StyleSheet, Platform, useWindowDimensions } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native'
 import * as Font from 'expo-font'
@@ -69,6 +69,12 @@ const ONBOARDING_KEY = 'anoqi_onboarding_done'
 export default function App() {
   const [appReady,       setAppReady]       = useState(false)
   const [onboardingDone, setOnboardingDone] = useState(false)
+  const { width: viewportWidth } = useWindowDimensions()
+  // On phone-width viewports the desktop column constraint (60% / minWidth 360)
+  // would otherwise leave the dark canvas bleeding through on each side of the
+  // shell, which reads as "black lines on the side" against light v2.0 screens.
+  // Below 768 we let the shell fill the viewport edge to edge.
+  const isCompactViewport = viewportWidth < 768
 
   useEffect(() => {
     // Fonts load in the background — we render with system fallbacks first so
@@ -164,7 +170,14 @@ export default function App() {
           canvas. A solid background here creates a visible "column"
           boundary against the position:fixed BreathingForm rendering in
           the void on each side. */}
-      <View style={styles.appShell}>
+      <View
+        style={[
+          styles.appShell,
+          isCompactViewport && Platform.OS === 'web'
+            ? { width: '100%' as const, maxWidth: undefined, minWidth: undefined }
+            : null,
+        ]}
+      >
         <ThemeProvider mode="dark">
           <NavigationContainer theme={navTheme}>
             <OnboardingProvider onComplete={handleOnboardingComplete}>

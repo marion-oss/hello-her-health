@@ -19,7 +19,6 @@ import {
   Bloom,
   Button,
   Checkbox,
-  Pill,
   ProgressBar,
   Text,
 } from '../../components'
@@ -110,7 +109,7 @@ function ConsentScreenInner() {
           contentContainerStyle={{ gap: theme.spacing[5] }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Terms + Privacy */}
+          {/* Terms + Privacy — required */}
           <Pressable
             accessibilityRole="checkbox"
             accessibilityState={{ checked: consent.terms }}
@@ -158,7 +157,52 @@ function ConsentScreenInner() {
             </View>
           </Pressable>
 
-          {/* Health data */}
+          {/* Research — optional. Placed above the (required) health row so
+              it stays above the fold on mobile; users were missing it
+              entirely when it was the third row. The optional marker is
+              an inline fuchsia-bold token (replacing the previous teal
+              pill) so it reads as an attribute of the label rather than
+              a separate ornament. */}
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: consent.research }}
+            onPress={() => toggle('research')}
+            style={({ hovered }: any) => [
+              {
+                flexDirection: 'row',
+                gap: theme.spacing[4],
+                padding: theme.spacing[3],
+                marginHorizontal: -theme.spacing[3],
+                borderRadius: theme.radii.md,
+              },
+              hover.transition,
+              hovered && { backgroundColor: 'rgba(255, 245, 238, 0.03)' },
+            ]}
+          >
+            <View style={{ marginTop: 2 }}>
+              <Checkbox
+                checked={consent.research}
+                onChange={() => toggle('research')}
+                accessibilityLabel="Contribute to women's health research"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text variant="body" tone="primary">
+                <Text variant="body" tone="accent" style={{ fontWeight: '600' }}>
+                  ({copy.optional}){' '}
+                </Text>
+                {copy.researchLabel}
+              </Text>
+              <Text variant="caption" tone="tertiary" style={{ marginTop: theme.spacing[2] }}>
+                {copy.researchNote}{' '}
+                <Text variant="caption" tone="accent" style={{ textDecorationLine: 'underline' }}>
+                  {copy.learnMore} →
+                </Text>
+              </Text>
+            </View>
+          </Pressable>
+
+          {/* Health data — required */}
           <Pressable
             accessibilityRole="checkbox"
             accessibilityState={{ checked: consent.health }}
@@ -188,53 +232,6 @@ function ConsentScreenInner() {
               </Text>
               <Text variant="caption" tone="tertiary" style={{ marginTop: theme.spacing[2] }}>
                 {copy.healthNote}
-              </Text>
-            </View>
-          </Pressable>
-
-          {/* Research (optional) */}
-          <Pressable
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: consent.research }}
-            onPress={() => toggle('research')}
-            style={({ hovered }: any) => [
-              {
-                flexDirection: 'row',
-                gap: theme.spacing[4],
-                padding: theme.spacing[3],
-                marginHorizontal: -theme.spacing[3],
-                borderRadius: theme.radii.md,
-              },
-              hover.transition,
-              hovered && { backgroundColor: 'rgba(255, 245, 238, 0.03)' },
-            ]}
-          >
-            <View style={{ marginTop: 2 }}>
-              <Checkbox
-                checked={consent.research}
-                onChange={() => toggle('research')}
-                accessibilityLabel="Contribute to women's health research"
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  marginBottom: theme.spacing[2],
-                  gap: theme.spacing[2],
-                }}
-              >
-                <Pill label={copy.optional} tone="teal" />
-              </View>
-              <Text variant="body" tone="primary">
-                {copy.researchLabel}
-              </Text>
-              <Text variant="caption" tone="tertiary" style={{ marginTop: theme.spacing[2] }}>
-                {copy.researchNote}{' '}
-                <Text variant="caption" tone="accent" style={{ textDecorationLine: 'underline' }}>
-                  {copy.learnMore} →
-                </Text>
               </Text>
             </View>
           </Pressable>
