@@ -1,30 +1,20 @@
-// Anoqi — chat Bubble.
+// Anoqi — chat Bubble (v2.2 light register).
 //
-// Iridescent register:
-//   user      — Fuchsia at high alpha, warm-white text.
-//   assistant — frosted glass (warm-white at low alpha + warm-white-alpha
-//               border); web gets backdrop-filter so the LiquidEmber layer
-//               glows through.
+//   user      — solid Fuchsia, white text.
+//   assistant — white surface, Sand hairline.
 //
 // The notch radius is preserved on the trailing edge for spatial cohesion.
 
 import React from 'react'
-import { Platform, View, type ViewStyle, type StyleProp } from 'react-native'
+import { View, type ViewStyle, type StyleProp } from 'react-native'
 
-import { useTheme } from '../theme'
+import { palette, useTheme } from '../theme'
 
 type Props = {
   role: 'user' | 'assistant'
   children: React.ReactNode
   style?: StyleProp<ViewStyle>
 }
-
-const webBackdrop = Platform.OS === 'web'
-  ? ({
-      backdropFilter: 'blur(18px) saturate(140%)',
-      WebkitBackdropFilter: 'blur(18px) saturate(140%)',
-    } as unknown as ViewStyle)
-  : null
 
 export function Bubble({ role, children, style }: Props) {
   const theme = useTheme()
@@ -44,7 +34,7 @@ export function Bubble({ role, children, style }: Props) {
           base,
           {
             alignSelf: 'flex-end',
-            backgroundColor: 'rgba(255, 4, 114, 0.85)',
+            backgroundColor: palette.fuchsia[500],
             borderBottomRightRadius: theme.radii.bubbleNotch,
           },
           style,
@@ -61,12 +51,11 @@ export function Bubble({ role, children, style }: Props) {
         base,
         {
           alignSelf: 'flex-start',
-          backgroundColor: 'rgba(255, 245, 238, 0.05)',
+          backgroundColor: '#ffffff',
           borderWidth: 1,
-          borderColor: 'rgba(255, 245, 238, 0.09)',
+          borderColor: palette.sand[300],
           borderBottomLeftRadius: theme.radii.bubbleNotch,
         },
-        webBackdrop,
         style,
       ]}
     >
