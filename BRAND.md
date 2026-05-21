@@ -4,7 +4,7 @@ The brand canon. **What** the visual identity is, **what** rules govern it, and 
 
 Companion to [`HANDOVER.md`](./HANDOVER.md) (architecture) and [`RUNBOOK.md`](./RUNBOOK.md) (operations). If those tell you the system, this tells you how it should *feel*.
 
-> **Version:** 2.1 — Welcome screen locked. Apricot bloom geometry finalised. Candy Pink added as eighth palette token. Headline rhythm simplified. See [§9 What changed from Sanctuary](#9-what-changed-from-sanctuary) for the full v1.0→v2.0 migration.
+> **Version:** 2.2 — Candy Pink replaced by **Plum** `#2D1A2E` (the dark insight surface). Apricot accents are now allowed *inside* a Plum container (documented exception). Body italic permitted in two narrow surfaces (knowledge cards, status labels). HomeScreen + Chat + Documents + Profile all migrated; `App.tsx` default mode flipped to light. See [§13 What changed from v2.1](#13-what-changed-from-v21) for the v2.1→v2.2 delta and [§9 What changed from Sanctuary](#9-what-changed-from-sanctuary) for the v1.0→v2.0 migration.
 
 ---
 
@@ -16,20 +16,24 @@ Anoqi is a women's-health AI companion. The brand is **confident, readable, and 
 
 ## 2. Palette
 
-Seven tokens. Every rule about what colours can go where is encoded as a "Allowed" / "Never" pair — break those rules and the brand drifts.
+Eight tokens. Every rule about what colours can go where is encoded as a "Allowed" / "Never" pair — break those rules and the brand drifts.
 
-### 2.1 The seven
+### 2.1 The eight
 
 | Token | Hex | Role |
 |---|---|---|
 | **Void** | `#0D0D12` | Headlines (non-accent), body copy, structure, button text on light fills |
 | **White** | `#FFFFFF` | Canvas. Always. The product breathes on white. |
 | **Fuchsia** | `#FF0472` | Signal: accent headline lines, primary CTAs, the dot, the pip, active states |
-| **Soft Apricot** | `#FDBA74` | Decoration only — radial gradient bloom in hero / empty-state moments |
+| **Soft Apricot** | `#FDBA74` | Decoration only — radial gradient bloom in hero / empty-state moments. Single documented exception: accent text + chips *inside* a Plum surface. |
 | **Warm Gray** | `#3A3040` | Secondary copy: subtitles, captions, body that should recede |
-| **Petal** | `#FEF0F4` | Subtle warmth: pill backgrounds, status surfaces, card tints |
+| **Petal** | `#FEF0F4` | Subtle warmth: pill backgrounds, status surfaces, card tints, bottom-dock background |
 | **Sand** | `#E8E0D8` | Quiet structure: secondary button outlines, hairline dividers |
-| **Candy Pink** | `#FFB0CC` | Reserved: future status tints, deeper warm surface if needed — not in active use in v2.1 |
+| **Plum** | `#2D1A2E` | v2.2 dark insight surface. Replaces Candy Pink. The only dark surface permitted on the light canvas — a deliberate moment of warmth + weight inside an editorial composition. |
+
+A companion light shade `palette.plum[50]` (`#F0E4D8`, warm cream) is used as the text colour for content placed *on* a Plum surface — Plum has too much chroma to pair with pure white. Not a top-level token, lives under the Plum scale in code (`app/theme/colors.ts`).
+
+Candy Pink (`#FFB0CC`) — added in v2.1 as a reserved slot, never shipped — was retired in v2.2 in favour of Plum.
 
 ### 2.2 Rules per token
 
@@ -43,7 +47,8 @@ Seven tokens. Every rule about what colours can go where is encoded as a "Allowe
 
 **Soft Apricot** `#FDBA74`
 - Allowed: radial-gradient bloom in hero compositions, empty-state warmth, decorative blobs behind primary content
-- Never: text (any size, any context), button fills, button borders, line art, icon fills, status colour
+- Allowed (v2.2 exception): accent text, source-chip backgrounds, decorative glows and dividers *inside a Plum surface only*. Apricot reads as a warm cousin of the Plum and unifies the dark insight container; on the white canvas the original Never rule still applies.
+- Never: text (any size, any context) on the white canvas, button fills, button borders, line art, icon fills, status colour
 
 **Warm Gray** `#3A3040`
 - Allowed: subtitles, body copy when full Void would be too heavy, captions, helper text, form labels
@@ -57,17 +62,24 @@ Seven tokens. Every rule about what colours can go where is encoded as a "Allowe
 - Allowed: secondary button outlines (1.5px stroke), divider rules, very-subtle hairlines
 - Never: text, fills, focus rings
 
+**Plum** `#2D1A2E`
+- Allowed: insight-card surface on the home screen, segmented-control container in onboarding, future "deeper warm surface" needs (modals that need weight, status cards that should read serious)
+- Allowed accents *inside* Plum: warm-cream text (`palette.plum[50]`), apricot eyebrow + chips + dividers, fuchsia inner CTAs
+- Never: applied to body text, applied as a border colour, used on more than one surface per screen (one moment of weight, not a pattern), used as a back-button or icon tint
+- Coverage: ≤ 25% of viewport on any screen that uses it. Plum is a content surface, not a structural one.
+
 ### 2.3 Coverage targets per screen
 
 If you measure a screen and one of these is wildly outside its band, you're drifting:
 
 | Surface | % of viewport |
 |---|---|
-| White (canvas) | 65–85% |
+| White (canvas) | 55–80% (lower bound when an Insight surface is present) |
 | Void (type + structure) | 8–18% |
 | Petal + Sand combined | 5–12% |
 | Fuchsia (accent + CTA) | 2–8% |
 | Soft Apricot (decoration) | 0–15% (one moment per screen, not every screen) |
+| Plum (insight surface) | 0–25% (one moment per screen, not every screen) |
 | Warm Gray | 1–5% |
 
 ---
@@ -139,6 +151,13 @@ Never:
 Body copy is **Inter 300, 13px, line-height 1.75**, colour Warm Gray `#3A3040`. The 1.75 leading is non-negotiable — it's the breathing room that makes serious copy feel approachable. Tight body copy is the single fastest way to make the product feel clinical or aggressive.
 
 For the rare moment when body copy needs to land harder (a single declarative sentence, a callout), step up to Void `#0D0D12` while keeping Inter 300 — switching to a heavier weight reads as alarm.
+
+**Italic exception (v2.2)** — body italic is permitted in two narrow surfaces:
+
+1. Knowledge cards (the "Savoir du jour · Cochrane" pattern). Italic signals reflective / editorial tone vs the directness of the rest of the product. Inter 300 italic only — never display italic.
+2. Status labels rendered in caption-size next to a primary value (e.g. "Bientôt disponible" on the Cycle card). Italic reads as a soft aside; non-italic in that spot would compete with the primary label.
+
+Outside those two surfaces, italic remains banned. Display headlines are never italic (see §3.3). The v1.0 Sanctuary use of italic everywhere — Cormorant display, italic body — stays deprecated.
 
 ---
 
@@ -290,7 +309,52 @@ The secondary intentionally **isn't pink**. It's a quiet outline that lets the p
 
 ### 5.8 Body / canvas
 
-Just White. The product breathes on white. The only "background colour" beyond white is the apricot bloom in hero moments and Petal in pill / card tints.
+Just White. The product breathes on white. The only "background colour" beyond white is the apricot bloom in hero moments, Petal in pill / card tints, and a single Plum insight surface where used.
+
+### 5.9 Insight surface (v2.2)
+
+The Plum dark container. The home screen's central editorial moment — a paragraph-shaped surface that carries a claim, its source, and one or two inner actions. Lives once per screen, no smaller than ~280px tall.
+
+| Slot | Value |
+|---|---|
+| Surface | Plum `#2D1A2E` |
+| Body text | Warm cream `#F0E4D8` (palette.plum[50]), Bricolage Bold 16/24 |
+| Eyebrow | Soft Apricot at 100% opacity, Bricolage 700, 1.6 letter-spacing |
+| Source chip | Soft Apricot text at 100%, apricot fill at 15% alpha, apricot border at 28% alpha |
+| Divider | Apricot at 15% alpha |
+| Decorative glow | Apricot at 18% alpha, radial, top-right corner, blurred 20px on web |
+| Primary inner CTA | Solid Fuchsia, white text, Bricolage Medium 11px, radius 14 |
+| Ghost inner CTA | White at 10% alpha, white text, white border at 28% alpha, radius 14 |
+| Outer radius | 14px (matches all other v2.2 cards) |
+
+The Plum surface is the only place apricot text + chips are allowed in the entire product (see §2.2). Outside this surface, apricot is decoration only.
+
+### 5.10 Knowledge card (v2.2)
+
+The reflective companion to the Insight surface. Lives below it on the home screen, optionally elsewhere. Carries longer-form editorial copy with a clear citation.
+
+| Slot | Value |
+|---|---|
+| Surface | Petal `#FEF0F4` |
+| Border | Sand `#E8E0D8` 1px |
+| Eyebrow | Fuchsia, Bricolage Bold 10px, 1.4 letter-spacing, uppercase ("Savoir du jour · Cochrane") |
+| Body | Inter 300 **italic**, 13/22, Void colour — italic per §3.4 exception |
+| Hint | Fuchsia 4px dot + fuchsia uppercase Bricolage 700 10px ("Swipe pour découvrir la suite") |
+| Outer radius | 20px (one notch larger than other cards — slightly editorial) |
+
+### 5.11 Bottom dock (v2.2)
+
+The floating bottom navigation pill. Replaces v1.0's LiquidEmber glass dock.
+
+| Slot | Value |
+|---|---|
+| Container | Petal `#FEF0F4` on Sand `#E8E0D8` 1px hairline, radius 36 |
+| Drop shadow (web) | `0 10px 28px -10px rgba(13, 13, 18, 0.18)` |
+| Active tab | White fill, Sand outline, Void icon, fuchsia 5px pulsing dot below the icon |
+| Inactive tab | Transparent, warm-gray `#5c5460` icon |
+| Pulse | Same 4s curve as the wordmark dot |
+
+No labels under icons. The dot is the indicator.
 
 ---
 
@@ -362,25 +426,40 @@ The dot's pulse, the entrance fade-up, any scale transform — all opt out under
 
 ## 8. Implementation map
 
-Where each token + rule should land in the codebase.
+Where each token + rule lives in the codebase.
 
-| File | What gets updated |
+### 8.1 Status as of v2.2
+
+| Layer | Status |
 |---|---|
-| `app/theme/colors.ts` | Replace Sanctuary palette with the 7 tokens in §2.1. Remove ember, dusk, burgundy, surface, warmWhite. |
-| `app/theme/typography.ts` | Bricolage Grotesque as `fontFamily.display`, Inter as `fontFamily.regular`, JetBrains as `fontFamily.mono`. Sizes from §3.2. Remove Cormorant. |
-| `app/theme/radii.ts` | Update `lg` to 14, keep the rest. |
-| `app/theme/spacing.ts` | No change (already 4px base). |
-| `app/theme/motion.ts` | Add `dotBreath` easing. Update `press` token = 160ms / outQuart. |
-| `app/components/Wordmark.tsx` | Update to Bricolage 800 + 7px-at-20 dot proportion. |
-| `app/components/Button.tsx` | Primary = fuchsia/white/Bricolage-500/radius-14. Secondary = white/void/Inter-400/1.5-Sand-border/radius-14. Remove ghost / ghostDanger variants until they're redesigned for the light canvas. |
-| `app/components/Pill.tsx` | Background Petal, fuchsia pip, void Inter-400 text. Status variants TBD (see §10). |
-| `app/components/BreathingForm.tsx` | **Delete this component.** Replace usage with the new `Bloom` component (see §10). |
-| `app/components/LiquidEmber.tsx` | **Delete.** Ember is gone. |
-| `app/components/PeonyBloom.tsx` | **Delete.** Was a v1.0 brand mark, no longer used. |
-| `app/components/Markdown/Markdown.tsx` | Update accent colour from ember to fuchsia for inline `[Sn]` citations. |
-| `app/screens/onboarding/WelcomeScreen.tsx` | Adopt the new hero composition exactly per the mockup HTML. |
+| Theme tokens (palette, typography, radii, motion) | ✅ Live (`app/theme/*`) |
+| Plum palette token | ✅ Live (`app/theme/colors.ts` — `palette.plum[500]` surface + `palette.plum[50]` companion text) |
+| App.tsx default mode | ✅ Light (`<ThemeProvider>` defaults to light; per-screen wrappers removed) |
+| WelcomeScreen | ✅ Live |
+| ObjectiveScreen | ✅ Live |
+| ConsentScreen | ✅ Live (research opt-in row 2 above the fold; "(Optionnel)" inline fuchsia-bold) |
+| AccountScreen | ✅ Live (Plum-surface segmented control with apricot indicator) |
+| HomeScreen | ✅ Live (v2.2 Plum register: profile chip, fuchsia greeting, Plum Insight, mini cards, Cycle ring, Knowledge card) |
+| ProfileScreen | ✅ Live |
+| Documents screens (List, Detail, Add) | ✅ Live |
+| ChatScreen + Bubble + StarterCard | ✅ Live |
+| Wordmark.tsx | ✅ Live (Bricolage 800, Void default colour) |
+| Button.tsx | ✅ Live (theme-aware) |
+| Bloom.tsx | ✅ Live (geometry locked in §4.1) |
+| GoalSheet, DocumentContextSheet, ConsentSheet, LiquidTabBar | ✅ Live (v2.2 light register) |
+| BreathingForm, LiquidEmber, PeonyBloom | 🗑️ Deprecated — not imported anywhere except a single `?test=breath` route in App.tsx (dev-only) and the SegmentedControl tests if any. Safe to delete in a follow-up. |
+| Markdown.tsx `[Sn]` citation tint | ⏳ Still v1.0 — needs to flip from ember → fuchsia (BRAND.md §10.2) |
+| BrandWordmark inlines in Welcome / Home / Profile / DocumentsList | ⏳ Duplicate the shared `Wordmark.tsx` — delete in a follow-up cleanup |
 
-A separate PR per concern is fine. Token + typography first, components second, screens third.
+### 8.2 Remaining work
+
+| Concern | Where |
+|---|---|
+| Status pill colour theory (§10.1) | Pill.tsx status variants, deferred to portal-led design |
+| Markdown citation tint (§10.2) | `app/components/Markdown/Markdown.tsx` |
+| Delete BrandWordmark inlines | 4 screens — replace with `<Wordmark size={...} />` |
+| Delete BreathingForm / LiquidEmber / PeonyBloom files | `app/components/` |
+| Physician portal v2.2 migration | Tracked separately in §11.7 |
 
 ---
 
@@ -398,7 +477,7 @@ For anyone returning to the codebase, the v1.0 → v2.0 delta in one table:
 | **Warmth** | Ember `#C4806A` wash everywhere | Soft Apricot `#FDBA74` in one bloom only |
 | **Brand mark** | Six-element BreathingForm + PeonyBloom + LiquidEmber | Single fuchsia dot + single apricot bloom |
 | **Pill backgrounds** | rgba(255,245,238,0.06) | Petal `#FEF0F4` |
-| **Candy Pink** | Not present | `#FFB0CC` added as eighth token (reserved for future status surfaces) |
+| **Eighth token** | Not present | Candy Pink `#FFB0CC` added in v2.1 (reserved, never shipped) → **replaced** in v2.2 by Plum `#2D1A2E` (active insight surface) |
 | **Secondary buttons** | Dusk-bordered ghost | Sand-bordered outline |
 | **Headline italics** | Italic by default | Upright always |
 | **Headline rhythm** | Single accent word | Two-tone horizontal split |
@@ -407,15 +486,16 @@ Mentally: the brand went from "intimate dark sanctuary" to "confident bright edi
 
 ---
 
-## 10. Open questions (out of scope for v2.0)
+## 10. Open questions
 
-Things the new system needs but doesn't yet specify. Each is a separate task.
+Still-unresolved design work tracked here, with status:
 
-1. **Status pill colour theory.** v1.0 had draft / inReview / approved / live / archived each with a colour. Those mapped to dark surfaces and don't translate. Need: five status colours that work as Petal-family tints on white.
-2. **Markdown accents.** Inline `[Sn]` citations, code fragments, bold, em — all need a re-derivation against white.
-3. **Dark-mode contingency.** If iOS users force dark mode at the OS level, the brand currently breaks. Decision: keep white-only with a system override (`color-scheme: light`), or design a v2.0-faithful dark variant.
-4. **Logo on non-white surfaces.** Press, partner docs, third-party embeds. Out of scope here but will need a brand-asset pack.
-5. **The Bloom component.** ~~This doc describes the visual; a `Bloom.tsx` component should replace BreathingForm with the new geometry.~~ **Partially resolved in v2.1.** The geometry is locked in §4.1. Implementation: a `Bloom` component with props `intensity` (0–1, default 1) and `position` (default `top-right`). The SVG in §4.1 is the full-intensity reference. Dot is always present except on splash/loading (intensity < 0.5).
+1. **Status pill colour theory.** v1.0 had draft / inReview / approved / live / archived each with a colour. Those mapped to dark surfaces and don't translate. Need: five status colours that work as Petal-family tints on white. **Open** — likely portal-led (see §11.4).
+2. **Markdown accents.** Inline `[Sn]` citations, code fragments, bold, em — all need a re-derivation against white. **Open** — Markdown.tsx tint is still v1.0 ember.
+3. **Dark-mode contingency.** If iOS users force dark mode at the OS level, the brand currently breaks. Decision: keep white-only with a system override (`color-scheme: light`), or design a v2.0-faithful dark variant. **Open** — current default is `color-scheme: light` (the dark palette is preserved in tokens but unused).
+4. **Logo on non-white surfaces.** Press, partner docs, third-party embeds. Out of scope here but will need a brand-asset pack. **Open**.
+5. **The Bloom component.** ✅ **Resolved in v2.1.** Geometry locked in §4.1. Implementation lives at `app/components/Bloom.tsx` with `intensity` (0–1) and `position` props. The dot is present except on splash/loading.
+6. **HomeScreen Insight content per objective (v2.2).** The Plum Insight card currently uses generic educational copy from `INSIGHTS` (`app/screens/home/HomeScreen.tsx`). The mockup showed claim-style copy ("Ton œstrogène baisse en phase lutéale — ce n'est pas de la fatigue") which needs physician-reviewed text per objective. **Open** — content design, not code.
 
 Pick these up in order as the rebrand rolls into more surfaces.
 
@@ -558,3 +638,24 @@ The locked production mockup for the patient app welcome screen is in `anoqi-wel
 - Bloom intensity — reduce to ~60% on inner screens and empty states
 - Bloom position — can move to bottom-left or bottom-right on secondary screens for variety
 - Dot size — scales proportionally with bloom intensity
+
+---
+
+## 13. What changed from v2.1
+
+The v2.1 → v2.2 delta. Shorter than the Sanctuary delta because v2.1 already had the canvas + typography + bloom right.
+
+| Concern | v2.1 | v2.2 |
+|---|---|---|
+| **Eighth palette token** | Candy Pink `#FFB0CC` (reserved, unused) | **Plum** `#2D1A2E` (active insight surface) |
+| **Apricot rule** | Decoration only, never UI / text | Decoration only on the white canvas; *allowed* as accent text + chips inside a Plum surface (documented exception) |
+| **Italic rule** | Banned everywhere | Banned in display; permitted in two body surfaces — knowledge cards, soft status labels — per §3.4 |
+| **HomeScreen Insight card** | Petal-tinted with single body text | Plum dark surface with apricot eyebrow + source chip + inner pills (§5.9) |
+| **Knowledge card** | Did not exist | Petal-bg italic editorial card with Cochrane source (§5.10) |
+| **Bottom dock** | LiquidEmber glass (v1.0 carryover) | Petal pill on Sand hairline, white active tab with fuchsia dot (§5.11) |
+| **Account screen pill** | White surface with apricot indicator | Plum surface with apricot-tinted active indicator (the indicator is the apricot-inside-Plum exception in practice) |
+| **App.tsx default mode** | `mode="dark"` with per-screen `<ThemeProvider mode="light">` wrappers on every migrated screen | `mode="light"` at the root; per-screen wrappers removed |
+| **Wordmark.tsx** | Inter Light, warmWhite default colour | Bricolage 800, Void default colour |
+| **GoalSheet / DocumentContextSheet** | Warm-white glass with apricot active rgbas | White surface with Sand hairline + Petal active fill + fuchsia border |
+
+Mentally: v2.0 was the canvas flip (dark→light). v2.1 was the headline + form lock-in. v2.2 is the *insight surface* — adding one deliberate moment of weight back into the editorial composition.
