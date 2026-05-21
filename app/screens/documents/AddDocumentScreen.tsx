@@ -1,4 +1,4 @@
-// Anoqi — AddDocumentScreen.
+// Anoqi — AddDocumentScreen (v2.2 light register).
 //
 // Single-stage flow now:
 //   1. On mount, take a pending File (set by a drag-and-drop on Documents
@@ -8,6 +8,10 @@
 //   3. Show the redaction preview with [NOM] / [TELEPHONE] / … chips so the
 //      user sees what was stripped before saving.
 //   4. Save locally + fire-and-forget upload if the user is signed in.
+//
+// v2.2: wraps itself in <ThemeProvider mode="light">. White canvas, white
+// section cards on a Sand hairline, Petal-tinted type pills with fuchsia
+// labels, dark-content status bar.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -28,10 +32,9 @@ import {
   BackHeader,
   Button,
   Icon,
-  LiquidEmber,
   Text,
 } from '../../components'
-import { useTheme } from '../../theme'
+import { ThemeProvider, palette, useTheme } from '../../theme'
 import { useOnboarding } from '../../context/OnboardingContext'
 import {
   loadDocument,
@@ -113,6 +116,14 @@ const PLACEHOLDER_REGEX =
 type Phase = 'importing' | 'preview' | 'error'
 
 export function AddDocumentScreen() {
+  return (
+    <ThemeProvider mode="light">
+      <AddDocumentScreenInner />
+    </ThemeProvider>
+  )
+}
+
+function AddDocumentScreenInner() {
   const theme = useTheme()
   const navigation = useNavigation<any>()
   const { language } = useOnboarding()
@@ -228,7 +239,7 @@ export function AddDocumentScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
-      <StatusBar barStyle="light-content" backgroundColor={theme.colors.bg.canvas} />
+      <StatusBar barStyle="dark-content" backgroundColor={theme.colors.bg.canvas} />
 
       <BackHeader
         showWordmark
@@ -348,14 +359,14 @@ function ImportingStage({
     <View>
       <Text
         variant="eyebrow"
-        style={{ color: 'rgba(255, 245, 238, 0.5)', marginBottom: theme.spacing[2] }}
+        style={{ color: palette.fuchsia[500], letterSpacing: 1.6, marginBottom: theme.spacing[2] }}
       >
         {copy.eyebrowImporting}
       </Text>
-      <Text variant="h2Italic" tone="primary">
+      <Text variant="h2" tone="primary">
         {copy.titleImporting}
       </Text>
-      <Text variant="bodyLight" tone="secondary" style={{ marginTop: theme.spacing[3] }}>
+      <Text variant="body" tone="secondary" style={{ marginTop: theme.spacing[3] }}>
         {copy.bodyImporting}
       </Text>
 
@@ -450,11 +461,11 @@ function PreviewStage({
     <View>
       <Text
         variant="eyebrow"
-        style={{ color: 'rgba(255, 245, 238, 0.5)', marginBottom: theme.spacing[2] }}
+        style={{ color: palette.fuchsia[500], letterSpacing: 1.6, marginBottom: theme.spacing[2] }}
       >
         {copy.eyebrowPreview}
       </Text>
-      <Text variant="h2Italic" tone="primary">
+      <Text variant="h2" tone="primary">
         {copy.titlePreview}
       </Text>
 
@@ -465,13 +476,13 @@ function PreviewStage({
       ) : null}
 
       {count === 0 ? (
-        <Text variant="bodyLight" tone="secondary" style={{ marginTop: theme.spacing[3] }}>
+        <Text variant="body" tone="secondary" style={{ marginTop: theme.spacing[3] }}>
           {copy.bodyNone}
         </Text>
       ) : (
         <>
-          <Text variant="bodyLight" tone="secondary" style={{ marginTop: theme.spacing[3] }}>
-            <Text variant="bodyLight" style={{ color: theme.colors.accent.primary }}>
+          <Text variant="body" tone="secondary" style={{ marginTop: theme.spacing[3] }}>
+            <Text variant="body" style={{ color: theme.colors.accent.primary }}>
               {count}
             </Text>
             {' '}
@@ -501,7 +512,8 @@ function PreviewStage({
       <Text
         variant="eyebrow"
         style={{
-          color: 'rgba(255, 245, 238, 0.4)',
+          color: theme.colors.text.tertiary,
+          letterSpacing: 1.4,
           marginTop: theme.spacing[8],
           marginBottom: theme.spacing[3],
         }}
@@ -511,37 +523,20 @@ function PreviewStage({
 
       <View
         style={{
+          backgroundColor: '#ffffff',
+          borderWidth: 1,
+          borderColor: palette.sand[300],
           borderRadius: theme.radii.xl,
-          overflow: 'hidden',
-          position: 'relative',
+          padding: theme.spacing[5],
         }}
       >
-        <LiquidEmber intensity={0.28} fuchsia={false} blur={40} borderRadius={theme.radii.xl} />
-        <View
-          style={[
-            {
-              backgroundColor: 'rgba(255, 245, 238, 0.04)',
-              borderWidth: 1,
-              borderColor: 'rgba(255, 245, 238, 0.08)',
-              borderRadius: theme.radii.xl,
-              padding: theme.spacing[5],
-            },
-            Platform.OS === 'web'
-              ? ({
-                  backdropFilter: 'blur(20px) saturate(140%)',
-                  WebkitBackdropFilter: 'blur(20px) saturate(140%)',
-                } as any)
-              : null,
-          ]}
-        >
-          <RichRedactedText
-            text={result.document.cleanText}
-            language={language}
-            color={theme.colors.text.primary}
-            chipColor={theme.colors.text.accent}
-            chipBg="rgba(196, 128, 106, 0.18)"
-          />
-        </View>
+        <RichRedactedText
+          text={result.document.cleanText}
+          language={language}
+          color={theme.colors.text.primary}
+          chipColor={theme.colors.text.accent}
+          chipBg={palette.petal[100]}
+        />
       </View>
     </View>
   )
@@ -572,12 +567,12 @@ function TypePill({ label, count, index }: { label: string; count: number; index
         flexDirection: 'row',
         alignItems: 'center',
         gap: theme.spacing[2],
-        backgroundColor: theme.colors.bg.surfaceWarm,
+        backgroundColor: palette.petal[100],
         borderRadius: theme.radii.pill,
         paddingVertical: theme.spacing[2],
         paddingHorizontal: theme.spacing[4],
         borderWidth: 1,
-        borderColor: 'rgba(196, 128, 106, 0.30)',
+        borderColor: palette.sand[300],
       }}
     >
       <Text variant="label" style={{ color: theme.colors.text.accent }}>

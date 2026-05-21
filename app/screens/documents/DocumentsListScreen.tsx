@@ -1,9 +1,13 @@
-// Anoqi — DocumentsListScreen.
+// Anoqi — DocumentsListScreen (v2.2 light register).
 //
 // Lists the user's on-device documents. Empty state is the trust pitch
 // (pseudonymisation lives on device). Each row reads the LocalDocument
 // so we can surface a structured insight ("4 valeurs · ferritine ↓")
 // instead of a generic "saved at" timestamp.
+//
+// v2.2: wraps itself in <ThemeProvider mode="light"> so theme-aware
+// descendants pick up the v2.2 tokens. White canvas, apricot bloom inner-
+// screen intensity, white+Sand document rows, fuchsia accents.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -15,19 +19,26 @@ import {
   SafeAreaView,
   StatusBar,
   View,
+  useWindowDimensions,
 } from 'react-native'
-import { useFocusEffect, useIsFocused, useNavigation } from '@react-navigation/native'
+import { useFocusEffect, useNavigation } from '@react-navigation/native'
+import Reanimated, {
+  Easing as ReanimatedEasing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated'
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import {
   BackHeader,
-  BreathingForm,
   Button,
   Icon,
   type IconName,
-  LiquidEmber,
   Text,
 } from '../../components'
-import { useTheme } from '../../theme'
+import { ThemeProvider, palette, useTheme } from '../../theme'
 import { useOnboarding } from '../../context/OnboardingContext'
 import {
   deleteDocument,
@@ -159,62 +170,45 @@ function DocumentRow({ entry, doc, index, language, onPress, onLongPress }: RowP
       >
         <View
           style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: theme.spacing[4],
+            paddingVertical: theme.spacing[4],
+            paddingHorizontal: theme.spacing[5],
+            backgroundColor: '#ffffff',
+            borderWidth: 1,
+            borderColor: palette.sand[300],
             borderRadius: theme.radii.xl,
-            overflow: 'hidden',
-            position: 'relative',
           }}
         >
-          <LiquidEmber intensity={0.32} fuchsia={false} blur={36} borderRadius={theme.radii.xl} />
           <View
-            style={[
-              {
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: theme.spacing[4],
-                paddingVertical: theme.spacing[4],
-                paddingHorizontal: theme.spacing[5],
-                backgroundColor: 'rgba(255, 245, 238, 0.04)',
-                borderWidth: 1,
-                borderColor: 'rgba(255, 245, 238, 0.08)',
-                borderRadius: theme.radii.xl,
-              },
-              Platform.OS === 'web'
-                ? ({
-                    backdropFilter: 'blur(20px) saturate(140%)',
-                    WebkitBackdropFilter: 'blur(20px) saturate(140%)',
-                  } as any)
-                : null,
-            ]}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: palette.petal[100],
+            }}
           >
-            <View
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: theme.colors.bg.surfaceWarm,
-              }}
-            >
-              <Icon name={meta.icon} size={18} color={theme.colors.text.accent} strokeWidth={1.6} />
-            </View>
-
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text variant="bodyMed" tone="primary" numberOfLines={1}>
-                {entry.name && entry.name.trim().length > 0 ? entry.name : meta[language]}
-              </Text>
-              <Text variant="caption" tone="tertiary">
-                {[meta[language].toUpperCase(), date.toUpperCase()].filter(Boolean).join(' · ')}
-              </Text>
-              {!!insight && (
-                <Text variant="label" tone="accent" style={{ marginTop: 4 }}>
-                  {insight}
-                </Text>
-              )}
-            </View>
-
-            <Icon name="ChevronRight" size={18} color={theme.colors.text.tertiary} strokeWidth={1.6} />
+            <Icon name={meta.icon} size={18} color={palette.fuchsia[500]} strokeWidth={1.6} />
           </View>
+
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text variant="bodyMed" tone="primary" numberOfLines={1}>
+              {entry.name && entry.name.trim().length > 0 ? entry.name : meta[language]}
+            </Text>
+            <Text variant="caption" tone="tertiary">
+              {[meta[language].toUpperCase(), date.toUpperCase()].filter(Boolean).join(' · ')}
+            </Text>
+            {!!insight && (
+              <Text variant="label" tone="accent" style={{ marginTop: 4 }}>
+                {insight}
+              </Text>
+            )}
+          </View>
+
+          <Icon name="ChevronRight" size={18} color={theme.colors.text.tertiary} strokeWidth={1.6} />
         </View>
       </Pressable>
     </Animated.View>
@@ -225,13 +219,21 @@ function DocumentRow({ entry, doc, index, language, onPress, onLongPress }: RowP
 // DocumentsListScreen
 // ─────────────────────────────────────────────────────────────
 export function DocumentsListScreen() {
+  return (
+    <ThemeProvider mode="light">
+      <DocumentsListScreenInner />
+    </ThemeProvider>
+  )
+}
+
+function DocumentsListScreenInner() {
   const theme = useTheme()
   const navigation = useNavigation<any>()
   const { language } = useOnboarding()
   const copy = COPY[language]
-  // Guard the position:fixed BreathingForm so it doesn't bleed across tabs
-  // that the bottom-tab navigator keeps mounted in parallel.
-  const isFocused = useIsFocused()
+  const { width } = useWindowDimensions()
+  const isCompact = width < 480
+  const bloomSize = isCompact ? 320 : 420
 
   const [entries, setEntries] = useState<DocumentIndexEntry[]>([])
   const [docs, setDocs] = useState<Record<string, LocalDocument | null>>({})
@@ -316,43 +318,13 @@ export function DocumentsListScreen() {
   }, [refresh])
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <StatusBar barStyle="light-content" backgroundColor={theme.colors.bg.canvas} />
+    <View style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
+      <StatusBar barStyle="dark-content" backgroundColor={theme.colors.bg.canvas} />
 
-      {/* Brand BreathingForm anchored at bottom-right — same placement as
-          ChatScreen so the visual sits at a consistent corner across tabs.
-          Behind content via DOM order; isFocused guard prevents the
-          position:fixed form (web) from bleeding into other tabs. */}
-      {isFocused ? (
-        <View
-          pointerEvents="none"
-          style={
-            Platform.OS === 'web'
-              ? ({
-                  position: 'fixed',
-                  right: -40,
-                  bottom: -40,
-                  width: 585,
-                  height: 585,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                } as any)
-              : {
-                  position: 'absolute',
-                  right: -40,
-                  bottom: -40,
-                  width: 585,
-                  height: 585,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }
-          }
-        >
-          <BreathingForm size={585} />
-        </View>
-      ) : null}
+      <Bloom size={bloomSize} intensity={0.6} />
 
-      <BackHeader showWordmark />
+      <SafeAreaView style={{ flex: 1 }}>
+        <BackHeader showWordmark />
 
       <View
         style={{
@@ -363,15 +335,15 @@ export function DocumentsListScreen() {
       >
         <Text
           variant="eyebrow"
-          style={{ color: 'rgba(255, 245, 238, 0.5)', marginBottom: theme.spacing[2] }}
+          style={{ color: palette.fuchsia[500], letterSpacing: 1.6, marginBottom: theme.spacing[2] }}
         >
           DOCUMENTS
         </Text>
-        <Text variant="h2Italic" tone="primary">
+        <Text variant="h2" tone="primary">
           {copy.title}
         </Text>
         <Text
-          variant="bodyLight"
+          variant="body"
           tone="secondary"
           style={{ marginTop: theme.spacing[2] }}
         >
@@ -479,7 +451,7 @@ export function DocumentsListScreen() {
             alignItems: 'center',
             justifyContent: 'center',
             paddingHorizontal: theme.spacing[6],
-            backgroundColor: 'rgba(13, 13, 18, 0.85)',
+            backgroundColor: 'rgba(255, 255, 255, 0.92)',
           }}
         >
           <View
@@ -489,20 +461,20 @@ export function DocumentsListScreen() {
               paddingHorizontal: theme.spacing[8],
               borderRadius: theme.radii.xl,
               borderWidth: 2,
-              borderColor: theme.colors.accent.primary,
+              borderColor: palette.fuchsia[500],
               borderStyle: 'dashed' as any,
-              backgroundColor: 'rgba(196, 128, 106, 0.06)',
+              backgroundColor: palette.petal[100],
               maxWidth: 420,
             }}
           >
             <Icon
               name="UploadCloud"
               size={48}
-              color={theme.colors.accent.primary}
+              color={palette.fuchsia[500]}
               strokeWidth={1.5}
             />
             <Text
-              variant="h3Italic"
+              variant="h3"
               tone="primary"
               align="center"
               style={{ marginTop: theme.spacing[4] }}
@@ -510,7 +482,7 @@ export function DocumentsListScreen() {
               {copy.dropOverlayTitle}
             </Text>
             <Text
-              variant="bodyLight"
+              variant="body"
               tone="secondary"
               align="center"
               style={{ marginTop: theme.spacing[2], maxWidth: 320 }}
@@ -520,6 +492,70 @@ export function DocumentsListScreen() {
           </View>
         </View>
       ) : null}
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
+  )
+}
+
+// ─── BLOOM ─────────────────────────────────────────────────────────────────
+function Bloom({ size, intensity }: { size: number; intensity: number }) {
+  const t = useSharedValue(0)
+  useEffect(() => {
+    t.value = withRepeat(
+      withTiming(1, { duration: 4000, easing: ReanimatedEasing.bezier(0.45, 0, 0.55, 1) }),
+      -1,
+      true,
+    )
+  }, [t])
+  const dotStyle = useAnimatedStyle(() => ({
+    opacity: (0.92 - 0.57 * t.value) * intensity,
+    transform: [{ scale: 1 - 0.38 * t.value }],
+  }))
+
+  const dotX  = size * 0.76
+  const dotY  = size * 0.21
+  const stop0 = Math.max(0, 0.7  * intensity)
+  const stop1 = Math.max(0, 0.38 * intensity)
+  const stop2 = Math.max(0, 0.10 * intensity)
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{ position: 'absolute', top: 0, right: 0, width: size, height: size }}
+    >
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <Defs>
+          <RadialGradient id="apricotDocs" cx="72%" cy="10%" r="55%" fx="72%" fy="10%">
+            <Stop offset="0%"   stopColor={palette.apricot[400]} stopOpacity={stop0} />
+            <Stop offset="35%"  stopColor={palette.apricot[400]} stopOpacity={stop1} />
+            <Stop offset="70%"  stopColor={palette.apricot[400]} stopOpacity={stop2} />
+            <Stop offset="100%" stopColor={palette.apricot[400]} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Rect width={size} height={size} fill="url(#apricotDocs)" />
+      </Svg>
+      <Reanimated.View
+        style={[
+          {
+            position: 'absolute',
+            left: dotX - 5,
+            top:  dotY - 5,
+            width: 10,
+            height: 10,
+            borderRadius: 999,
+            backgroundColor: palette.fuchsia[500],
+            ...(Platform.OS === 'web'
+              ? ({ boxShadow: '0 0 14px rgba(255, 4, 114, 0.45)' } as any)
+              : {
+                  shadowColor: palette.fuchsia[500],
+                  shadowOpacity: 0.45,
+                  shadowRadius: 6,
+                  shadowOffset: { width: 0, height: 0 },
+                }),
+          },
+          dotStyle,
+        ]}
+      />
+    </View>
   )
 }

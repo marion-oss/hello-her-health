@@ -1,14 +1,16 @@
-// Anoqi — DocumentDetailScreen.
+// Anoqi — DocumentDetailScreen (v2.2 light register).
 //
 // Opened when the user taps a row in the Documents list. Shows the saved
 // (pseudonymised) document: name, type, date, the structured insight blocks
 // (lab values / medications) and the cleaned text in full. Delete sits at
 // the bottom — destructive, deliberate.
+//
+// v2.2: wraps itself in <ThemeProvider mode="light">; white canvas, white
+// section cards on a Sand hairline, no LiquidEmber glass.
 
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   Alert,
-  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -19,13 +21,11 @@ import { useNavigation, useRoute } from '@react-navigation/native'
 
 import {
   BackHeader,
-  Button,
   Icon,
   type IconName,
-  LiquidEmber,
   Text,
 } from '../../components'
-import { useTheme } from '../../theme'
+import { ThemeProvider, palette, useTheme } from '../../theme'
 import { useOnboarding } from '../../context/OnboardingContext'
 import {
   deleteDocument,
@@ -88,6 +88,14 @@ function formatDate(iso: string | null, language: 'fr' | 'en'): string {
 }
 
 export function DocumentDetailScreen() {
+  return (
+    <ThemeProvider mode="light">
+      <DocumentDetailScreenInner />
+    </ThemeProvider>
+  )
+}
+
+function DocumentDetailScreenInner() {
   const theme = useTheme()
   const navigation = useNavigation<any>()
   const route = useRoute<any>()
@@ -163,7 +171,7 @@ export function DocumentDetailScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
-      <StatusBar barStyle="light-content" backgroundColor={theme.colors.bg.canvas} />
+      <StatusBar barStyle="dark-content" backgroundColor={theme.colors.bg.canvas} />
 
       <BackHeader showWordmark onBack={() => navigation.goBack()} />
 
@@ -180,15 +188,15 @@ export function DocumentDetailScreen() {
         <View>
           <Text
             variant="eyebrow"
-            style={{ color: 'rgba(255, 245, 238, 0.5)', marginBottom: theme.spacing[2] }}
+            style={{ color: palette.fuchsia[500], letterSpacing: 1.6, marginBottom: theme.spacing[2] }}
           >
             {meta[language].toUpperCase()}
           </Text>
-          <Text variant="h2Italic" tone="primary">
+          <Text variant="h2" tone="primary">
             {title}
           </Text>
           {!!dateLabel && (
-            <Text variant="bodyLight" tone="secondary" style={{ marginTop: theme.spacing[2] }}>
+            <Text variant="body" tone="secondary" style={{ marginTop: theme.spacing[2] }}>
               {dateLabel}
             </Text>
           )}
@@ -266,8 +274,8 @@ export function DocumentDetailScreen() {
               paddingVertical: theme.spacing[4],
               borderRadius: theme.radii.pill,
               borderWidth: 1,
-              borderColor: 'rgba(185, 74, 100, 0.30)',
-              backgroundColor: 'rgba(185, 74, 100, 0.06)',
+              borderColor: theme.colors.text.danger,
+              backgroundColor: theme.colors.accent.dangerSurface,
               opacity: pressed ? 0.8 : 1,
               transform: pressed ? [{ scale: 0.985 }] : undefined,
             })}
@@ -298,7 +306,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <Text
         variant="eyebrow"
         style={{
-          color: 'rgba(255, 245, 238, 0.4)',
+          color: theme.colors.text.tertiary,
+          letterSpacing: 1.4,
           marginBottom: theme.spacing[3],
         }}
       >
@@ -306,31 +315,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       </Text>
       <View
         style={{
+          backgroundColor: '#ffffff',
+          borderWidth: 1,
+          borderColor: palette.sand[300],
           borderRadius: theme.radii.xl,
-          overflow: 'hidden',
-          position: 'relative',
+          padding: theme.spacing[5],
         }}
       >
-        <LiquidEmber intensity={0.28} fuchsia={false} blur={40} borderRadius={theme.radii.xl} />
-        <View
-          style={[
-            {
-              backgroundColor: 'rgba(255, 245, 238, 0.04)',
-              borderWidth: 1,
-              borderColor: 'rgba(255, 245, 238, 0.08)',
-              borderRadius: theme.radii.xl,
-              padding: theme.spacing[5],
-            },
-            Platform.OS === 'web'
-              ? ({
-                  backdropFilter: 'blur(20px) saturate(140%)',
-                  WebkitBackdropFilter: 'blur(20px) saturate(140%)',
-                } as any)
-              : null,
-          ]}
-        >
-          {children}
-        </View>
+        {children}
       </View>
     </View>
   )
