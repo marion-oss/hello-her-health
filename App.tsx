@@ -41,7 +41,7 @@ import {
 
 import { OnboardingProvider }  from './app/context/OnboardingContext'
 import { MainNavigator }       from './app/navigation/MainNavigator'
-import { ThemeProvider, darkColors } from './app/theme'
+import { ThemeProvider, lightColors } from './app/theme'
 import { BreathingForm } from './app/components'
 
 // OnboardingNavigator is only rendered for first-time users; returning users
@@ -114,8 +114,9 @@ export default function App() {
     }
   }, [appReady])
 
-  // Locked to dark mode — Anoqi's Sanctuary palette is dark-first.
-  const colors = darkColors
+  // Anoqi is light-only since the v2.2 rebrand. The dark palette stays
+  // available via <ThemeProvider mode="dark"> for future contingency.
+  const colors = lightColors
 
   if (!appReady) return null
 
@@ -125,10 +126,10 @@ export default function App() {
   }
 
   // Mirror role tokens into React Navigation's theme so navigator-mounted
-  // screens pick up Void + Warm White without per-screen plumbing.
+  // screens pick up the v2.2 light palette without per-screen plumbing.
   const navTheme = {
     ...DefaultTheme,
-    dark: true,
+    dark: false,
     colors: {
       ...DefaultTheme.colors,
       background: colors.bg.canvas,
@@ -161,24 +162,12 @@ export default function App() {
     )
   }
 
-  // Root canvas tracks the rendered surface: while the onboarding flow is on
-  // screen (all light v2.0/v2.2) we paint white, so the appShell column on
-  // desktop doesn't leave a dark void on either side. Once onboarding is done
-  // and MainNavigator (still v1.0 dark) mounts, we flip back to the dark
-  // canvas. Pre-stages the App.tsx default-mode flip — once Chat, Documents
-  // and Profile all migrate to light, this becomes unconditional white and
-  // the dark branch can be deleted.
-  const rootCanvas = onboardingDone ? colors.bg.canvas : '#ffffff'
-
   return (
     <View
-      style={[styles.root, { backgroundColor: rootCanvas }]}
+      style={[styles.root, { backgroundColor: colors.bg.canvas }]}
       onLayout={onLayoutRootView}
     >
-      {/* appShell is transparent — the root View already provides the void
-          canvas. A solid background here creates a visible "column"
-          boundary against the position:fixed BreathingForm rendering in
-          the void on each side. */}
+      {/* appShell is transparent — the root View provides the light canvas. */}
       <View
         style={[
           styles.appShell,
@@ -187,7 +176,7 @@ export default function App() {
             : null,
         ]}
       >
-        <ThemeProvider mode="dark">
+        <ThemeProvider>
           <NavigationContainer theme={navTheme}>
             <OnboardingProvider onComplete={handleOnboardingComplete}>
               {onboardingDone ? (

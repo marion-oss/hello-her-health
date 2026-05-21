@@ -1,12 +1,7 @@
-// Anoqi — ProfileScreen (v2.2 light register).
+// Anoqi — ProfileScreen.
 //
 // One control for now: language toggle (FR / EN). Reads + writes through
 // OnboardingContext so the rest of the app picks it up immediately.
-//
-// v2.2: wraps itself in <ThemeProvider mode="light"> so theme-aware
-// descendants pick up the v2.2 tokens. White canvas, apricot bloom inner-
-// screen intensity, Bricolage 800 h1, Petal-tinted card, fuchsia primary
-// active state on the language pills. No italic.
 
 import React, { useEffect } from 'react'
 import {
@@ -28,7 +23,7 @@ import Animated, {
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import { useOnboarding } from '../../context/OnboardingContext'
-import { ThemeProvider, palette, useTheme } from '../../theme'
+import { palette, useTheme } from '../../theme'
 import { Text } from '../../components'
 
 const COPY = {
@@ -48,17 +43,7 @@ const COPY = {
   },
 } as const
 
-// ─── PUBLIC ENTRY ──────────────────────────────────────────────────────────
 export function ProfileScreen() {
-  return (
-    <ThemeProvider mode="light">
-      <ProfileScreenInner />
-    </ThemeProvider>
-  )
-}
-
-// ─── INNER ─────────────────────────────────────────────────────────────────
-function ProfileScreenInner() {
   const navigation = useNavigation<any>()
   const { language, setLanguage } = useOnboarding()
   const theme = useTheme()

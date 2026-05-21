@@ -1,12 +1,9 @@
-// Anoqi — DocumentDetailScreen (v2.2 light register).
+// Anoqi — DocumentDetailScreen.
 //
 // Opened when the user taps a row in the Documents list. Shows the saved
 // (pseudonymised) document: name, type, date, the structured insight blocks
 // (lab values / medications) and the cleaned text in full. Delete sits at
 // the bottom — destructive, deliberate.
-//
-// v2.2: wraps itself in <ThemeProvider mode="light">; white canvas, white
-// section cards on a Sand hairline, no LiquidEmber glass.
 
 import React, { useCallback, useEffect, useState } from 'react'
 import {
@@ -25,7 +22,7 @@ import {
   type IconName,
   Text,
 } from '../../components'
-import { ThemeProvider, palette, useTheme } from '../../theme'
+import { palette, useTheme } from '../../theme'
 import { useOnboarding } from '../../context/OnboardingContext'
 import {
   deleteDocument,
@@ -88,14 +85,6 @@ function formatDate(iso: string | null, language: 'fr' | 'en'): string {
 }
 
 export function DocumentDetailScreen() {
-  return (
-    <ThemeProvider mode="light">
-      <DocumentDetailScreenInner />
-    </ThemeProvider>
-  )
-}
-
-function DocumentDetailScreenInner() {
   const theme = useTheme()
   const navigation = useNavigation<any>()
   const route = useRoute<any>()

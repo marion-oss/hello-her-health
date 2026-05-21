@@ -1,7 +1,8 @@
 // Anoqi — ThemeProvider. Wraps the app, exposes light/dark theme via useTheme().
 //
-// The theme value is selected from the OS color scheme. To force a mode in
-// development, wrap with <ThemeProvider mode="dark"> directly.
+// Anoqi is light-only since the v2.2 rebrand. The dark palette is kept in
+// place for future contingency (dark-mode surfaces / future opt-in) but no
+// screen renders against it today. Passing mode="dark" is still supported.
 
 import React, { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { useColorScheme } from 'react-native'
@@ -39,13 +40,12 @@ const buildTheme = (mode: ThemeMode): Theme => ({
   shadow: (level: ShadowLevel) => shadow(level, mode),
 })
 
-const ThemeContext = createContext<Theme>(buildTheme('dark'))
+const ThemeContext = createContext<Theme>(buildTheme('light'))
 
 export function ThemeProvider({ children, mode }: { children: ReactNode; mode?: ThemeMode }) {
-  // Anoqi is dark-only — OS color scheme is ignored unless the prop says
-  // otherwise. lightColors aliases darkColors in colors.ts, so this is also
-  // safe if a downstream surface ever passes mode="light".
-  const resolvedMode: ThemeMode = mode ?? 'dark'
+  // Default is light per the v2.2 rebrand. Pass mode="dark" only on surfaces
+  // explicitly designed for the dark palette.
+  const resolvedMode: ThemeMode = mode ?? 'light'
   const value = useMemo(() => buildTheme(resolvedMode), [resolvedMode])
   // Touch useColorScheme so the hook stays subscribed (avoids stale RN warnings).
   useColorScheme()

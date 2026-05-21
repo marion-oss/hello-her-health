@@ -45,7 +45,7 @@ import {
   type HealthObjective,
   type Language,
 } from '../../context/OnboardingContext'
-import { ThemeProvider, palette, useTheme } from '../../theme'
+import { palette, useTheme } from '../../theme'
 import { STARTERS } from './starters'
 import { StarterCard } from './StarterCard'
 import {
@@ -296,14 +296,6 @@ const AssistantMessageItem = memo(function AssistantMessageItem({
 
 
 export function ChatScreen() {
-  return (
-    <ThemeProvider mode="light">
-      <ChatScreenInner />
-    </ThemeProvider>
-  )
-}
-
-function ChatScreenInner() {
   const navigation = useNavigation<any>()
   const { language, objective, setObjective, sessionId } = useOnboarding()
   const theme = useTheme()
