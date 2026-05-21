@@ -1,14 +1,13 @@
-// LiquidTabBar — floating bottom navigation in the iridescent register.
+// LiquidTabBar — floating bottom navigation (v2.2 light register).
 //
-// A single frosted glass pill sits just above the home indicator, with the
-// LiquidEmber layer breathing underneath. Each tab is a press target with a
-// Lucide icon + small label; the active tab gets a pulsing fuchsia dot and a
-// brighter icon. No labels live below the icons — the dot is the indicator.
+// A single Petal-tinted pill sits just above the home indicator. Each tab is
+// a press target with a Lucide icon; the active tab gets a pulsing fuchsia
+// dot below the icon (no labels — the dot is the indicator).
 //
 // Drop in as React Navigation's `tabBar` render prop.
 
 import React, { useEffect } from 'react'
-import { Platform, Pressable, View, type ViewStyle } from 'react-native'
+import { Platform, Pressable, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import Animated, {
@@ -19,10 +18,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 
-import { hover, palette, useTheme } from '../theme'
+import { hover, palette } from '../theme'
 import { Icon, type IconName } from './Icon'
-import { LiquidEmber } from './LiquidEmber'
-import { Text } from './Text'
 
 const ROUTE_META: Record<string, { icon: IconName; labelFr: string; labelEn: string }> = {
   Home:      { icon: 'House',    labelFr: "Aujourd'hui", labelEn: 'Today'     },
@@ -31,20 +28,11 @@ const ROUTE_META: Record<string, { icon: IconName; labelFr: string; labelEn: str
   Profile:   { icon: 'User',     labelFr: 'Profil',      labelEn: 'Profile'   },
 }
 
-const webBackdrop = Platform.OS === 'web'
-  ? ({
-      backdropFilter: 'blur(22px) saturate(140%)',
-      WebkitBackdropFilter: 'blur(22px) saturate(140%)',
-    } as unknown as ViewStyle)
-  : null
-
 export function LiquidTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets()
-  const theme = useTheme()
 
   // Hide the bar when the *focused* screen opts out via
-  // `tabBarStyle: { display: 'none' }`. Chat uses this for its immersive
-  // mode so the input bar can dock at the screen edge.
+  // `tabBarStyle: { display: 'none' }`. Chat uses this for immersive mode.
   const focusedRoute = state.routes[state.index]
   const focusedOpts = descriptors[focusedRoute.key].options
   const tabBarStyleObj = focusedOpts.tabBarStyle as { display?: string } | undefined
@@ -64,64 +52,49 @@ export function LiquidTabBar({ state, descriptors, navigation }: BottomTabBarPro
       <View
         style={{
           borderRadius: 36,
-          overflow: 'hidden',
-          // Ember tinted shadow so the floating pill reads as warm, not
-          // hovering in nothing.
+          backgroundColor: palette.petal[100],
+          borderWidth: 1,
+          borderColor: palette.sand[300],
+          paddingHorizontal: 8,
+          paddingVertical: 8,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
           ...(Platform.OS === 'web'
-            ? ({ boxShadow: '0 18px 40px -12px rgba(196,128,106,0.35), 0 6px 18px -6px rgba(0,0,0,0.55)' } as any)
+            ? ({ boxShadow: '0 10px 28px -10px rgba(13, 13, 18, 0.18), 0 4px 12px -6px rgba(13, 13, 18, 0.10)' } as any)
             : {
-                shadowColor: palette.ember[700],
-                shadowOpacity: 0.5,
+                shadowColor: palette.void[500],
+                shadowOpacity: 0.18,
                 shadowRadius: 18,
-                shadowOffset: { width: 0, height: 12 },
+                shadowOffset: { width: 0, height: 8 },
               }),
         }}
       >
-        {/* Slow ember liquid under the glass */}
-        <LiquidEmber intensity={0.85} blur={28} borderRadius={36} fuchsia={true} />
+        {state.routes.map((route, index) => {
+          const isFocused = state.index === index
+          const meta = ROUTE_META[route.name] ?? { icon: 'House' as IconName, labelFr: route.name, labelEn: route.name }
 
-        <View
-          style={[
-            {
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: 8,
-              paddingVertical: 8,
-              gap: 4,
-              backgroundColor: 'rgba(255, 245, 238, 0.06)',
-              borderWidth: 1,
-              borderColor: 'rgba(255, 245, 238, 0.12)',
-              borderRadius: 36,
-            },
-            webBackdrop,
-          ]}
-        >
-          {state.routes.map((route, index) => {
-            const isFocused = state.index === index
-            const meta = ROUTE_META[route.name] ?? { icon: 'House' as IconName, labelFr: route.name, labelEn: route.name }
-
-            const onPress = () => {
-              const event = navigation.emit({
-                type: 'tabPress',
-                target: route.key,
-                canPreventDefault: true,
-              })
-              if (!isFocused && !event.defaultPrevented) {
-                navigation.navigate(route.name as never)
-              }
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            })
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name as never)
             }
+          }
 
-            return (
-              <TabButton
-                key={route.key}
-                icon={meta.icon}
-                label={meta.labelEn}
-                focused={isFocused}
-                onPress={onPress}
-              />
-            )
-          })}
-        </View>
+          return (
+            <TabButton
+              key={route.key}
+              icon={meta.icon}
+              label={meta.labelEn}
+              focused={isFocused}
+              onPress={onPress}
+            />
+          )
+        })}
       </View>
     </View>
   )
@@ -138,11 +111,9 @@ function TabButton({
   focused: boolean
   onPress: () => void
 }) {
-  // Press-down feedback
   const scale = useSharedValue(1)
   const ease = Easing.bezier(0.22, 1, 0.36, 1)
 
-  // Pulsing dot on the active tab — same 4s rhythm as the brand wordmark.
   const pulse = useSharedValue(0)
   useEffect(() => {
     pulse.value = withRepeat(
@@ -158,9 +129,7 @@ function TabButton({
     transform: [{ scale: focused ? 1 - 0.18 * pulse.value : 0.6 }],
   }))
 
-  const iconColor = focused
-    ? palette.warmWhite[100]
-    : 'rgba(255, 245, 238, 0.45)'
+  const iconColor = focused ? palette.void[500] : palette.warmGray[300]
 
   return (
     <Animated.View style={scaleStyle}>
@@ -179,13 +148,13 @@ function TabButton({
             borderRadius: 999,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: focused ? 'rgba(255, 245, 238, 0.08)' : 'transparent',
+            backgroundColor: focused ? '#ffffff' : 'transparent',
             borderWidth: focused ? 1 : 0,
-            borderColor: 'rgba(255, 245, 238, 0.10)',
+            borderColor: palette.sand[300],
           },
           hover.transition,
           hovered && !focused && {
-            backgroundColor: 'rgba(255, 245, 238, 0.04)',
+            backgroundColor: 'rgba(255, 255, 255, 0.6)',
           },
         ]}
       >

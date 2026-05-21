@@ -34,7 +34,6 @@ import {
 } from '../screens/onboarding/consent.copy'
 import { Button } from './Button'
 import { Checkbox } from './Checkbox'
-import { Pill } from './Pill'
 import { Text } from './Text'
 
 // Above this viewport width, switch from full-width bottom sheet to
@@ -268,7 +267,11 @@ export function ConsentSheet({ visible, language, onAccept }: Props) {
               </View>
             </Pressable>
 
-            {/* Research (optional) */}
+            {/* Research (optional) — placed last as in ConsentSheet's
+                original order; ConsentScreen reordered to row 2 in PR #36
+                because the third row sat below the fold on mobile. The
+                sheet variant doesn't have the same problem because it
+                scrolls fully open. */}
             <Pressable
               accessibilityRole="checkbox"
               accessibilityState={{ checked: consent.research }}
@@ -283,17 +286,10 @@ export function ConsentSheet({ visible, language, onAccept }: Props) {
                 />
               </View>
               <View style={{ flex: 1 }}>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginBottom: theme.spacing[2],
-                    gap: theme.spacing[2],
-                  }}
-                >
-                  <Pill label={copy.optional} tone="teal" />
-                </View>
                 <Text variant="body" tone="primary">
+                  <Text variant="body" tone="accent" style={{ fontWeight: '600' }}>
+                    ({copy.optional}){' '}
+                  </Text>
                   {copy.researchLabel}
                 </Text>
                 <Text variant="caption" tone="tertiary" style={{ marginTop: theme.spacing[2] }}>

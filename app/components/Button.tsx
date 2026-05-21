@@ -137,11 +137,11 @@ export function Button({
             lift && hover.lift,
             lift && variant === 'primary' && hover.glow('rgba(255, 4, 114, 0.55)'),
             lift && variant === 'secondary' && {
-              borderColor: theme.colors.border.strong ?? 'rgba(255, 245, 238, 0.22)',
-              backgroundColor: 'rgba(255, 245, 238, 0.04)',
+              borderColor: theme.colors.border.strong ?? theme.colors.border.default,
+              backgroundColor: theme.colors.bg.surfaceMuted,
             },
             lift && (variant === 'ghost' || variant === 'ghostDanger') && {
-              backgroundColor: 'rgba(255, 245, 238, 0.05)',
+              backgroundColor: theme.colors.bg.surfaceMuted,
             },
           ]
         }}
