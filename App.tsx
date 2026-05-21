@@ -161,9 +161,18 @@ export default function App() {
     )
   }
 
+  // Root canvas tracks the rendered surface: while the onboarding flow is on
+  // screen (all light v2.0/v2.2) we paint white, so the appShell column on
+  // desktop doesn't leave a dark void on either side. Once onboarding is done
+  // and MainNavigator (still v1.0 dark) mounts, we flip back to the dark
+  // canvas. Pre-stages the App.tsx default-mode flip — once Chat, Documents
+  // and Profile all migrate to light, this becomes unconditional white and
+  // the dark branch can be deleted.
+  const rootCanvas = onboardingDone ? colors.bg.canvas : '#ffffff'
+
   return (
     <View
-      style={[styles.root, { backgroundColor: colors.bg.canvas }]}
+      style={[styles.root, { backgroundColor: rootCanvas }]}
       onLayout={onLayoutRootView}
     >
       {/* appShell is transparent — the root View already provides the void
@@ -185,7 +194,7 @@ export default function App() {
                 <MainNavigator />
               ) : (
                 <Suspense
-                  fallback={<View style={{ flex: 1, backgroundColor: colors.bg.canvas }} />}
+                  fallback={<View style={{ flex: 1, backgroundColor: '#ffffff' }} />}
                 >
                   <LazyOnboardingNavigator />
                 </Suspense>
