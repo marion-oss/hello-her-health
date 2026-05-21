@@ -45,7 +45,7 @@ import {
   type HealthObjective,
   type Language,
 } from '../../context/OnboardingContext'
-import { palette, useTheme } from '../../theme'
+import { ThemeProvider, palette, useTheme } from '../../theme'
 import { STARTERS } from './starters'
 import { StarterCard } from './StarterCard'
 import {
@@ -59,7 +59,6 @@ import { Alert } from 'react-native'
 import { supabase } from '../../lib/supabase'
 import {
   BackHeader,
-  BreathingForm,
   Bubble,
   Button,
   type CitationSource,
@@ -74,6 +73,14 @@ import {
   Text,
   TypingIndicator,
 } from '../../components'
+import Reanimated, {
+  Easing as ReanimatedEasing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated'
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 // Cap each document's cleanText at this many characters before sending. The
 // BE applies its own caps too — this just avoids shipping megabytes.
@@ -289,6 +296,14 @@ const AssistantMessageItem = memo(function AssistantMessageItem({
 
 
 export function ChatScreen() {
+  return (
+    <ThemeProvider mode="light">
+      <ChatScreenInner />
+    </ThemeProvider>
+  )
+}
+
+function ChatScreenInner() {
   const navigation = useNavigation<any>()
   const { language, objective, setObjective, sessionId } = useOnboarding()
   const theme = useTheme()
@@ -966,42 +981,10 @@ export function ChatScreen() {
 
   // ── Main render ─────────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      {/* Breathing form tucked into the bottom-right corner — exact same
-          placement as DocumentsScreen so the brand visual sits at a
-          consistent anchor across tabs. Behind content via DOM order.
-          Guarded by isFocused so the form's `position: fixed` (web) doesn't
-          bleed into sibling tabs that the bottom-tab navigator keeps
-          mounted in parallel. */}
-      {isFocused ? (
-        <View
-          pointerEvents="none"
-          style={
-            Platform.OS === 'web'
-              ? ({
-                  position: 'fixed',
-                  right: -40,
-                  bottom: -40,
-                  width: 585,
-                  height: 585,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                } as any)
-              : {
-                  position: 'absolute',
-                  right: -40,
-                  bottom: -40,
-                  width: 585,
-                  height: 585,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }
-          }
-        >
-          <BreathingForm size={585} />
-        </View>
-      ) : null}
+    <View style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
+      {isFocused ? <ChatBloom /> : null}
 
+      <SafeAreaView style={{ flex: 1 }}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1027,17 +1010,17 @@ export function ChatScreen() {
                 paddingVertical: 5,
                 borderRadius: theme.radii.pill,
                 borderWidth: 1,
-                borderColor: 'rgba(196, 128, 106, 0.28)',
+                borderColor: palette.sand[300],
                 backgroundColor: pressed
-                  ? 'rgba(196, 128, 106, 0.20)'
-                  : 'rgba(196, 128, 106, 0.10)',
+                  ? palette.petal[200]
+                  : palette.petal[100],
               })}
             >
-              <Icon name={objMeta.icon} size={12} color={palette.ember[300]} strokeWidth={1.8} />
-              <Text variant="label" style={{ color: palette.ember[200] }}>
+              <Icon name={objMeta.icon} size={12} color={palette.fuchsia[500]} strokeWidth={1.8} />
+              <Text variant="label" style={{ color: palette.void[500] }}>
                 {objMeta[language]}
               </Text>
-              <Icon name="ChevronDown" size={11} color={palette.ember[300]} strokeWidth={1.8} />
+              <Icon name="ChevronDown" size={11} color={palette.fuchsia[500]} strokeWidth={1.8} />
             </Pressable>
           }
         />
@@ -1195,10 +1178,10 @@ export function ChatScreen() {
               marginBottom: theme.spacing[2],
               paddingHorizontal: theme.spacing[3],
               paddingVertical: theme.spacing[2],
-              backgroundColor: theme.colors.bg.surfaceWarm,
+              backgroundColor: palette.petal[100],
               borderRadius: theme.radii.pill,
               borderWidth: 1,
-              borderColor: 'rgba(196, 128, 106, 0.20)',
+              borderColor: palette.sand[300],
               opacity: pressed ? 0.7 : 1,
               transform: pressed ? [{ scale: 0.985 }] : undefined,
             })}
@@ -1224,9 +1207,8 @@ export function ChatScreen() {
 
         {/* Input bar — sits above the floating LiquidTabBar. The pill is
             ~62px tall and floats 14px above the safe-area; 92px of bottom
-            clearance keeps the input fully visible. Background is intentionally
-            transparent — a solid bg here would create a visible "column"
-            rectangle against the position:fixed BreathingForm in the void. */}
+            clearance keeps the input fully visible. Background is left
+            transparent so the apricot bloom decoration shows through. */}
         <View
           style={{
             flexDirection: 'row',
@@ -1272,10 +1254,10 @@ export function ChatScreen() {
             style={{
               flex: 1,
               position: 'relative',
-              backgroundColor: 'rgba(255, 245, 238, 0.04)',
+              backgroundColor: '#ffffff',
               borderRadius: theme.radii.pill,
               borderWidth: 1,
-              borderColor: 'rgba(255, 245, 238, 0.10)',
+              borderColor: palette.sand[300],
             }}
           >
             <TextInput
@@ -1407,7 +1389,7 @@ export function ChatScreen() {
             alignItems: 'center',
             justifyContent: 'center',
             paddingHorizontal: theme.spacing[6],
-            backgroundColor: 'rgba(13, 13, 18, 0.85)',
+            backgroundColor: 'rgba(255, 255, 255, 0.92)',
           }}
         >
           <View
@@ -1417,20 +1399,20 @@ export function ChatScreen() {
               paddingHorizontal: theme.spacing[8],
               borderRadius: theme.radii.xl,
               borderWidth: 2,
-              borderColor: theme.colors.accent.primary,
+              borderColor: palette.fuchsia[500],
               borderStyle: 'dashed' as any,
-              backgroundColor: 'rgba(196, 128, 106, 0.06)',
+              backgroundColor: palette.petal[100],
               maxWidth: 420,
             }}
           >
             <Icon
               name="UploadCloud"
               size={48}
-              color={theme.colors.accent.primary}
+              color={palette.fuchsia[500]}
               strokeWidth={1.5}
             />
             <Text
-              variant="h3Italic"
+              variant="h3"
               tone="primary"
               align="center"
               style={{ marginTop: theme.spacing[4] }}
@@ -1438,7 +1420,7 @@ export function ChatScreen() {
               {copy.dropTitle}
             </Text>
             <Text
-              variant="bodyLight"
+              variant="body"
               tone="secondary"
               align="center"
               style={{ marginTop: theme.spacing[2], maxWidth: 320 }}
@@ -1448,6 +1430,75 @@ export function ChatScreen() {
           </View>
         </View>
       ) : null}
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
+  )
+}
+
+// ─── BLOOM ─────────────────────────────────────────────────────────────────
+function ChatBloom() {
+  const { width } = useWindowDimensions()
+  const isCompact = width < 480
+  const size = isCompact ? 320 : 420
+  const intensity = 0.6
+
+  const t = useSharedValue(0)
+  useEffect(() => {
+    t.value = withRepeat(
+      withTiming(1, { duration: 4000, easing: ReanimatedEasing.bezier(0.45, 0, 0.55, 1) }),
+      -1,
+      true,
+    )
+  }, [t])
+  const dotStyle = useAnimatedStyle(() => ({
+    opacity: (0.92 - 0.57 * t.value) * intensity,
+    transform: [{ scale: 1 - 0.38 * t.value }],
+  }))
+
+  const dotX  = size * 0.76
+  const dotY  = size * 0.21
+  const stop0 = Math.max(0, 0.7  * intensity)
+  const stop1 = Math.max(0, 0.38 * intensity)
+  const stop2 = Math.max(0, 0.10 * intensity)
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{ position: 'absolute', top: 0, right: 0, width: size, height: size }}
+    >
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <Defs>
+          <RadialGradient id="apricotChat" cx="72%" cy="10%" r="55%" fx="72%" fy="10%">
+            <Stop offset="0%"   stopColor={palette.apricot[400]} stopOpacity={stop0} />
+            <Stop offset="35%"  stopColor={palette.apricot[400]} stopOpacity={stop1} />
+            <Stop offset="70%"  stopColor={palette.apricot[400]} stopOpacity={stop2} />
+            <Stop offset="100%" stopColor={palette.apricot[400]} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Rect width={size} height={size} fill="url(#apricotChat)" />
+      </Svg>
+      <Reanimated.View
+        style={[
+          {
+            position: 'absolute',
+            left: dotX - 5,
+            top:  dotY - 5,
+            width: 10,
+            height: 10,
+            borderRadius: 999,
+            backgroundColor: palette.fuchsia[500],
+            ...(Platform.OS === 'web'
+              ? ({ boxShadow: '0 0 14px rgba(255, 4, 114, 0.45)' } as any)
+              : {
+                  shadowColor: palette.fuchsia[500],
+                  shadowOpacity: 0.45,
+                  shadowRadius: 6,
+                  shadowOffset: { width: 0, height: 0 },
+                }),
+          },
+          dotStyle,
+        ]}
+      />
+    </View>
   )
 }

@@ -1,8 +1,8 @@
-// Anoqi — Starter prompt card.
+// Anoqi — Starter prompt card (v2.2 light register).
 //
-// One inscribed card on warm ember glass. No icon — the italic serif
-// question is the whole composition. Card height grows with content,
-// stacks 1-up on phones and 2-up at ≥ 520px viewport.
+// White card with a Sand hairline, fuchsia hover ring, Bricolage 700 body.
+// Card height grows with content, stacks 1-up on phones and 2-up at
+// ≥ 520px viewport.
 
 import React, { useEffect, useState } from 'react'
 import { Platform, Pressable, useWindowDimensions } from 'react-native'
@@ -14,7 +14,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 
-import { LiquidEmber, Text } from '../../components'
+import { Text } from '../../components'
 import { palette, useTheme } from '../../theme'
 import { easing } from '../../theme/motion'
 
@@ -37,9 +37,8 @@ export function StarterCard({ text, index, onPress }: StarterCardProps) {
 
   const [hovered, setHovered] = useState(false)
 
-  // Stagger fade-up entrance. Each card 60ms after the previous.
-  // 320ms outQuart matches Anoqi's motion tokens; under Emil's 300ms-per-step
-  // ceiling for UI animation while still reading as intentional.
+  // Stagger fade-up entrance. Each card 60ms after the previous. 320ms
+  // outQuart matches Anoqi's motion tokens.
   const enter = useSharedValue(reduceMotion ? 1 : 0)
   useEffect(() => {
     if (reduceMotion) {
@@ -64,14 +63,11 @@ export function StarterCard({ text, index, onPress }: StarterCardProps) {
           flexGrow: 1,
           flexBasis: twoUp ? '47%' : '100%',
           borderRadius: 22,
-          overflow: 'hidden',
-          position: 'relative',
           minHeight: 88,
         },
         enterStyle,
       ]}
     >
-      <LiquidEmber intensity={0.55} fuchsia={false} blur={36} borderRadius={22} />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={text}
@@ -82,14 +78,12 @@ export function StarterCard({ text, index, onPress }: StarterCardProps) {
           {
             flex: 1,
             backgroundColor: pressed
-              ? 'rgba(255, 245, 238, 0.10)'
-              : hovered
-              ? 'rgba(255, 245, 238, 0.075)'
-              : 'rgba(255, 245, 238, 0.05)',
-            borderWidth: 1,
+              ? palette.petal[100]
+              : '#ffffff',
+            borderWidth: 1.5,
             borderColor: hovered
-              ? 'rgba(255, 245, 238, 0.18)'
-              : 'rgba(255, 245, 238, 0.09)',
+              ? palette.fuchsia[500]
+              : palette.sand[300],
             borderRadius: 22,
             paddingVertical: theme.spacing[5],
             paddingHorizontal: theme.spacing[4],
@@ -98,22 +92,24 @@ export function StarterCard({ text, index, onPress }: StarterCardProps) {
           },
           Platform.OS === 'web'
             ? ({
-                backdropFilter: 'blur(18px) saturate(140%)',
-                WebkitBackdropFilter: 'blur(18px) saturate(140%)',
                 transitionProperty: 'transform, background-color, border-color',
                 transitionDuration: '200ms',
                 transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                ...(hovered
+                  ? { boxShadow: '0 4px 14px rgba(255, 4, 114, 0.10)' }
+                  : null),
               } as any)
             : null,
         ]}
       >
         <Text
-          variant="h4Italic"
           style={[
             {
-              color: palette.warmWhite[100],
+              fontFamily: 'BricolageGrotesque-Bold',
+              color: theme.colors.text.primary,
               fontSize: smallType ? 18 : 20,
               lineHeight: smallType ? 22 : 26,
+              letterSpacing: -0.2,
             },
             Platform.OS === 'web' ? ({ textWrap: 'balance' } as any) : null,
           ]}
