@@ -1,12 +1,12 @@
-// Anoqi — GoalSheet.
+// Anoqi — GoalSheet (v2.2 light register).
 //
-// Bottom-up sheet for switching the active HealthObjective. Mounted from Home
-// (the focus pill) and from Chat (the header chip). Light custom build over
-// RN's Modal + Animated.Value — no external sheet dep, no Reanimated.
+// Bottom-up sheet for switching the active HealthObjective. Mounted from
+// Home (the focus pill) and from Chat (the header chip). Light custom
+// build over RN's Modal + Animated.Value.
 //
-// Layout: dim backdrop, sheet pinned to the bottom with a glass surface, 5
-// goal rows, "Save" CTA. Selected row gets an ember tint that mirrors the
-// Home focus pill.
+// Layout: dim backdrop, sheet pinned to the bottom with a white surface,
+// 5 goal rows, "Save" CTA. Selected row gets a Petal tint + fuchsia border
+// + fuchsia check.
 
 import React, { useEffect, useRef, useState } from 'react'
 import {
@@ -84,19 +84,12 @@ export function GoalSheet({ visible, selected, language, onSelect, onClose }: Pr
   const { height, width } = useWindowDimensions()
   const copy = COPY[language]
 
-  // On wide viewports the sheet would sprawl across the whole screen even
-  // though the app shell is constrained to a centre column. Pin to ~30% so
-  // it reads like a focused mobile sheet on desktop too. Phones still get
-  // edge-to-edge.
   const isWide = width >= 800
   const sideInset = isWide ? `${(100 - 30) / 2}%` as `${number}%` : 0
 
-  // Local draft so the user can browse without committing on every tap.
   const [draft, setDraft] = useState<HealthObjective | null>(selected)
   useEffect(() => { if (visible) setDraft(selected) }, [visible, selected])
 
-  // We drive animation ourselves so the dismiss feels coherent (backdrop fade
-  // + sheet slide together) without Modal's default jank on web.
   const progress = useRef(new Animated.Value(0)).current
   const [mounted, setMounted] = useState(visible)
 
@@ -143,44 +136,39 @@ export function GoalSheet({ visible, selected, language, onSelect, onClose }: Pr
         <Animated.View
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: 'rgba(0,0,0,0.55)', opacity: backdropOpacity },
+            { backgroundColor: 'rgba(13, 13, 18, 0.35)', opacity: backdropOpacity },
           ]}
         >
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
         </Animated.View>
 
         <Animated.View
-          style={[
-            {
-              position: 'absolute',
-              left: sideInset,
-              right: sideInset,
-              bottom: 0,
-              backgroundColor: theme.colors.bg.surface,
-              borderTopLeftRadius: 28,
-              borderTopRightRadius: 28,
-              borderBottomLeftRadius: isWide ? 28 : 0,
-              borderBottomRightRadius: isWide ? 28 : 0,
-              marginBottom: isWide ? 24 : 0,
-              borderTopWidth: 1,
-              borderColor: 'rgba(255, 245, 238, 0.08)',
-              transform: [{ translateY }],
-              shadowColor: '#000',
-              shadowOpacity: 0.4,
-              shadowRadius: 24,
-              shadowOffset: { width: 0, height: -8 },
-            },
-            Platform.OS === 'web'
-              ? ({ backdropFilter: 'blur(24px) saturate(140%)', WebkitBackdropFilter: 'blur(24px) saturate(140%)' } as any)
-              : null,
-          ]}
+          style={{
+            position: 'absolute',
+            left: sideInset,
+            right: sideInset,
+            bottom: 0,
+            backgroundColor: '#ffffff',
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            borderBottomLeftRadius: isWide ? 28 : 0,
+            borderBottomRightRadius: isWide ? 28 : 0,
+            marginBottom: isWide ? 24 : 0,
+            borderTopWidth: 1,
+            borderColor: palette.sand[300],
+            transform: [{ translateY }],
+            shadowColor: palette.void[500],
+            shadowOpacity: 0.18,
+            shadowRadius: 24,
+            shadowOffset: { width: 0, height: -8 },
+          }}
         >
           <SafeAreaView>
             <View style={{ paddingHorizontal: theme.spacing[6], paddingTop: theme.spacing[4], paddingBottom: theme.spacing[6] }}>
               {/* Drag handle */}
-              <View style={{ alignSelf: 'center', width: 44, height: 4, borderRadius: 2, backgroundColor: 'rgba(255, 245, 238, 0.18)', marginBottom: theme.spacing[4] }} />
+              <View style={{ alignSelf: 'center', width: 44, height: 4, borderRadius: 2, backgroundColor: palette.sand[300], marginBottom: theme.spacing[4] }} />
 
-              <Text variant="h3Italic" tone="primary">{copy.title}</Text>
+              <Text variant="h3" tone="primary">{copy.title}</Text>
               <Text variant="body" tone="secondary" style={{ marginTop: theme.spacing[2], marginBottom: theme.spacing[5] }}>
                 {copy.subtitle}
               </Text>
@@ -202,15 +190,15 @@ export function GoalSheet({ visible, selected, language, onSelect, onClose }: Pr
                         paddingVertical: theme.spacing[3],
                         paddingHorizontal: theme.spacing[4],
                         borderRadius: 18,
-                        borderWidth: 1,
+                        borderWidth: 1.5,
                         borderColor: active
-                          ? 'rgba(196, 128, 106, 0.42)'
-                          : 'rgba(255, 245, 238, 0.08)',
+                          ? palette.fuchsia[500]
+                          : palette.sand[300],
                         backgroundColor: active
-                          ? 'rgba(196, 128, 106, 0.14)'
+                          ? palette.petal[100]
                           : pressed
-                            ? 'rgba(255, 245, 238, 0.06)'
-                            : 'transparent',
+                            ? palette.petal[100]
+                            : '#ffffff',
                       })}
                     >
                       <View
@@ -221,19 +209,19 @@ export function GoalSheet({ visible, selected, language, onSelect, onClose }: Pr
                           alignItems: 'center',
                           justifyContent: 'center',
                           backgroundColor: active
-                            ? 'rgba(196, 128, 106, 0.22)'
-                            : 'rgba(255, 245, 238, 0.05)',
+                            ? palette.petal[200]
+                            : palette.petal[100],
                         }}
                       >
                         <Icon
                           name={opt.icon}
                           size={18}
-                          color={active ? palette.ember[200] : palette.warmWhite[200]}
+                          color={active ? palette.fuchsia[500] : palette.warmGray[500]}
                           strokeWidth={1.7}
                         />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text variant="bodyMed" style={{ color: active ? palette.warmWhite[100] : palette.warmWhite[200] }}>
+                        <Text variant="bodyMed" style={{ color: palette.void[500] }}>
                           {opt[language].label}
                         </Text>
                         <Text variant="label" tone="secondary" style={{ marginTop: 2 }}>
@@ -241,7 +229,7 @@ export function GoalSheet({ visible, selected, language, onSelect, onClose }: Pr
                         </Text>
                       </View>
                       {active ? (
-                        <Icon name="Check" size={18} color={palette.ember[200]} strokeWidth={2} />
+                        <Icon name="Check" size={18} color={palette.fuchsia[500]} strokeWidth={2} />
                       ) : null}
                     </Pressable>
                   )
@@ -259,14 +247,14 @@ export function GoalSheet({ visible, selected, language, onSelect, onClose }: Pr
                   borderRadius: theme.radii.pill,
                   alignItems: 'center',
                   backgroundColor: !draft
-                    ? 'rgba(255, 245, 238, 0.06)'
+                    ? palette.petal[100]
                     : pressed
                       ? palette.fuchsia[600]
                       : palette.fuchsia[500],
                   opacity: !draft ? 0.6 : 1,
                 })}
               >
-                <Text variant="bodyMed" style={{ color: palette.warmWhite[100] }}>
+                <Text variant="bodyMed" style={{ color: !draft ? palette.warmGray[300] : '#ffffff' }}>
                   {copy.cta}
                 </Text>
               </Pressable>

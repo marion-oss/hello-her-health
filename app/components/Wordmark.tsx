@@ -1,14 +1,11 @@
-// Anoqi — Wordmark.
+// Anoqi — Wordmark (v2.2 light register).
 //
-// "anoqi" in Inter Light with the Fuchsia dot above the *i*. The dot is the
-// only fully-saturated mark on the screen and pulses on a 4s heartbeat —
-// per the brand deck:
+// "anoqi" in Bricolage Grotesque 800 with the Fuchsia dot above the *i*.
+// The dot is the only fully-saturated mark on the screen and pulses on a
+// 4s heartbeat:
 //
-//   animation: pulse 4s ease-in-out infinite;
-//   @keyframes pulse {
-//     0%, 100% { opacity: 0.9; transform: scale(1);    }
-//     50%      { opacity: 0.6; transform: scale(0.82); }
-//   }
+//   0%, 100% { opacity: 0.9; transform: scale(1);    }
+//   50%      { opacity: 0.6; transform: scale(0.82); }
 //
 // Never a notification bounce. A breath.
 
@@ -28,13 +25,13 @@ import { Text } from './Text'
 type Props = {
   /** Size of the "anoqi" wordmark in px. The dot scales with it. */
   size?: number
-  /** Override the wordmark color (e.g. on a colored surface). */
+  /** Override the wordmark color (e.g. on a colored surface). Default Void. */
   color?: string
 }
 
 const breath = Easing.bezier(0.45, 0, 0.55, 1)
 
-export function Wordmark({ size = 22, color = palette.warmWhite[100] }: Props) {
+export function Wordmark({ size = 22, color = palette.void[500] }: Props) {
   const t = useSharedValue(0)
 
   useEffect(() => {
@@ -42,30 +39,29 @@ export function Wordmark({ size = 22, color = palette.warmWhite[100] }: Props) {
   }, [t])
 
   // Mirror the brand-deck keyframes precisely:
-  //   t=0 (frame 0/100) → opacity 0.9, scale 1
-  //   t=1 (frame 50)    → opacity 0.6, scale 0.82
+  //   t=0 → opacity 0.9, scale 1
+  //   t=1 → opacity 0.6, scale 0.82
   const dotStyle = useAnimatedStyle(() => ({
     opacity: 0.9 - 0.3 * t.value,
     transform: [{ scale: 1 - 0.18 * t.value }],
   }))
 
-  // Dot scales relative to the wordmark cap height so the visual relationship
-  // stays constant from a 14px caption to a 40px hero. The 0.29 multiplier
-  // is the deck baseline (0.24) bumped by 20% so the pulse reads more
-  // clearly at small sizes.
-  const dotSize = Math.max(4, Math.round(size * 0.29))
-  const dotMarginTop = Math.round(size * 0.24)
-  const dotMarginLeft = Math.max(2, Math.round(size * 0.13))
+  // Dot scales relative to wordmark cap height. Bricolage 800 is heavier
+  // than the v1.0 Inter Light, so the proportions are tighter than the deck
+  // baseline.
+  const dotSize       = Math.max(4, Math.round(size * 0.32))
+  const dotMarginTop  = Math.round(size * 0.10)
+  const dotMarginLeft = Math.max(2, Math.round(size * 0.06))
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
       <Text
         style={{
-          fontFamily: 'Inter-Light',
+          fontFamily: 'BricolageGrotesque-ExtraBold',
           fontSize: size,
-          letterSpacing: -0.01 * size,
+          letterSpacing: -0.025 * size,
           color,
-          lineHeight: size * 1.1,
+          lineHeight: size,
         }}
       >
         anoqi

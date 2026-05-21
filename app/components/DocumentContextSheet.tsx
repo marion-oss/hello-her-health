@@ -1,13 +1,11 @@
-// Anoqi — DocumentContextSheet.
+// Anoqi — DocumentContextSheet (v2.2 light register).
 //
 // Bottom-up sheet for picking which uploaded documents Anoqi can see in
 // the current chat. Opened from the "N document in context · manage" pill
 // in ChatScreen. Multi-select; each toggle persists immediately so the
 // pill count and the prompt content stay coherent across reloads.
 //
-// Mirrors GoalSheet's animation + responsive width so the visual identity
-// stays consistent with the goal picker. Multi-select replaces GoalSheet's
-// single-select "draft" pattern: there is no Save CTA, only a Done button.
+// Mirrors GoalSheet's animation + responsive width.
 
 import React, { useEffect, useRef, useState } from 'react'
 import {
@@ -88,12 +86,9 @@ export function DocumentContextSheet({
   const { height, width } = useWindowDimensions()
   const copy = COPY[language]
 
-  // Pin to ~30% width on desktop so it reads like a focused mobile sheet.
-  // Phones still get edge-to-edge.
   const isWide = width >= 800
   const sideInset = isWide ? `${(100 - 30) / 2}%` as `${number}%` : 0
 
-  // Backdrop + sheet animate together so the dismiss feels coherent.
   const progress = useRef(new Animated.Value(0)).current
   const [mounted, setMounted] = useState(visible)
 
@@ -138,45 +133,40 @@ export function DocumentContextSheet({
         <Animated.View
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: 'rgba(0,0,0,0.55)', opacity: backdropOpacity },
+            { backgroundColor: 'rgba(13, 13, 18, 0.35)', opacity: backdropOpacity },
           ]}
         >
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
         </Animated.View>
 
         <Animated.View
-          style={[
-            {
-              position: 'absolute',
-              left: sideInset,
-              right: sideInset,
-              bottom: 0,
-              maxHeight: height * 0.85,
-              backgroundColor: theme.colors.bg.surface,
-              borderTopLeftRadius: 28,
-              borderTopRightRadius: 28,
-              borderBottomLeftRadius: isWide ? 28 : 0,
-              borderBottomRightRadius: isWide ? 28 : 0,
-              marginBottom: isWide ? 24 : 0,
-              borderTopWidth: 1,
-              borderColor: 'rgba(255, 245, 238, 0.08)',
-              transform: [{ translateY }],
-              shadowColor: '#000',
-              shadowOpacity: 0.4,
-              shadowRadius: 24,
-              shadowOffset: { width: 0, height: -8 },
-            },
-            Platform.OS === 'web'
-              ? ({ backdropFilter: 'blur(24px) saturate(140%)', WebkitBackdropFilter: 'blur(24px) saturate(140%)' } as any)
-              : null,
-          ]}
+          style={{
+            position: 'absolute',
+            left: sideInset,
+            right: sideInset,
+            bottom: 0,
+            maxHeight: height * 0.85,
+            backgroundColor: '#ffffff',
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            borderBottomLeftRadius: isWide ? 28 : 0,
+            borderBottomRightRadius: isWide ? 28 : 0,
+            marginBottom: isWide ? 24 : 0,
+            borderTopWidth: 1,
+            borderColor: palette.sand[300],
+            transform: [{ translateY }],
+            shadowColor: palette.void[500],
+            shadowOpacity: 0.18,
+            shadowRadius: 24,
+            shadowOffset: { width: 0, height: -8 },
+          }}
         >
           <SafeAreaView>
             <View style={{ paddingHorizontal: theme.spacing[6], paddingTop: theme.spacing[4], paddingBottom: theme.spacing[6] }}>
               {/* Drag handle */}
-              <View style={{ alignSelf: 'center', width: 44, height: 4, borderRadius: 2, backgroundColor: 'rgba(255, 245, 238, 0.18)', marginBottom: theme.spacing[4] }} />
+              <View style={{ alignSelf: 'center', width: 44, height: 4, borderRadius: 2, backgroundColor: palette.sand[300], marginBottom: theme.spacing[4] }} />
 
-              <Text variant="h3Italic" tone="primary">{copy.title}</Text>
+              <Text variant="h3" tone="primary">{copy.title}</Text>
               <Text variant="body" tone="secondary" style={{ marginTop: theme.spacing[2], marginBottom: theme.spacing[5] }}>
                 {copy.subtitle}
               </Text>
@@ -186,11 +176,11 @@ export function DocumentContextSheet({
                   <View
                     style={{
                       width: 56, height: 56, borderRadius: 28,
-                      backgroundColor: 'rgba(255, 245, 238, 0.05)',
+                      backgroundColor: palette.petal[100],
                       alignItems: 'center', justifyContent: 'center',
                     }}
                   >
-                    <Icon name="FileText" size={22} color={palette.warmWhite[300]} strokeWidth={1.5} />
+                    <Icon name="FileText" size={22} color={palette.fuchsia[500]} strokeWidth={1.5} />
                   </View>
                   <Text variant="bodyMed" tone="primary" align="center">{copy.emptyTitle}</Text>
                   <Text variant="label" tone="secondary" align="center" style={{ maxWidth: 320 }}>
@@ -207,7 +197,7 @@ export function DocumentContextSheet({
                       backgroundColor: pressed ? palette.fuchsia[600] : palette.fuchsia[500],
                     })}
                   >
-                    <Text variant="bodyMed" style={{ color: palette.warmWhite[100] }}>{copy.add}</Text>
+                    <Text variant="bodyMed" style={{ color: '#ffffff' }}>{copy.add}</Text>
                   </Pressable>
                 </View>
               ) : (
@@ -231,15 +221,15 @@ export function DocumentContextSheet({
                           paddingVertical: theme.spacing[3],
                           paddingHorizontal: theme.spacing[4],
                           borderRadius: 18,
-                          borderWidth: 1,
+                          borderWidth: 1.5,
                           borderColor: active
-                            ? 'rgba(196, 128, 106, 0.42)'
-                            : 'rgba(255, 245, 238, 0.08)',
+                            ? palette.fuchsia[500]
+                            : palette.sand[300],
                           backgroundColor: active
-                            ? 'rgba(196, 128, 106, 0.14)'
+                            ? palette.petal[100]
                             : pressed
-                              ? 'rgba(255, 245, 238, 0.06)'
-                              : 'transparent',
+                              ? palette.petal[100]
+                              : '#ffffff',
                         })}
                       >
                         <View
@@ -247,14 +237,14 @@ export function DocumentContextSheet({
                             width: 36, height: 36, borderRadius: 18,
                             alignItems: 'center', justifyContent: 'center',
                             backgroundColor: active
-                              ? 'rgba(196, 128, 106, 0.22)'
-                              : 'rgba(255, 245, 238, 0.05)',
+                              ? palette.petal[200]
+                              : palette.petal[100],
                           }}
                         >
                           <Icon
                             name={meta.icon}
                             size={18}
-                            color={active ? palette.ember[200] : palette.warmWhite[200]}
+                            color={active ? palette.fuchsia[500] : palette.warmGray[500]}
                             strokeWidth={1.7}
                           />
                         </View>
@@ -262,7 +252,7 @@ export function DocumentContextSheet({
                           <Text
                             variant="bodyMed"
                             numberOfLines={1}
-                            style={{ color: active ? palette.warmWhite[100] : palette.warmWhite[200] }}
+                            style={{ color: palette.void[500] }}
                           >
                             {label}
                           </Text>
@@ -270,19 +260,19 @@ export function DocumentContextSheet({
                             {[meta[language], date].filter(Boolean).join(' · ')}
                           </Text>
                         </View>
-                        {/* Right-side checkbox — filled circle with check when on,
-                            hollow ring when off. */}
+                        {/* Right-side checkbox — filled fuchsia circle with white check
+                            when on, hollow Sand ring when off. */}
                         <View
                           style={{
                             width: 22, height: 22, borderRadius: 11,
                             alignItems: 'center', justifyContent: 'center',
                             borderWidth: active ? 0 : 1.5,
-                            borderColor: 'rgba(255, 245, 238, 0.22)',
-                            backgroundColor: active ? palette.ember[300] : 'transparent',
+                            borderColor: palette.sand[300],
+                            backgroundColor: active ? palette.fuchsia[500] : 'transparent',
                           }}
                         >
                           {active ? (
-                            <Icon name="Check" size={14} color={palette.warmWhite[100]} strokeWidth={2.4} />
+                            <Icon name="Check" size={14} color="#ffffff" strokeWidth={2.4} />
                           ) : null}
                         </View>
                       </Pressable>
@@ -303,7 +293,7 @@ export function DocumentContextSheet({
                   backgroundColor: pressed ? palette.fuchsia[600] : palette.fuchsia[500],
                 })}
               >
-                <Text variant="bodyMed" style={{ color: palette.warmWhite[100] }}>
+                <Text variant="bodyMed" style={{ color: '#ffffff' }}>
                   {copy.done}
                 </Text>
               </Pressable>
