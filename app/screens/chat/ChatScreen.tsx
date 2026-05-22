@@ -67,6 +67,7 @@ import {
   GoalSheet,
   Icon,
   type IconName,
+  LangToggle,
   Markdown,
   parseMarkdown,
   StreamingCursor,
@@ -896,6 +897,7 @@ export function ChatScreen() {
             if (navigation.canGoBack()) navigation.goBack()
             else navigation.navigate('Home')
           }}
+          rightSlot={<LangToggle />}
         />
         <View
           style={{
@@ -990,30 +992,33 @@ export function ChatScreen() {
             else navigation.navigate('Home')
           }}
           rightSlot={
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={objMeta[language]}
-              onPress={() => setGoalSheetOpen(true)}
-              style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                paddingHorizontal: 10,
-                paddingVertical: 5,
-                borderRadius: theme.radii.pill,
-                borderWidth: 1,
-                borderColor: palette.sand[300],
-                backgroundColor: pressed
-                  ? palette.petal[200]
-                  : palette.petal[100],
-              })}
-            >
-              <Icon name={objMeta.icon} size={12} color={palette.fuchsia[500]} strokeWidth={1.8} />
-              <Text variant="label" style={{ color: palette.void[500] }}>
-                {objMeta[language]}
-              </Text>
-              <Icon name="ChevronDown" size={11} color={palette.fuchsia[500]} strokeWidth={1.8} />
-            </Pressable>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <LangToggle />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={objMeta[language]}
+                onPress={() => setGoalSheetOpen(true)}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: theme.radii.pill,
+                  borderWidth: 1,
+                  borderColor: palette.sand[300],
+                  backgroundColor: pressed
+                    ? palette.petal[200]
+                    : palette.petal[100],
+                })}
+              >
+                <Icon name={objMeta.icon} size={12} color={palette.fuchsia[500]} strokeWidth={1.8} />
+                <Text variant="label" style={{ color: palette.void[500] }}>
+                  {objMeta[language]}
+                </Text>
+                <Icon name="ChevronDown" size={11} color={palette.fuchsia[500]} strokeWidth={1.8} />
+              </Pressable>
+            </View>
           }
         />
 

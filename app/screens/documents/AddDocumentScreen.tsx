@@ -28,6 +28,7 @@ import {
   BackHeader,
   Button,
   Icon,
+  LangToggle,
   Text,
 } from '../../components'
 import { palette, useTheme } from '../../theme'
@@ -232,6 +233,7 @@ export function AddDocumentScreen() {
       <BackHeader
         showWordmark
         onBack={() => navigation.goBack()}
+        rightSlot={<LangToggle />}
       />
 
       <KeyboardAvoidingView

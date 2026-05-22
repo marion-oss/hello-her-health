@@ -49,7 +49,7 @@ import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 import { useOnboarding, type HealthObjective } from '../../context/OnboardingContext'
 import { supabase } from '../../lib/supabase'
 import { useTheme, palette } from '../../theme'
-import { Icon, Text } from '../../components'
+import { Icon, LangToggle, Text } from '../../components'
 import { listDocuments, type DocumentIndexEntry } from '../../lib/documentStore'
 
 // ─── COPY ──────────────────────────────────────────────────────────────────
@@ -226,11 +226,14 @@ export function HomeScreen() {
             }}
           >
             <BrandWordmark size={isCompact ? 22 : 26} />
-            <ProfileChip
-              initial={profileInitial}
-              label={copy.profileChipLabel}
-              onPress={goProfile}
-            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <LangToggle />
+              <ProfileChip
+                initial={profileInitial}
+                label={copy.profileChipLabel}
+                onPress={goProfile}
+              />
+            </View>
           </View>
 
           {/* Greeting block */}

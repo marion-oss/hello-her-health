@@ -32,6 +32,7 @@ import {
   Button,
   Icon,
   type IconName,
+  LangToggle,
   Text,
 } from '../../components'
 import { palette, useTheme } from '../../theme'
@@ -309,7 +310,7 @@ export function DocumentsListScreen() {
       <Bloom size={bloomSize} intensity={0.6} />
 
       <SafeAreaView style={{ flex: 1 }}>
-        <BackHeader showWordmark />
+        <BackHeader showWordmark rightSlot={<LangToggle />} />
 
       <View
         style={{
