@@ -20,6 +20,7 @@ import {
   BackHeader,
   Icon,
   type IconName,
+  LangToggle,
   Text,
 } from '../../components'
 import { palette, useTheme } from '../../theme'
@@ -138,7 +139,7 @@ export function DocumentDetailScreen() {
   if (!loaded) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
-        <BackHeader showWordmark onBack={() => navigation.goBack()} />
+        <BackHeader showWordmark onBack={() => navigation.goBack()} rightSlot={<LangToggle />} />
       </SafeAreaView>
     )
   }
@@ -146,7 +147,7 @@ export function DocumentDetailScreen() {
   if (!doc) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
-        <BackHeader showWordmark onBack={() => navigation.goBack()} />
+        <BackHeader showWordmark onBack={() => navigation.goBack()} rightSlot={<LangToggle />} />
         <View style={{ padding: theme.spacing[6] }}>
           <Text variant="body" tone="secondary">{copy.notFound}</Text>
         </View>
@@ -162,7 +163,7 @@ export function DocumentDetailScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.canvas }}>
       <StatusBar barStyle="dark-content" backgroundColor={theme.colors.bg.canvas} />
 
-      <BackHeader showWordmark onBack={() => navigation.goBack()} />
+      <BackHeader showWordmark onBack={() => navigation.goBack()} rightSlot={<LangToggle />} />
 
       <ScrollView
         contentContainerStyle={{

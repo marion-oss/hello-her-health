@@ -24,7 +24,7 @@ import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import { useOnboarding } from '../../context/OnboardingContext'
 import { palette, useTheme } from '../../theme'
-import { Text } from '../../components'
+import { LangToggle, Text } from '../../components'
 
 const COPY = {
   fr: {
@@ -60,11 +60,12 @@ export function ProfileScreen() {
       <Bloom size={bloomSize} intensity={0.6} />
 
       <SafeAreaView style={{ flex: 1 }}>
-        {/* Header — wordmark navigates back to Home tab. */}
+        {/* Header — wordmark navigates back to Home; LangToggle on the right. */}
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
+            justifyContent: 'space-between',
             paddingHorizontal: isCompact ? 24 : 40,
             paddingTop: isCompact ? 20 : 28,
             paddingBottom: 8,
@@ -82,6 +83,7 @@ export function ProfileScreen() {
           >
             <BrandWordmark size={isCompact ? 22 : 26} />
           </Pressable>
+          <LangToggle />
         </View>
 
         <View

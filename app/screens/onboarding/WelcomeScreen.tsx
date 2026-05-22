@@ -24,9 +24,9 @@ import Animated, {
 } from 'react-native-reanimated'
 import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
-import { useOnboarding, type Language } from '../../context/OnboardingContext'
+import { useOnboarding } from '../../context/OnboardingContext'
 import { useTheme, palette } from '../../theme'
-import { Text } from '../../components'
+import { LangToggle, Text } from '../../components'
 
 // ─── COPY ──────────────────────────────────────────────────────────────────
 //
@@ -66,7 +66,7 @@ const COPY = {
 
 export function WelcomeScreen() {
   const navigation = useNavigation<any>()
-  const { language, setLanguage } = useOnboarding()
+  const { language } = useOnboarding()
   const { width } = useWindowDimensions()
   const theme = useTheme()
   const copy = COPY[language]
@@ -109,7 +109,7 @@ export function WelcomeScreen() {
             }}
           >
             <BrandWordmark size={isCompact ? 20 : 24} />
-            <LangToggle language={language} onChange={setLanguage} />
+            <LangToggle />
           </View>
 
           {/* Eyebrow */}
@@ -337,50 +337,6 @@ function BrandWordmark({ size }: { size: number }) {
           dotStyle,
         ]}
       />
-    </View>
-  )
-}
-
-// ─── LANG TOGGLE ──────────────────────────────────────────────────────────
-function LangToggle({
-  language,
-  onChange,
-}: {
-  language: Language
-  onChange: (l: Language) => void
-}) {
-  const theme = useTheme()
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <Pressable onPress={() => onChange('fr')} hitSlop={8}>
-        <Text
-          variant="eyebrow"
-          style={{
-            color:
-              language === 'fr'
-                ? theme.colors.text.primary
-                : theme.colors.text.tertiary,
-          }}
-        >
-          FR
-        </Text>
-      </Pressable>
-      <Text variant="eyebrow" style={{ color: theme.colors.text.tertiary }}>
-        ·
-      </Text>
-      <Pressable onPress={() => onChange('en')} hitSlop={8}>
-        <Text
-          variant="eyebrow"
-          style={{
-            color:
-              language === 'en'
-                ? theme.colors.text.primary
-                : theme.colors.text.tertiary,
-          }}
-        >
-          EN
-        </Text>
-      </Pressable>
     </View>
   )
 }
