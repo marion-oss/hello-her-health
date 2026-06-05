@@ -19,12 +19,11 @@ export type Env = {
   ANOQI_RAG_ENABLED?: string
 
   // Secrets (set via `wrangler secret put`)
-  VERTEX_SA_JSON: string                  // service-account JSON for Vertex AI (anoqi-vertex-worker)
+  VERTEX_SA_JSON: string                  // service-account JSON for Vertex AI (anoqi-vertex-worker).
+                                          // Used by both chat (lib/gemini.ts) and retrieval embeddings
+                                          // (lib/retrieval.ts) via lib/vertexAuth.ts.
   GCP_PROJECT_ID: string                  // typically `reverberant-kit-491312-e8`
   GCP_REGION: string                      // typically `global` (or a region for data residency)
-  GEMINI_API_KEY: string                  // legacy AI Studio key — still used by retrieval embeddings
-                                          // (gemini-embedding-001). Retrieval migration to Vertex is
-                                          // a follow-up PR; once that lands, remove this secret.
   SUPABASE_URL: string
   SUPABASE_SERVICE_ROLE_KEY: string
   SUPABASE_JWT_JWKS_URL?: string  // reserved for future JWKS-based local verification
