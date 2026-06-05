@@ -77,7 +77,7 @@ const COPY = {
     knowledgeEyebrow:   'Savoir du jour · Cochrane',
     knowledgeBody:
       "Les fluctuations hormonales tout au long du cycle influencent ton énergie, ton humeur, et ta concentration.",
-    knowledgeHint:      'Swipe pour découvrir la suite',
+    knowledgeHint:      'Continuer dans le chat →',
   },
   en: {
     greetingMorning:    'Good morning',
@@ -102,7 +102,7 @@ const COPY = {
     knowledgeEyebrow:   'Today\'s knowledge · Cochrane',
     knowledgeBody:
       "Hormonal fluctuations throughout the cycle influence your energy, mood, and concentration.",
-    knowledgeHint:      'Swipe to discover more',
+    knowledgeHint:      'Continue in chat →',
   },
 } as const
 
@@ -329,12 +329,15 @@ export function HomeScreen() {
             <CycleCard title={copy.cycleTitle} soon={copy.cycleSoon} />
           </View>
 
-          {/* Knowledge of the day */}
+          {/* Knowledge of the day — tap anywhere to continue the thread in
+              chat. Replaces the v2.2 'Swipe to discover more' affordance,
+              which never had a gesture handler or additional content wired up. */}
           <View style={{ marginTop: 20 }}>
             <KnowledgeCard
               eyebrow={copy.knowledgeEyebrow}
               body={copy.knowledgeBody}
               hint={copy.knowledgeHint}
+              onPress={goChat}
             />
           </View>
         </ScrollView>
@@ -898,17 +901,22 @@ function CycleCard({ title, soon }: { title: string; soon: string }) {
 }
 
 // ─── KNOWLEDGE CARD ────────────────────────────────────────────────────────
+// Tappable: tapping anywhere on the card navigates to Chat so the user can
+// continue exploring the insight conversationally. The hint pill at the
+// bottom doubles as the affordance label.
 function KnowledgeCard({
   eyebrow,
   body,
   hint,
+  onPress,
 }: {
   eyebrow: string
   body:    string
   hint:    string
+  onPress?: () => void
 }) {
   const theme = useTheme()
-  return (
+  const inner = (
     <View
       style={{
         backgroundColor: palette.petal[100],
@@ -967,5 +975,18 @@ function KnowledgeCard({
         </Text>
       </View>
     </View>
+  )
+  if (!onPress) return inner
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }: any) => ({
+        opacity: pressed ? 0.92 : 1,
+        transform: pressed ? [{ scale: 0.99 }] : undefined,
+      })}
+    >
+      {inner}
+    </Pressable>
   )
 }
