@@ -10,6 +10,7 @@ import {
   Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   View,
   useWindowDimensions,
@@ -39,11 +40,11 @@ const COPY = {
     headlineTop:    ['Mieux', 'informée.'],
     headlineBottom: ['Mieux', 'entendue.'],
     subtitle:
-      'Comprendre votre corps, préparer vos consultations, naviguer en confiance.',
+      'Comprenez votre corps. Préparez vos consultations. Avancez en confiance.',
     pills: [
-      'Sources validées — NHS, HAS, NICE',
-      'Études menées sur les femmes',
-      'Jamais lié à votre identité',
+      'Information fondée sur la science — nous nous appuyons sur des sources fiables.',
+      'Confidentialité dès le départ — nous n’utilisons pas d’identifiants personnels.',
+      'Étapes personnalisées — nous vous aidons à trouver la prochaine.',
     ],
     cta:   'Commencer →',
     login: "J'ai déjà un compte",
@@ -53,11 +54,11 @@ const COPY = {
     headlineTop:    ['Better', 'informed.'],
     headlineBottom: ['Better', 'heard.'],
     subtitle:
-      'Understand your body, prepare for appointments, navigate with confidence.',
+      'Understand your body. Prepare for appointments. Move forward with confidence.',
     pills: [
-      'Validated sources — NHS, HAS, NICE',
-      'Research conducted on women',
-      'Never linked to your identity',
+      'Science-backed information — we review trusted sources.',
+      'Private by design — we do not use personal identifiers.',
+      'Tailored next steps — we help you find your next step.',
     ],
     cta:   'Get started →',
     login: 'I already have an account',
@@ -88,9 +89,13 @@ export function WelcomeScreen() {
       <Bloom size={bloomSize} />
 
       <SafeAreaView style={{ flex: 1 }}>
-        <View
-          style={{
-            flex: 1,
+        {/* ScrollView (flexGrow:1) keeps the "header top / CTA bottom" rhythm
+            on tall viewports AND lets the content scroll when iOS Safari's
+            URL bar shrinks the visible area on iPhone 16 Pro and similar. */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            flexGrow: 1,
             paddingHorizontal: isCompact ? 26 : 40,
             paddingTop: isCompact ? 24 : 32,
             paddingBottom: isCompact ? 26 : 40,
@@ -98,6 +103,7 @@ export function WelcomeScreen() {
             alignSelf: 'center',
             width: '100%',
           }}
+          showsVerticalScrollIndicator={false}
         >
           {/* Header — wordmark left, language toggle right */}
           <View
@@ -198,7 +204,7 @@ export function WelcomeScreen() {
           {/* Secondary CTA — white fill, Sand outline, neutral. Hierarchy
               comes from colour, not weight. */}
           <SecondaryButton label={copy.login} onPress={goLogin} />
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </View>
   )
