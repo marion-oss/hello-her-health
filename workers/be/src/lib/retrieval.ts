@@ -1,15 +1,26 @@
 /**
  * anoqi — Retrieval-Augmented Generation: query-time retrieval (Workers port)
  *
- * Same logic as api/lib/retrieval.ts. Two differences for the Workers port:
+ * Same logic as api/lib/retrieval.ts. Three differences for the Workers port:
  *   1. SupabaseClient comes from the npm package, not esm.sh.
- *   2. GEMINI_API_KEY is passed in via `env`, not read from `Deno.env`.
+ *   2. Service-account auth is passed in via `env`, not read from `Deno.env`.
+ *   3. Embeddings now go through Vertex AI (`:predict`), authenticated with
+ *      the same SA OAuth helper used by the chat path (../lib/vertexAuth).
+ *      The legacy AI Studio path (`generativelanguage.googleapis.com` +
+ *      `x-goog-api-key`) is gone — AI Studio prepayment credits were
+ *      depleting on common topics and breaking retrieval; Vertex's paid
+ *      quotas don't have that problem.
+ *
+ *  Embedding contract preserved: same model (gemini-embedding-001), same
+ *  dim (768), same task_type (RETRIEVAL_QUERY). Cache version bumped to
+ *  invalidate any AI-Studio-sourced cached vectors as a safety measure.
  *
  * Failure mode: if embedding or DB calls fail, returns []. Chat continues
  * without snippets (the LLM falls back to its base behaviour). Retrieval
  * MUST NOT block the user's message.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getVertexAccessToken } from './vertexAuth'
 
 // ─────────────────────────────────────────────────────────────
 // CONFIG
@@ -17,8 +28,14 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 // Embedding model: keep in sync with api/jobs/embed_rag.ts EMBEDDING_MODEL.
 // Mismatching query-side and document-side embeddings produces garbage retrieval.
 const EMBEDDING_MODEL = 'gemini-embedding-001'
-const GEMINI_EMBED_URL =
-  `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:embedContent`
+
+function buildVertexEmbedUrl(projectId: string, region: string): string {
+  // Same global / regional hostname rule as lib/gemini.ts buildVertexUrl().
+  const host = region === 'global'
+    ? 'aiplatform.googleapis.com'
+    : `${region}-aiplatform.googleapis.com`
+  return `https://${host}/v1/projects/${projectId}/locations/${region}/publishers/google/models/${EMBEDDING_MODEL}:predict`
+}
 
 const EMBEDDING_DIM = 768
 const DEFAULT_TOP_K = 5
@@ -71,7 +88,9 @@ export interface RetrieveOptions {
 
 /** Just the slice of `env` this module needs. */
 export interface RetrievalEnv {
-  GEMINI_API_KEY: string
+  VERTEX_SA_JSON: string
+  GCP_PROJECT_ID: string
+  GCP_REGION:     string
   /** Optional KV namespace for embedding cache. When absent, every query embeds live. */
   EMBEDDING_CACHE?: KVNamespace
 }
@@ -80,9 +99,11 @@ export interface RetrievalEnv {
 // but Gemini's model could rotate; 24h is short enough that a model upgrade
 // flushes within a day without us shipping a cache-bust.
 const EMBED_CACHE_TTL_SECONDS = 60 * 60 * 24
-// Bumped any time the embedding contract changes (model, dim, taskType, etc).
+// Bumped any time the embedding contract changes (model, dim, taskType, host).
 // Stale entries from older versions are ignored on read.
-const EMBED_CACHE_VERSION = 'v1'
+//   v1 — AI Studio (generativelanguage.googleapis.com :embedContent)
+//   v2 — Vertex AI (aiplatform.googleapis.com :predict). Bumped 2026-06-05.
+const EMBED_CACHE_VERSION = 'v2'
 
 // SHA-256 hash of the query text → 64-char hex. Deterministic, no collisions
 // at our scale, doesn't expose the literal query as a KV key (privacy nicety).
@@ -101,9 +122,8 @@ async function hashQuery(text: string): Promise<string> {
 // EMBED
 // ─────────────────────────────────────────────────────────────
 export async function embedQuery(text: string, env: RetrievalEnv): Promise<number[] | null> {
-  const apiKey = env.GEMINI_API_KEY
-  if (!apiKey) {
-    console.error('[retrieval] GEMINI_API_KEY not set; skipping embedding')
+  if (!env.VERTEX_SA_JSON || !env.GCP_PROJECT_ID || !env.GCP_REGION) {
+    console.error('[retrieval] VERTEX_SA_JSON / GCP_PROJECT_ID / GCP_REGION not set; skipping embedding')
     return null
   }
 
@@ -127,17 +147,27 @@ export async function embedQuery(text: string, env: RetrievalEnv): Promise<numbe
     }
   }
 
+  let accessToken: string
   try {
-    const res = await fetch(GEMINI_EMBED_URL, {
+    accessToken = await getVertexAccessToken(env.VERTEX_SA_JSON)
+  } catch (e) {
+    console.error('[retrieval] vertex token mint failed:', e)
+    return null
+  }
+
+  try {
+    const res = await fetch(buildVertexEmbedUrl(env.GCP_PROJECT_ID, env.GCP_REGION), {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
-        content: { parts: [{ text: trimmed }] },
-        outputDimensionality: EMBEDDING_DIM,
-        taskType: 'RETRIEVAL_QUERY',
+        // Vertex AI :predict expects an instances[] array; each instance carries
+        // the text + task_type (snake_case on Vertex vs camelCase on AI Studio).
+        // Output dim is passed via top-level `parameters`.
+        instances:  [{ content: trimmed, task_type: 'RETRIEVAL_QUERY' }],
+        parameters: { outputDimensionality: EMBEDDING_DIM },
       }),
     })
 
@@ -148,7 +178,8 @@ export async function embedQuery(text: string, env: RetrievalEnv): Promise<numbe
     }
 
     const data: any = await res.json()
-    const values: number[] | undefined = data.embedding?.values
+    // Vertex response: { predictions: [{ embeddings: { values: [...] } }] }
+    const values: number[] | undefined = data.predictions?.[0]?.embeddings?.values
     if (!Array.isArray(values) || values.length !== EMBEDDING_DIM) {
       console.error('[retrieval] embed returned unexpected shape:', { length: values?.length })
       return null
