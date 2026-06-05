@@ -4,10 +4,14 @@ account_id = "8c0835bd412c69c713ed9eedaaf1ca24"  # Marion@anoqi.health's Account
 compatibility_date = "2026-05-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Public, non-secret config. Flip ANOQI_RAG_ENABLED via dashboard or `wrangler secret put`
-# when you want runtime control without a redeploy.
+# Public, non-secret config. Declared here so `wrangler deploy` doesn't strip
+# them (anything not in [vars] gets removed from the deployed Worker, even if
+# previously set via dashboard). Flip values via dashboard or by editing here
+# and redeploying.
 [vars]
 ANOQI_RAG_ENABLED = "true"
+GCP_PROJECT_ID = "reverberant-kit-491312-e8"
+GCP_REGION = "global"
 
 # Secrets + vars — set via Cloudflare dashboard or
 # `wrangler secret put <name> --name anoqi-api-staging`:
