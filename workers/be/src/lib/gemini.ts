@@ -1,33 +1,78 @@
 /**
- * anoqi — Gemini AI client (Workers port)
+ * anoqi — Gemini AI client (Workers port, Vertex AI)
  *
- * Wraps Google's Gemini API (AI Studio / Generative Language API) for use
- * in Cloudflare Workers. Uses native fetch — no npm package required.
+ * Wraps Google's Gemini API via the Vertex AI prediction endpoint
+ * (aiplatform.googleapis.com), authenticated with a service-account OAuth
+ * token minted by ../lib/vertexAuth. Uses native fetch — no npm package
+ * required.
  *
- * Differs from api/lib/gemini.ts in one place: the API key is passed in
- * via the `env` argument rather than read from `Deno.env`. Workers don't
- * have a `Deno` global; env arrives via the Hono context (`c.env`) and
- * gets threaded down to the lib functions explicitly.
+ * Differs from api/lib/gemini.ts in one place: env is passed in via the
+ * `env` argument rather than read from `Deno.env`. Workers don't have a
+ * `Deno` global; env arrives via the Hono context (`c.env`) and gets
+ * threaded down to the lib functions explicitly. The Supabase Edge twin
+ * still calls AI Studio; migrate it in a follow-up PR.
  *
  * Exports:
  *   chat()            — conversational messages, runs policy check on output
  *   generateSummary() — structured JSON summary generation (higher-capability model)
  *
- * Required secret (set via `wrangler secret put GEMINI_API_KEY`):
- *   GEMINI_API_KEY=AIza...
- *   Issued from: https://aistudio.google.com/apikey
+ * Required env (set via Cloudflare dashboard or `wrangler secret put`):
+ *   VERTEX_SA_JSON     — full service-account JSON for anoqi-vertex-worker
+ *                        (project reverberant-kit-491312-e8). Stored as a
+ *                        secret. Granted roles/aiplatform.user on the project.
+ *   GCP_PROJECT_ID     — `reverberant-kit-491312-e8` (plaintext var)
+ *   GCP_REGION         — `global` (plaintext var). Use a regional value
+ *                        like `europe-west4` if you need EU data residency.
  *
  * Models used:
- *   gemini-2.5-flash  — chat (fast + cost-efficient)
- *   gemini-2.5-pro    — summaries (higher quality structured output)
+ *   gemini-3.5-flash  — chat (fast + cost-efficient)
+ *   gemini-3.5-pro    — summaries (higher quality structured output)
  */
 
 import { checkPolicy, type PolicyResult } from '../policy/policyChecker'
+import { getVertexAccessToken } from './vertexAuth'
 
-const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
+const CHAT_MODEL    = 'gemini-3.5-flash'
+const SUMMARY_MODEL = 'gemini-3.5-pro'
 
-const CHAT_MODEL    = 'gemini-2.5-flash'
-const SUMMARY_MODEL = 'gemini-2.5-pro'
+function buildVertexUrl(
+  projectId: string,
+  region:    string,
+  model:     string,
+  action:    'generateContent' | 'streamGenerateContent',
+  query?:    string,
+): string {
+  // The 'global' endpoint uses a host without a region prefix; regional
+  // endpoints use `{region}-aiplatform.googleapis.com`. See
+  // https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations
+  const host = region === 'global'
+    ? 'aiplatform.googleapis.com'
+    : `${region}-aiplatform.googleapis.com`
+  const url = `https://${host}/v1/projects/${projectId}/locations/${region}/publishers/google/models/${model}:${action}`
+  return query ? `${url}?${query}` : url
+}
+
+// Retry transient 429s (and 5xx) with exponential backoff + jitter. Vertex
+// AI's quotas are generous on a billing-enabled project but TPM bursts can
+// still cause brief 429s, especially with parallel streams.
+async function fetchWithBackoff(
+  url:     string,
+  init:    RequestInit,
+  maxAttempts = 3,
+): Promise<Response> {
+  let lastResp: Response | null = null
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const resp = await fetch(url, init)
+    if (resp.status !== 429 && resp.status < 500) return resp
+    lastResp = resp
+    if (attempt === maxAttempts) break
+    // 300ms, 900ms, 2700ms with ±30% jitter
+    const baseMs = 300 * Math.pow(3, attempt - 1)
+    const jitter = baseMs * (0.7 + Math.random() * 0.6)
+    await new Promise(r => setTimeout(r, jitter))
+  }
+  return lastResp!
+}
 
 // ─────────────────────────────────────────────────────────────
 // SYSTEM PROMPT — anoqi's clinical persona and guardrails
@@ -108,7 +153,9 @@ export interface ChatResult {
 
 /** Just the slice of `env` this module needs. Handlers pass `c.env` directly. */
 export interface GeminiEnv {
-  GEMINI_API_KEY: string
+  VERTEX_SA_JSON: string
+  GCP_PROJECT_ID: string
+  GCP_REGION:     string
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -122,10 +169,16 @@ export async function chat(
   language: Language = 'fr',
   userDocsBlock: string | undefined = undefined,
 ): Promise<ChatResult> {
-  const apiKey = env.GEMINI_API_KEY
+  if (!env.VERTEX_SA_JSON || !env.GCP_PROJECT_ID || !env.GCP_REGION) {
+    console.error('[gemini] VERTEX_SA_JSON / GCP_PROJECT_ID / GCP_REGION not set')
+    return apiError(CHAT_MODEL)
+  }
 
-  if (!apiKey) {
-    console.error('[gemini] GEMINI_API_KEY secret not set')
+  let accessToken: string
+  try {
+    accessToken = await getVertexAccessToken(env.VERTEX_SA_JSON)
+  } catch (e) {
+    console.error('[gemini] vertex token mint failed:', e)
     return apiError(CHAT_MODEL)
   }
 
@@ -150,13 +203,13 @@ export async function chat(
   }))
 
   try {
-    const response = await fetch(
-      `${GEMINI_API_BASE}/${CHAT_MODEL}:generateContent`,
+    const response = await fetchWithBackoff(
+      buildVertexUrl(env.GCP_PROJECT_ID, env.GCP_REGION, CHAT_MODEL, 'generateContent'),
       {
         method: 'POST',
         headers: {
-          'Content-Type':   'application/json',
-          'x-goog-api-key':  apiKey,
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -238,10 +291,17 @@ export async function* chatStream(
   language: Language = 'fr',
   userDocsBlock: string | undefined = undefined,
 ): AsyncGenerator<ChatStreamEvent, void, unknown> {
-  const apiKey = env.GEMINI_API_KEY
+  if (!env.VERTEX_SA_JSON || !env.GCP_PROJECT_ID || !env.GCP_REGION) {
+    console.error('[gemini] VERTEX_SA_JSON / GCP_PROJECT_ID / GCP_REGION not set')
+    yield { kind: 'error', reason: 'api_error' }
+    return
+  }
 
-  if (!apiKey) {
-    console.error('[gemini] GEMINI_API_KEY secret not set')
+  let accessToken: string
+  try {
+    accessToken = await getVertexAccessToken(env.VERTEX_SA_JSON)
+  } catch (e) {
+    console.error('[gemini] vertex token mint failed:', e)
     yield { kind: 'error', reason: 'api_error' }
     return
   }
@@ -270,13 +330,13 @@ export async function* chatStream(
     // `alt=sse` switches the streamGenerateContent endpoint to Server-Sent
     // Events. Without it, the response is a JSON array delivered as one chunk
     // (defeats the point).
-    response = await fetch(
-      `${GEMINI_API_BASE}/${CHAT_MODEL}:streamGenerateContent?alt=sse`,
+    response = await fetchWithBackoff(
+      buildVertexUrl(env.GCP_PROJECT_ID, env.GCP_REGION, CHAT_MODEL, 'streamGenerateContent', 'alt=sse'),
       {
         method: 'POST',
         headers: {
-          'Content-Type':   'application/json',
-          'x-goog-api-key':  apiKey,
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -361,21 +421,27 @@ export async function generateSummary(
   prompt: string,
   env: GeminiEnv,
 ): Promise<string | null> {
-  const apiKey = env.GEMINI_API_KEY
+  if (!env.VERTEX_SA_JSON || !env.GCP_PROJECT_ID || !env.GCP_REGION) {
+    console.error('[gemini] VERTEX_SA_JSON / GCP_PROJECT_ID / GCP_REGION not set')
+    return null
+  }
 
-  if (!apiKey) {
-    console.error('[gemini] GEMINI_API_KEY secret not set')
+  let accessToken: string
+  try {
+    accessToken = await getVertexAccessToken(env.VERTEX_SA_JSON)
+  } catch (e) {
+    console.error('[gemini] vertex token mint failed:', e)
     return null
   }
 
   try {
-    const response = await fetch(
-      `${GEMINI_API_BASE}/${SUMMARY_MODEL}:generateContent`,
+    const response = await fetchWithBackoff(
+      buildVertexUrl(env.GCP_PROJECT_ID, env.GCP_REGION, SUMMARY_MODEL, 'generateContent'),
       {
         method: 'POST',
         headers: {
-          'Content-Type':   'application/json',
-          'x-goog-api-key':  apiKey,
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],

@@ -9,8 +9,19 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 ANOQI_RAG_ENABLED = "true"
 
-# Secrets — set via `wrangler secret put <name> --name anoqi-api-staging`:
-#   GEMINI_API_KEY                — same value as the Supabase Edge Function uses
+# Secrets + vars — set via Cloudflare dashboard or
+# `wrangler secret put <name> --name anoqi-api-staging`:
+#   VERTEX_SA_JSON                — full service-account JSON (secret) for
+#                                   anoqi-vertex-worker on project
+#                                   reverberant-kit-491312-e8. The Worker
+#                                   mints OAuth tokens from this on each
+#                                   cold start. Vertex AI doesn't accept
+#                                   API keys (only OAuth) so this replaces
+#                                   the legacy GEMINI_API_KEY pattern.
+#   GCP_PROJECT_ID                — plaintext, typically `reverberant-kit-491312-e8`
+#   GCP_REGION                    — plaintext, typically `global` (or a
+#                                   region like `europe-west4` for EU
+#                                   data residency)
 #   SUPABASE_URL                  — https://xulemxvfufwvewvtwwcv.supabase.co
 #   SUPABASE_SERVICE_ROLE_KEY     — bypasses RLS; required by chat / documents / summaries
 #   SUPABASE_JWT_JWKS_URL         — https://xulemxvfufwvewvtwwcv.supabase.co/auth/v1/keys
