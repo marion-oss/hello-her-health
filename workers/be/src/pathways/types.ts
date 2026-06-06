@@ -107,6 +107,25 @@ export interface SideEffectEntry {
   whenToEscalate?:  string
 }
 
+/** V2 §6.1 Phase 8 — one reassurance prompt or question within a check-in. */
+export interface CheckInPrompt {
+  /** Short label, e.g. 'Breast tension', 'Bleeding pattern'. */
+  topic: string
+  text:  string
+}
+
+/** V2 §6.1 Phase 8 — a single scheduled check-in (e.g. 3 weeks post-start). */
+export interface CheckIn {
+  /** When it fires, e.g. '3 weeks post-start'. */
+  timing:              string
+  /** Why this window matters clinically. */
+  rationale:           string
+  opening:             string
+  prompts:             CheckInPrompt[]
+  /** Symptoms that warrant escalation at this check-in. */
+  escalationTriggers:  string[]
+}
+
 export interface DiagnosticCriteria {
   name:     string
   criteria: string[]
@@ -137,6 +156,7 @@ export interface PathwayModule {
   methodTable?:         MethodEntry[]        // contraception (Phase 4 PR)
   ukmecGates?:          UkmecGate[]          // contraception (Phase 2 PR)
   sideEffectLiteracy?:  SideEffectEntry[]    // contraception (Phase 5 PR)
+  checkInProtocol?:     CheckIn[]            // contraception (Phase 8 PR)
   hrtOptions?:          HrtOption[]          // menopause (future)
   diagnosticCriteria?:  DiagnosticCriteria   // endo, pmos (future)
 
