@@ -60,7 +60,80 @@ export const contraceptionEn: PathwayModule = {
       number:  2,
       title:   'Medical History Screen (UKMEC-gated)',
       purpose: 'identify contraindications and conditions requiring physician review (UKMEC 2025 logic)',
-      questions: [],
+      questions: [
+        // Cardiovascular and clotting
+        {
+          id:          'cv.clot_stroke_bp',
+          prompt:      'Have you ever had a blood clot, stroke, or been told your blood pressure is very high?',
+          required:    true,
+          branchLogic: 'Active VTE/PE → emergency services. History of VTE/PE, stroke, or ischaemic heart disease → prescribing-clinician appointment. BP ≥160/100 → CHC is UKMEC 4, block.',
+        },
+        {
+          id:          'cv.smoking',
+          prompt:      'Do you smoke? If so, roughly how many a day — and are you over 35?',
+          required:    true,
+          branchLogic: '>15/day AND >35 = UKMEC 4 for CHC → block CHC.',
+        },
+        {
+          id:       'cv.family_clot',
+          prompt:   'Has anyone in your close family — a parent or sibling — had a blood clot before the age of 45?',
+          required: true,
+        },
+        {
+          id:          'cv.migraine_aura',
+          prompt:      'Do you get migraines? If yes — do they ever come with a visual disturbance beforehand, like zigzag lines, blind spots, or flashing lights?',
+          required:    true,
+          branchLogic: 'Migraine with aura = UKMEC 4 for CHC → block CHC entirely. Continue: progestogen-only methods and the copper IUD remain good options.',
+        },
+        // Body metrics
+        {
+          id:         'metrics.height_weight',
+          prompt:     'What is your height and weight?',
+          required:   true,
+          validation: 'Calculate BMI. BMI >35 with an additional CV risk factor = UKMEC 3 → flag for prescribing physician. Record BMI (clotting risk + oral hormone absorption).',
+        },
+        // Hormonal and metabolic
+        {
+          id:       'hormonal.diagnoses',
+          prompt:   'Have you been diagnosed with PCOS, endometriosis, fibroids, or adenomyosis?',
+          required: false,
+        },
+        {
+          id:       'metabolic.diabetes',
+          prompt:   'Do you have diabetes? If yes, is it managed with medication?',
+          required: false,
+        },
+        {
+          id:          'metabolic.liver_gallbladder',
+          prompt:      'Any liver or gallbladder conditions?',
+          required:    false,
+          branchLogic: 'Severe liver disease or tumour → prescribing-clinician appointment (CHC = UKMEC 4).',
+        },
+        {
+          id:          'meds.current',
+          prompt:      'Are you taking any regular medications or supplements at the moment — including weight-loss injections like Ozempic or Mounjaro, herbal remedies, or anything for epilepsy?',
+          required:    true,
+          branchLogic: 'GLP-1 (Ozempic/Wegovy/Mounjaro) → set glp1_user = true → strongly bias away from oral methods. St John\'s Wort, rifampicin, anti-epileptics → flag drug interaction → prescribing-physician referral.',
+        },
+        // Mental health
+        {
+          id:               'mh.hormonal_mood',
+          prompt:           'Have you ever noticed that your mood, energy, or mental health seemed to shift with hormonal changes — around your period, for example, or when you were on contraception before?',
+          required:         false,
+          symptomsRecorded: ['mood_low'],
+        },
+        {
+          id:       'mh.depression_treatment',
+          prompt:   'Are you currently being treated for depression, or taking any antidepressants?',
+          required: false,
+        },
+      ],
+      enrichmentHooks: [
+        {
+          id:          'phase2.immediate_referral_screen',
+          description: 'Screen these first, before proceeding. Immediate referrals: active or recent VTE/PE → emergency services; history of VTE/PE, stroke, or ischaemic heart disease → prescribing-clinician appointment; current or recent breast cancer → appointment, do not discuss hormonal methods until seen; severe liver disease or tumour → appointment; undiagnosed abnormal vaginal bleeding → appointment within the week; suspected pregnancy → pregnancy resources; migraine with aura → continue, CHC unsuitable, steer to progestogen-only options.',
+        },
+      ],
     },
     {
       number:  3,
@@ -98,6 +171,20 @@ export const contraceptionEn: PathwayModule = {
       purpose: 'check-in protocol (3 weeks, 6 weeks, 2 months) to support continuation',
       questions: [],
     },
+  ],
+
+  // UKMEC gates (V2 §6.1, source CoSRH/FSRH UKMEC 2025). Method keys:
+  // chc = combined hormonal; pop = progestogen-only pill; implant; lng_ius;
+  // copper_iud. Category: 1 = no restriction … 4 = unacceptable risk (block).
+  // Reference summary — always use the full document for complete criteria.
+  ukmecGates: [
+    { condition: 'Migraine with aura',                     categories: { chc: 4, pop: 2, implant: 2, lng_ius: 2, copper_iud: 1 }, action: 'Combined oestrogen contraindicated (UKMEC 4) — block CHC. Progestogen-only methods and copper IUD remain available.' },
+    { condition: 'Blood pressure ≥ 160/100',               categories: { chc: 4, pop: 1, implant: 1, lng_ius: 2, copper_iud: 1 }, action: 'Block CHC (UKMEC 4).' },
+    { condition: 'Smoking > 15/day AND > 35 yrs',          categories: { chc: 4, pop: 1, implant: 1, lng_ius: 2, copper_iud: 1 }, action: 'Block CHC (UKMEC 4).' },
+    { condition: 'Active VTE (current)',                   categories: { chc: 4, pop: 2, implant: 2, lng_ius: 2, copper_iud: 1 }, action: 'Block CHC (UKMEC 4). Active VTE → direct to emergency services.' },
+    { condition: 'BMI > 35 with CV risk factor',           categories: { chc: 3, pop: 1, implant: 1, lng_ius: 2, copper_iud: 1 }, action: 'CHC = UKMEC 3 — flag for prescribing physician.' },
+    { condition: 'Current breast cancer',                  categories: { chc: 4, pop: 4, implant: 4, lng_ius: 4, copper_iud: 1 }, action: 'Block all hormonal methods (UKMEC 4). Do not discuss hormonal methods until seen.' },
+    { condition: 'Severe liver disease',                   categories: { chc: 4, pop: 3, implant: 3, lng_ius: 3, copper_iud: 1 }, action: 'Block CHC (UKMEC 4); flag progestogen-only methods (UKMEC 3).' },
   ],
 
   mythCorrections: [],
