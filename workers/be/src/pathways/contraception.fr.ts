@@ -239,6 +239,12 @@ export const contraceptionFr: PathwayModule = {
       title:   'Suivi',
       purpose: 'protocole de check-in (3 semaines, 6 semaines, 2 mois) pour soutenir la continuité',
       questions: [],
+      enrichmentHooks: [
+        {
+          id:          'phase8.method_specific',
+          description: "Ne montrer que les prompts de réassurance pertinents pour la méthode de l'utilisatrice. En cas d'insatisfaction, appliquer le protocole d'insatisfaction (Partie 3.5) — ne jamais laisser un abandon silencieux.",
+        },
+      ],
     },
   ],
 
@@ -268,6 +274,60 @@ export const contraceptionFr: PathwayModule = {
     { name: 'Patch Evra',          type: 'Hormonal hebdomadaire', duration: 'En continu',          keyPoints: 'CHC par voie transdermique. Effet de premier passage hépatique plus faible que la pilule.', clinicianNotes: 'Utile en cas de difficulté d\'observance. Même UKMEC que la pilule combinée.' },
     { name: 'Anneau Nuvaring',     type: 'Hormonal mensuel',   duration: 'En continu',            keyPoints: 'CHC par anneau vaginal. Pose et retrait une fois par mois.', clinicianNotes: 'Utile en cas de difficulté d\'observance. Même UKMEC que la pilule combinée.' },
     { name: 'Injection DMPA',      type: 'Toutes les 12 à 13 semaines', duration: 'En continu',    keyPoints: 'Aucune action quotidienne. Retour de fertilité retardé (jusqu\'à 12 mois). Densité osseuse : prudence au long cours.', clinicianNotes: 'Sécheresse vaginale et baisse de moral rapportées. Peut diminuer la densité osseuse en usage prolongé.' },
+  ],
+
+  // Check-in protocol (V2 §6.1 Phase 8). Show only prompts relevant to the method.
+  checkInProtocol: [
+    {
+      timing:    '3 semaines après le début',
+      rationale: "Point d'abandon précoce le plus fréquent. Les symptômes inquiètent parce qu'ils sont inattendus et sans contexte.",
+      opening:   "Ça fait environ 3 semaines que tu es sous [méthode] — bravo d'avoir tenu bon. Certaines choses sont tout à fait normales à ce stade, d'autres méritent d'être signalées. Faisons un petit point.",
+      prompts: [
+        { topic: 'Tension mammaire', text: "Une sensibilité des seins ? C'est très fréquent les premières semaines — ce n'est pas un signe de cancer du sein. Ça disparaît presque toujours tout seul dans les semaines qui viennent." },
+        { topic: 'Spotting',         text: "Quelques saignements légers, c'est très fréquent à ce stade — ça ne veut pas dire que la méthode ne marche pas. Si tu as eu un nouveau partenaire récemment, le spotting peut parfois venir d'une infection plutôt que de ta contraception — un test IST rapide le confirmerait." },
+        { topic: 'Nausées',          text: "De légères nausées les premières semaines ? Essaie de prendre ta pilule avec un repas ou au coucher — ça règle généralement le problème." },
+        { topic: 'Humeur basse / irritabilité', text: "Un peu à plat ou irritable ? Les ajustements hormonaux précoces peuvent affecter l'humeur — ça se stabilise généralement dans les semaines à venir. Si c'est sévère ou persistant, parlons-en." },
+        { topic: 'Maux de tête',     text: "De légers maux de tête sont fréquents les premières semaines. Pense à bien t'hydrater. Si tu as un mal de tête soudain et intense, différent de d'habitude, ou accompagné de troubles visuels, contacte ton médecin le jour même." },
+      ],
+      escalationTriggers: [
+        'Saignements abondants imbibant une protection chaque heure',
+        'Douleur thoracique ou essoufflement',
+        'Mal de tête soudain et intense',
+        'Douleur, gonflement et chaleur dans une jambe',
+        'Idées suicidaires',
+      ],
+    },
+    {
+      timing:    '6 semaines après le début',
+      rationale: "Les effets secondaires initiaux devraient s'atténuer. Des symptômes persistants peuvent indiquer une méthode inadaptée — un changement précoce vaut mieux qu'un abandon.",
+      opening:   "Ça fait environ 6 semaines que tu as commencé [méthode]. Comment ça va ? Faisons le point sur quelques aspects.",
+      prompts: [
+        { topic: 'Profil de saignement', text: "Comment sont tes saignements par rapport à ce qu'on avait dit d'attendre au début ?" },
+        { topic: 'Humeur / énergie',     text: "As-tu remarqué des changements dans ton humeur ou ton énergie ces dernières semaines ?" },
+        { topic: 'Effets non signalés',  text: "Des effets secondaires que tu n'aurais pas encore mentionnés à un médecin ?" },
+        { topic: 'Recherches en ligne',  text: "Est-ce qu'il t'est arrivé de googler des symptômes ? Dis-moi lesquels — je peux peut-être t'aider à y voir clair." },
+        { topic: 'Nouveau partenaire',   text: "Si tu as commencé une nouvelle relation depuis le début de ta contraception, c'est juste bon à savoir : le spotting peut parfois venir d'une infection bactérienne plutôt que de ta méthode. Un dépistage IST rapide l'exclut complètement." },
+      ],
+      escalationTriggers: [
+        "Changement d'humeur sévère et persistant",
+        'Grossesse suspectée',
+        'Saignements anormaux avec un nouveau partenaire',
+      ],
+    },
+    {
+      timing:    '2 mois après le début',
+      rationale: "Moment de consolider la continuité ou de permettre un changement éclairé et accompagné — pas un abandon par frustration.",
+      opening:   "Deux mois — la phase d'adaptation devrait être bien derrière toi maintenant. Voyons où tu en es.",
+      prompts: [
+        { topic: 'Satisfaction',       text: "Es-tu satisfaite de ton choix, ou commences-tu à te poser des questions sur d'autres options ?" },
+        { topic: 'Saignements',        text: "Tes saignements se sont-ils installés dans un schéma auquel tu t'attendais ?" },
+        { topic: 'Préoccupations',     text: "Des préoccupations qui restent — quelque chose que tu repousses depuis un moment ?" },
+        { topic: 'Pilule en continu (CHC)', text: "Savais-tu qu'on peut prendre la pilule combinée en continu pendant 3 mois d'affilée, pour n'avoir que 4 règles par an ? Beaucoup de femmes l'ignorent — ça peut aider pour les douleurs et l'abondance des saignements." },
+      ],
+      escalationTriggers: [
+        'En cas d\'insatisfaction : appliquer le protocole d\'insatisfaction (Partie 3.5) — ne pas laisser un abandon silencieux',
+      ],
+    },
   ],
 
   // Side-effect literacy (V2 §6.1 Phase 5). Explain before symptoms occur.
