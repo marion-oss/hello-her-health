@@ -12,10 +12,11 @@ compatibility_flags = ["nodejs_compat"]
 ANOQI_RAG_ENABLED = "true"
 GCP_PROJECT_ID = "reverberant-kit-491312-e8"
 GCP_REGION = "global"
-# Pathway runtime engine (workers/be/src/pathways). Default OFF — ship dark,
-# flip to "true" per PATHWAYS.md PR I once phases 1-8 are validated. Apply
-# migration 007_pathway_session_state.sql before flipping so state persists.
-PATHWAY_RUNTIME_ENABLED = "false"
+# Pathway runtime engine (workers/be/src/pathways). Enabled 2026-06-06 on
+# staging for end-to-end testing of the contraception pathway. Migration
+# 007_pathway_session_state.sql has been applied. Set back to "false" to
+# disable without a code change.
+PATHWAY_RUNTIME_ENABLED = "true"
 
 # Secrets + vars — set via Cloudflare dashboard or
 # `wrangler secret put <name> --name anoqi-api-staging`:
