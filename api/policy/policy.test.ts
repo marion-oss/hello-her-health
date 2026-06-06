@@ -40,6 +40,13 @@ describe('checkPolicy — diagnosis language → block', () => {
     { input: 'You have polycystic ovary syndrome.', label: 'you have' },
     { input: 'You are suffering from severe dysmenorrhea.', label: 'you are suffering from' },
     { input: 'You are diagnosed with PMDD.', label: 'you are diagnosed with' },
+    // v1.2 — perfect-tense diagnostic claims must still block despite the
+    // conversational carve-outs added to the bare possessive patterns.
+    { input: 'You have been diagnosed with PCOS.', label: 'you have been diagnosed' },
+    { input: 'You have endometriosis, based on these symptoms.', label: 'you have <condition>' },
+    { input: 'Vous avez été diagnostiquée avec une endométriose.', label: 'vous avez été diagnostiquée' },
+    { input: 'Vous avez une thyroïdite de Hashimoto.', label: 'vous avez une <condition>' },
+    { input: 'Tu as du SOPK, sans aucun doute.', label: 'tu as du <condition>' },
   ]
 
   diagnosisCases.forEach(({ input, label }) => {
@@ -170,6 +177,35 @@ describe('checkPolicy — safe content → pass through unchanged', () => {
   safeCases.forEach(({ input, label }) => {
     it(`passes unchanged: "${label}"`, () => {
       const result = checkPolicy(input)
+      expect(result.safe).toBe(true)
+      expect(result.flags).toHaveLength(0)
+      expect(result.sanitisedContent).toBe(input)
+    })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────
+// checkPolicy — conversational "have / avez / as" → must NOT block
+// Regression guard for the v1.2 bug: bare "you have" / "vous avez" / "tu as"
+// wiped ordinary empathetic replies and replaced them with the diagnosis
+// fallback mid-conversation. These are normal dialogue, not diagnoses.
+// ─────────────────────────────────────────────────────────────
+describe('checkPolicy — conversational have/avez/as → pass through (v1.2 regression)', () => {
+  const conversationalCases = [
+    { input: 'It sounds like you have had difficult experiences with hormonal methods.', lang: 'en' as const, label: 'EN you have had' },
+    { input: 'The side effects you have described — low mood and brain fog — are worth noting for your doctor.', lang: 'en' as const, label: 'EN you have described' },
+    { input: 'Based on what you have told me, here are some methods to ask your doctor about.', lang: 'en' as const, label: 'EN you have told' },
+    { input: 'You have several options you could discuss with your physician.', lang: 'en' as const, label: 'EN you have several options' },
+    { input: 'I can help you identify a few options you have not yet tried.', lang: 'en' as const, label: 'EN you have not' },
+    { input: 'Once you have your appointment, you can raise these points.', lang: 'en' as const, label: 'EN you have your appointment' },
+    { input: 'Vous avez mentionné des effets secondaires importants.', lang: 'fr' as const, label: 'FR vous avez mentionné' },
+    { input: 'Vous avez raison, ces symptômes méritent attention.', lang: 'fr' as const, label: 'FR vous avez raison' },
+    { input: 'Tu as essayé plusieurs méthodes, c\'est utile à noter.', lang: 'fr' as const, label: 'FR tu as essayé' },
+  ]
+
+  conversationalCases.forEach(({ input, lang, label }) => {
+    it(`passes unchanged: "${label}"`, () => {
+      const result = checkPolicy(input, lang)
       expect(result.safe).toBe(true)
       expect(result.flags).toHaveLength(0)
       expect(result.sanitisedContent).toBe(input)
