@@ -215,6 +215,12 @@ export const contraceptionEn: PathwayModule = {
       title:   'Consultation Preparation',
       purpose: 'generate a personalised first-person summary the user brings to her prescribing physician',
       questions: [],
+      enrichmentHooks: [
+        {
+          id:          'phase7.generate_summary',
+          description: 'Generate the summary per consultationPrepTemplate: written in the first person, as if the user wrote it. Pull in relevant medical history from Phase 2, the methods she is interested in and her questions, her concerns and how they were addressed, the questions to ask her doctor, and the things to remember about the methods she is considering.',
+        },
+      ],
     },
     {
       number:  8,

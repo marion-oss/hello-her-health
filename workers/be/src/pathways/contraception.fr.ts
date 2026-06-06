@@ -227,6 +227,12 @@ export const contraceptionFr: PathwayModule = {
       title:   'Préparation à la consultation',
       purpose: 'générer un résumé personnalisé, à la première personne, que l\'utilisatrice apporte à son médecin prescripteur',
       questions: [],
+      enrichmentHooks: [
+        {
+          id:          'phase7.generate_summary',
+          description: "Générer le résumé selon consultationPrepTemplate : rédigé à la première personne, comme si l'utilisatrice l'avait écrit. Reprendre les antécédents pertinents de la phase 2, les méthodes qui l'intéressent et ses questions, ses inquiétudes et la façon dont elles ont été abordées, les questions à poser au médecin, et les points à retenir sur les méthodes envisagées.",
+        },
+      ],
     },
     {
       number:  8,
