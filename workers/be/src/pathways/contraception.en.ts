@@ -203,6 +203,12 @@ export const contraceptionEn: PathwayModule = {
       title:   'Myth-Busting Layer',
       purpose: 'correct misinformation as it arises, warmly and with a source',
       questions: [],
+      enrichmentHooks: [
+        {
+          id:          'phase6.correct_in_flow',
+          description: 'Correct misinformation when it arises — throughout the conversation, not as a lecture at the end. When the user mentions a belief that matches a known myth, correct it immediately, warmly, and with a source.',
+        },
+      ],
     },
     {
       number:  7,
@@ -258,7 +264,38 @@ export const contraceptionEn: PathwayModule = {
     { effect: 'Fertility return',            whatToSay: 'Fertility is not affected by these methods, and barrier methods should be used immediately once the method is stopped, as it can return as quickly as 4–7 days. Evidence suggests fertility may be highest in the first cycle after stopping the combined pill. The injection is the exception — up to 12 months.' },
   ],
 
-  mythCorrections: [],
+  // Myth corrections (V2 §6.1 Phase 6). Correct warmly, in flow, with a source.
+  mythCorrections: [
+    {
+      trigger:    'I heard the pill makes you infertile',
+      correction: 'This is one of the most common myths about contraception. Fertility returns within 4–7 days of stopping the combined pill — and research suggests fertility may actually be at its best in the first cycle after stopping. The injection is the only exception, where it can take up to 12 months to return.',
+      sources:    ['Bristol ALSPAC Study', 'John et al. J Gen Intern Med 2025'],
+    },
+    {
+      trigger:    'I should take a break from the pill every year',
+      correction: "There's no medical reason to take a break from the pill — this is a myth that has been passed down through families for decades. Breaks are associated with a higher risk of unplanned pregnancy, without any health benefit. You can safely continue for as long as you need contraception.",
+      sources:    ['FSRH CHC Guideline 2023'],
+    },
+    {
+      trigger:    'The pill causes cancer',
+      correction: "The combined pill is actually protective against ovarian cancer and cancer of the lining of the womb. There is a small increase in breast cancer risk — but to put it in perspective: for every 10,000 women who take the pill for 5 years, roughly 1 additional breast cancer case may occur compared to women who don't take it. That's a similar increase in risk to drinking more than one alcoholic drink a day. The risk returns to normal within about 5 years of stopping.",
+      sources:    ['Jahanfar et al. Front Glob Womens Health 2024', 'Int J Cancer 2021'],
+    },
+    {
+      trigger:    'Natural hormones are always safer than synthetic',
+      correction: "Natural versus synthetic isn't quite the right frame here. Your own ovaries produce hormones that carry their own risks. The hormones in contraceptives have decades of safety data behind them. What matters is whether the benefits outweigh the risks for your specific situation — which is exactly what your doctor assesses.",
+    },
+    {
+      trigger:    'After stopping hormonal contraception it takes months for my body to get back to normal',
+      correction: 'The washout period for most hormonal methods is around 20–30 days — after that, any ongoing symptoms like irregular cycles, acne, or hair changes are your own baseline, not your contraception. That\'s actually useful information: it means those symptoms are worth investigating in their own right.',
+      sources:    ['Dr Frontino clinical note', 'FSRH'],
+    },
+    {
+      trigger:    'I saw on TikTok/Instagram that [method] causes [side effect]',
+      correction: 'Social media is one of the biggest sources of misinformation about contraception. Research shows that 74% of YouTube influencers discussing contraception encouraged discontinuation, and about half of TikTok posts about birth control promoted negative claims — most based on individual experience, not clinical evidence. Let me tell you what the evidence actually says.',
+      sources:    ['Pfender UPenn/STAT News 2024', 'John et al. PMC 2025'],
+    },
+  ],
 
   differentialAwareness: {},
 

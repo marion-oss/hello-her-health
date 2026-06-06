@@ -215,6 +215,12 @@ export const contraceptionFr: PathwayModule = {
       title:   'Démystification',
       purpose: 'corriger les idées reçues au fil de la conversation, avec chaleur et sources',
       questions: [],
+      enrichmentHooks: [
+        {
+          id:          'phase6.correct_in_flow',
+          description: "Corriger la désinformation quand elle apparaît — au fil de la conversation, pas en bloc à la fin. Quand l'utilisatrice exprime une croyance qui correspond à un mythe connu, la corriger immédiatement, avec chaleur et une source.",
+        },
+      ],
     },
     {
       number:  7,
@@ -270,8 +276,38 @@ export const contraceptionFr: PathwayModule = {
     { effect: 'Retour de fertilité',         whatToSay: "La fertilité n'est pas altérée par ces méthodes et il faut utiliser une protection de barrière dès l'arrêt, car elle peut revenir en 4 à 7 jours. Les données suggèrent même qu'elle est la plus élevée dans le premier cycle après l'arrêt de la pilule combinée. L'injection est l'exception — jusqu'à 12 mois." },
   ],
 
-  // Populated by the Phase 6 PR (V2 §6.1 myth-busting table).
-  mythCorrections: [],
+  // Myth corrections (V2 §6.1 Phase 6). Correct warmly, in flow, with a source.
+  mythCorrections: [
+    {
+      trigger:    "J'ai entendu que la pilule rend stérile",
+      correction: "C'est l'un des mythes les plus répandus sur la contraception. La fertilité revient dans les 4 à 7 jours après l'arrêt de la pilule combinée — et la recherche suggère qu'elle est même optimale dans le premier cycle après l'arrêt. L'injection est la seule exception, où le retour peut prendre jusqu'à 12 mois.",
+      sources:    ['Bristol ALSPAC Study', 'John et al. J Gen Intern Med 2025'],
+    },
+    {
+      trigger:    "Il faut faire une pause de la pilule chaque année",
+      correction: "Il n'y a aucune raison médicale de faire une pause de la pilule — c'est un mythe transmis dans les familles depuis des décennies. Les pauses sont associées à un risque plus élevé de grossesse non désirée, sans aucun bénéfice pour la santé. Tu peux la prendre en continu aussi longtemps que tu as besoin d'une contraception.",
+      sources:    ['FSRH CHC Guideline 2023'],
+    },
+    {
+      trigger:    "La pilule donne le cancer",
+      correction: "La pilule combinée protège en réalité contre le cancer de l'ovaire et celui de la muqueuse de l'utérus. Il existe une légère augmentation du risque de cancer du sein — mais pour la mettre en perspective : pour 10 000 femmes prenant la pilule pendant 5 ans, environ 1 cas supplémentaire de cancer du sein peut survenir par rapport aux femmes qui ne la prennent pas. C'est une augmentation comparable à celle de boire plus d'un verre d'alcool par jour. Le risque revient à la normale environ 5 ans après l'arrêt.",
+      sources:    ['Jahanfar et al. Front Glob Womens Health 2024', 'Int J Cancer 2021'],
+    },
+    {
+      trigger:    "Les hormones naturelles sont toujours plus sûres que les synthétiques",
+      correction: "Naturel contre synthétique n'est pas vraiment le bon cadre ici. Tes propres ovaires produisent des hormones qui comportent leurs propres risques. Les hormones des contraceptifs ont des décennies de données de sécurité derrière elles. Ce qui compte, c'est de savoir si les bénéfices l'emportent sur les risques dans ta situation précise — c'est exactement ce que ton médecin évalue.",
+    },
+    {
+      trigger:    "Après l'arrêt de la contraception hormonale, le corps met des mois à revenir à la normale",
+      correction: "La période d'élimination de la plupart des méthodes hormonales est d'environ 20 à 30 jours — après quoi tout symptôme persistant (cycles irréguliers, acné, changements capillaires) correspond à ton propre état de base, pas à ta contraception. C'est en fait une information utile : ces symptômes méritent d'être explorés pour eux-mêmes.",
+      sources:    ['Note clinique Dr Frontino', 'FSRH'],
+    },
+    {
+      trigger:    "J'ai vu sur TikTok/Instagram que [méthode] provoque [effet secondaire]",
+      correction: "Les réseaux sociaux sont l'une des plus grandes sources de désinformation sur la contraception. Les études montrent que 74 % des influenceurs YouTube parlant de contraception encourageaient l'arrêt, et environ la moitié des publications TikTok sur la contraception véhiculaient des affirmations négatives — la plupart fondées sur des expériences individuelles, pas sur des preuves cliniques. Laisse-moi te dire ce que disent réellement les données.",
+      sources:    ['Pfender UPenn/STAT News 2024', 'John et al. PMC 2025'],
+    },
+  ],
 
   // Empty until a second pathway declaring an overlapping symptom lands.
   differentialAwareness: {},
