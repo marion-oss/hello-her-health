@@ -191,6 +191,12 @@ export const contraceptionEn: PathwayModule = {
       title:   'Side Effect Literacy',
       purpose: 'proactively explain expected side effects, their timelines, and the escalation signal',
       questions: [],
+      enrichmentHooks: [
+        {
+          id:          'phase5.preempt_principle',
+          description: 'For every method under consideration, explain expected side effects BEFORE they occur. This is the most important retention intervention: users who are surprised discontinue; users who expected side effects continue. Be specific, give timelines, give the escalation signal.',
+        },
+      ],
     },
     {
       number:  6,
@@ -238,6 +244,18 @@ export const contraceptionEn: PathwayModule = {
     { name: 'Evra patch',        type: 'Weekly hormonal',   duration: 'Ongoing',          keyPoints: 'CHC via transdermal route. Lower first-pass hepatic effect than the pill.', clinicianNotes: 'Good for adherence-challenged users. Same UKMEC as the CHC pill.' },
     { name: 'Nuvaring',          type: 'Monthly hormonal',  duration: 'Ongoing',          keyPoints: 'CHC via vaginal ring. Monthly insertion and removal.', clinicianNotes: 'Good for adherence-challenged users. Same UKMEC as the CHC pill.' },
     { name: 'DMPA injection',    type: 'Every 12–13 weeks', duration: 'Ongoing',          keyPoints: 'No daily action. Delayed fertility return (up to 12 months). Bone density: caution long-term.', clinicianNotes: 'Vaginal dryness and low mood reported. Can decrease bone density with prolonged use.' },
+  ],
+
+  // Side-effect literacy (V2 §6.1 Phase 5). Explain before symptoms occur.
+  sideEffectLiteracy: [
+    { effect: 'Breast tension',              whatToSay: 'Some breast tenderness in the first 2–3 weeks is very common with hormonal methods. It is not a sign of breast cancer — it nearly always fades on its own.', whenToEscalate: 'Persistent lump; nipple discharge; pain after 8 weeks → physician referral.' },
+    { effect: 'Spotting / irregular bleeding', whatToSay: "Light spotting in the first 3–6 months is normal. If you've recently had a new sexual partner, spotting can sometimes be from an infection rather than your contraception — worth a quick STI test.", whenToEscalate: 'Soaking a pad every hour; bleeding after sex consistently; bleeding after 6 months without periods → urgent physician referral.' },
+    { effect: 'Nausea',                      whatToSay: 'Nausea is common in the first few weeks with oral pills. Try taking it with food or at bedtime — this usually helps.', whenToEscalate: 'Persisting beyond 6 weeks → physician referral.' },
+    { effect: 'Mood changes',                whatToSay: 'Some women notice mood shifts, especially early on. Individual variation is high. Keep a note — it helps if you speak to your doctor.', whenToEscalate: 'Suicidal ideation → crisis escalation. Severe persistent low mood after 6 weeks → physician referral.' },
+    { effect: 'Acne',                        whatToSay: "All combined hormonal methods can improve acne. If acne persists or worsens on a combined pill, it may indicate the formulation isn't quite right — worth discussing a switch with your doctor.", whenToEscalate: 'Severe worsening → physician referral.' },
+    { effect: 'Libido',                      whatToSay: 'Changes to sex drive in either direction are reported with all hormonal methods. Not universal, and often settles as the body adjusts.', whenToEscalate: 'Persistent distress → physician referral.' },
+    { effect: 'Weight',                      whatToSay: 'The injection (DMPA/Depo-Provera) has modest evidence of weight gain in some users — roughly 1–2kg on average over the first year for those affected. No other method has an established weight effect in controlled trials.' },
+    { effect: 'Fertility return',            whatToSay: 'Fertility is not affected by these methods, and barrier methods should be used immediately once the method is stopped, as it can return as quickly as 4–7 days. Evidence suggests fertility may be highest in the first cycle after stopping the combined pill. The injection is the exception — up to 12 months.' },
   ],
 
   mythCorrections: [],
