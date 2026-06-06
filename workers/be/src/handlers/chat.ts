@@ -19,7 +19,7 @@ import { getServiceClient } from '../lib/supabase'
 import { getUserIdFromRequest } from '../auth'
 import { classifyInput, checkPolicy } from '../policy/policyChecker'
 import { chat as geminiChat, chatStream as geminiChatStream } from '../lib/gemini'
-import { runPathwayTurn, recordPhaseTokens } from '../pathways/session'
+import { runPathwayTurn, recordPhaseTokens, advancePhase } from '../pathways/session'
 import type { PathwayKey } from '../pathways/types'
 import { retrieve, renderSnippetsForPrompt, type Snippet } from '../lib/retrieval'
 import { parseCitations, type MessageSource } from '../lib/citationParser'
@@ -429,7 +429,7 @@ async function chatJsonHandler(c: Context<{ Bindings: Env }>): Promise<Response>
   const {
     supabase, userId, activeConversationId, isNewConversation,
     message, language, journeyType, messageHistory, snippets, systemAddendum,
-    userDocsBlock, pathwayBlock, pathwayPhase,
+    userDocsBlock, pathwayBlock, pathwayKey, pathwayPhase,
   } = prep
 
   // Call Gemini (policy check runs inside)
@@ -537,6 +537,17 @@ async function chatJsonHandler(c: Context<{ Bindings: Env }>): Promise<Response>
     else await titleP
   }
 
+  // Background phase advancement (affects the next turn only).
+  if (pathwayKey) {
+    const advanceP = advancePhase({
+      supabase, env: c.env, conversationId: activeConversationId, language,
+      userMessage: message, assistantMessage: cleanContent,
+    })
+    const waitUntil = c.executionCtx?.waitUntil?.bind(c.executionCtx)
+    if (waitUntil) waitUntil(advanceP)
+    else await advanceP
+  }
+
   const responsePayload: ChatResponse = {
     message: {
       id:              crypto.randomUUID(),
@@ -573,7 +584,7 @@ async function chatStreamHandler(c: Context<{ Bindings: Env }>): Promise<Respons
   const {
     supabase, userId, activeConversationId, isNewConversation,
     message, language, journeyType, messageHistory, snippets, systemAddendum,
-    userDocsBlock, pathwayBlock, pathwayPhase,
+    userDocsBlock, pathwayBlock, pathwayKey, pathwayPhase,
   } = prep
 
   const encoder = new TextEncoder()
@@ -670,6 +681,12 @@ async function chatStreamHandler(c: Context<{ Bindings: Env }>): Promise<Respons
           }
           if (pathwayPhase != null) {
             await recordPhaseTokens(supabase, activeConversationId, pathwayPhase, streamTokens)
+          }
+          if (pathwayKey) {
+            await advancePhase({
+              supabase, env: c.env, conversationId: activeConversationId, language,
+              userMessage: message, assistantMessage: cleanContent,
+            })
           }
         })().catch((e) => console.error('[chat-stream] persist error:', e))
 
