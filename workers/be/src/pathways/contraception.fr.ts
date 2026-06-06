@@ -203,6 +203,12 @@ export const contraceptionFr: PathwayModule = {
       title:   'Comprendre les effets secondaires',
       purpose: 'expliquer en amont les effets secondaires attendus, leurs délais et les signaux d\'alerte',
       questions: [],
+      enrichmentHooks: [
+        {
+          id:          'phase5.preempt_principle',
+          description: "Pour chaque méthode envisagée, expliquer les effets secondaires attendus AVANT qu'ils ne surviennent. C'est l'intervention de rétention la plus importante : les utilisatrices surprises arrêtent, celles qui s'y attendaient continuent. Être précise, donner les délais, donner le signal d'alerte.",
+        },
+      ],
     },
     {
       number:  6,
@@ -250,6 +256,18 @@ export const contraceptionFr: PathwayModule = {
     { name: 'Patch Evra',          type: 'Hormonal hebdomadaire', duration: 'En continu',          keyPoints: 'CHC par voie transdermique. Effet de premier passage hépatique plus faible que la pilule.', clinicianNotes: 'Utile en cas de difficulté d\'observance. Même UKMEC que la pilule combinée.' },
     { name: 'Anneau Nuvaring',     type: 'Hormonal mensuel',   duration: 'En continu',            keyPoints: 'CHC par anneau vaginal. Pose et retrait une fois par mois.', clinicianNotes: 'Utile en cas de difficulté d\'observance. Même UKMEC que la pilule combinée.' },
     { name: 'Injection DMPA',      type: 'Toutes les 12 à 13 semaines', duration: 'En continu',    keyPoints: 'Aucune action quotidienne. Retour de fertilité retardé (jusqu\'à 12 mois). Densité osseuse : prudence au long cours.', clinicianNotes: 'Sécheresse vaginale et baisse de moral rapportées. Peut diminuer la densité osseuse en usage prolongé.' },
+  ],
+
+  // Side-effect literacy (V2 §6.1 Phase 5). Explain before symptoms occur.
+  sideEffectLiteracy: [
+    { effect: 'Tension mammaire',            whatToSay: "Une certaine sensibilité des seins pendant les 2 à 3 premières semaines est très fréquente avec les méthodes hormonales. Ce n'est pas un signe de cancer du sein — ça disparaît presque toujours tout seul.", whenToEscalate: 'Boule persistante ; écoulement du mamelon ; douleur au-delà de 8 semaines → orientation médicale.' },
+    { effect: 'Spotting / saignements irréguliers', whatToSay: "De légers saignements pendant les 3 à 6 premiers mois sont normaux. Si tu as eu un nouveau partenaire récemment, le spotting peut parfois venir d'une infection plutôt que de ta contraception — un test IST rapide vaut la peine.", whenToEscalate: "Imbiber une protection chaque heure ; saignements après les rapports de façon constante ; saignements après 6 mois sans règles → orientation médicale urgente." },
+    { effect: 'Nausées',                     whatToSay: "Les nausées sont fréquentes les premières semaines avec les pilules orales. Essaie de la prendre avec un repas ou au coucher — ça aide généralement.", whenToEscalate: 'Persistance au-delà de 6 semaines → orientation médicale.' },
+    { effect: "Changements d'humeur",        whatToSay: "Certaines femmes remarquent des variations d'humeur, surtout au début. La variabilité individuelle est forte. Garde une note — c'est utile pour en parler à ton médecin.", whenToEscalate: "Idées suicidaires → escalade de crise. Humeur très basse et persistante au-delà de 6 semaines → orientation médicale." },
+    { effect: 'Acné',                        whatToSay: "Toutes les méthodes hormonales combinées peuvent améliorer l'acné. Si l'acné persiste ou s'aggrave sous pilule combinée, la formulation n'est peut-être pas la bonne — un changement vaut la peine d'être discuté avec ton médecin.", whenToEscalate: 'Aggravation sévère → orientation médicale.' },
+    { effect: 'Libido',                      whatToSay: "Des changements du désir sexuel, dans un sens ou dans l'autre, sont rapportés avec toutes les méthodes hormonales. Ce n'est pas systématique et ça se stabilise souvent une fois le corps adapté.", whenToEscalate: 'Détresse persistante → orientation médicale.' },
+    { effect: 'Poids',                       whatToSay: "Seule l'injection (DMPA/Depo-Provera) a des données modestes de prise de poids chez certaines utilisatrices — environ 1 à 2 kg en moyenne la première année pour celles concernées. Aucune autre méthode n'a d'effet établi sur le poids dans les essais contrôlés." },
+    { effect: 'Retour de fertilité',         whatToSay: "La fertilité n'est pas altérée par ces méthodes et il faut utiliser une protection de barrière dès l'arrêt, car elle peut revenir en 4 à 7 jours. Les données suggèrent même qu'elle est la plus élevée dans le premier cycle après l'arrêt de la pilule combinée. L'injection est l'exception — jusqu'à 12 mois." },
   ],
 
   // Populated by the Phase 6 PR (V2 §6.1 myth-busting table).
