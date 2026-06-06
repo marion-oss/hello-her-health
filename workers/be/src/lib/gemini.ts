@@ -32,10 +32,10 @@
 import { checkPolicy, type PolicyResult } from '../policy/policyChecker'
 import { getVertexAccessToken } from './vertexAuth'
 
-const CHAT_MODEL    = 'gemini-3.5-flash'
+export const CHAT_MODEL    = 'gemini-3.5-flash'
 const SUMMARY_MODEL = 'gemini-3.5-pro'
 
-function buildVertexUrl(
+export function buildVertexUrl(
   projectId: string,
   region:    string,
   model:     string,
@@ -135,6 +135,31 @@ const JOURNEY_CONTEXTS: Record<Language, Record<string, string>> = {
   },
 }
 
+/**
+ * Assemble the system prompt from its layers. Order matters and mirrors
+ * PATHWAYS.md: base persona → journey context → pathway context → user docs →
+ * RAG snippets. Pathway context precedes user docs/RAG so the model anchors on
+ * the active phase; user docs precede RAG so it anchors on the user's own data.
+ * Shared by chat() and chatStream() to prevent the two from drifting.
+ */
+function buildSystemPrompt(
+  language:       Language,
+  journeyType:    string | undefined,
+  pathwayBlock:   string | undefined,
+  userDocsBlock:  string | undefined,
+  systemAddendum: string | undefined,
+): string {
+  const base = BASE_SYSTEM_PROMPTS[language]
+  const journeyContext = JOURNEY_CONTEXTS[language][journeyType ?? 'free_chat'] ?? ''
+  const layers: Array<string | undefined> = [
+    journeyContext ? `${base}\n\n${journeyContext}` : base,
+    pathwayBlock,
+    userDocsBlock,
+    systemAddendum,
+  ]
+  return layers.filter((s): s is string => Boolean(s)).join('\n\n')
+}
+
 // ─────────────────────────────────────────────────────────────
 // TYPES
 // ─────────────────────────────────────────────────────────────
@@ -168,6 +193,7 @@ export async function chat(
   env: GeminiEnv,
   language: Language = 'fr',
   userDocsBlock: string | undefined = undefined,
+  pathwayBlock: string | undefined = undefined,
 ): Promise<ChatResult> {
   if (!env.VERTEX_SA_JSON || !env.GCP_PROJECT_ID || !env.GCP_REGION) {
     console.error('[gemini] VERTEX_SA_JSON / GCP_PROJECT_ID / GCP_REGION not set')
@@ -182,20 +208,7 @@ export async function chat(
     return apiError(CHAT_MODEL)
   }
 
-  const base = BASE_SYSTEM_PROMPTS[language]
-  const journeyContext = JOURNEY_CONTEXTS[language][journeyType ?? 'free_chat'] ?? ''
-  const baseWithJourney = journeyContext
-    ? `${base}\n\n${journeyContext}`
-    : base
-  // Compose order: base persona → journey → user documents → RAG snippets.
-  // User docs come before RAG snippets so the model anchors on the user's
-  // own data when both are present.
-  const withUserDocs = userDocsBlock
-    ? `${baseWithJourney}\n\n${userDocsBlock}`
-    : baseWithJourney
-  const systemPrompt = systemAddendum
-    ? `${withUserDocs}\n\n${systemAddendum}`
-    : withUserDocs
+  const systemPrompt = buildSystemPrompt(language, journeyType, pathwayBlock, userDocsBlock, systemAddendum)
 
   const contents = messages.map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
@@ -290,6 +303,7 @@ export async function* chatStream(
   env: GeminiEnv,
   language: Language = 'fr',
   userDocsBlock: string | undefined = undefined,
+  pathwayBlock: string | undefined = undefined,
 ): AsyncGenerator<ChatStreamEvent, void, unknown> {
   if (!env.VERTEX_SA_JSON || !env.GCP_PROJECT_ID || !env.GCP_REGION) {
     console.error('[gemini] VERTEX_SA_JSON / GCP_PROJECT_ID / GCP_REGION not set')
@@ -306,19 +320,7 @@ export async function* chatStream(
     return
   }
 
-  const base = BASE_SYSTEM_PROMPTS[language]
-  const journeyContext = JOURNEY_CONTEXTS[language][journeyType ?? 'free_chat'] ?? ''
-  const baseWithJourney = journeyContext
-    ? `${base}\n\n${journeyContext}`
-    : base
-  // Compose order mirrors chat(): base persona → journey → user docs →
-  // RAG snippets. Keeps the model's anchor on the user's data first.
-  const withUserDocs = userDocsBlock
-    ? `${baseWithJourney}\n\n${userDocsBlock}`
-    : baseWithJourney
-  const systemPrompt = systemAddendum
-    ? `${withUserDocs}\n\n${systemAddendum}`
-    : withUserDocs
+  const systemPrompt = buildSystemPrompt(language, journeyType, pathwayBlock, userDocsBlock, systemAddendum)
 
   const contents = messages.map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',

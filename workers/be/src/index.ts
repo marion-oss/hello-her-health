@@ -18,6 +18,12 @@ export type Env = {
   // Public, non-secret config (from wrangler.toml [vars])
   ANOQI_RAG_ENABLED?: string
 
+  // Pathway runtime gate (workers/be/src/pathways/*). 'true' to enable the
+  // clinical-pathway engine on /chat. Default OFF — ship the code dark and
+  // flip per PATHWAYS.md PR I once phases 1-8 are validated. When off, /chat
+  // behaves exactly as before. Requires migration 007 applied to persist state.
+  PATHWAY_RUNTIME_ENABLED?: string
+
   // Secrets (set via `wrangler secret put`)
   VERTEX_SA_JSON: string                  // service-account JSON for Vertex AI (anoqi-vertex-worker).
                                           // Used by both chat (lib/gemini.ts) and retrieval embeddings
