@@ -139,7 +139,40 @@ export const contraceptionEn: PathwayModule = {
       number:  3,
       title:   'Lifestyle and Preferences',
       purpose: 'establish preferences (reversibility, frequency, route of administration, expectations about bleeding)',
-      questions: [],
+      questions: [
+        {
+          id:       'prefs.reversibility',
+          prompt:   'How important is it that your contraception is quickly reversible if you want to try for a pregnancy in the near future?',
+          required: true,
+        },
+        {
+          id:          'prefs.frequency',
+          prompt:      'Would you prefer something you never think about, something you change once a week or month, or once a day — or does that not matter much to you?',
+          required:    true,
+          branchLogic: 'Weight the response using the adherence_concern flag set in Phase 1.',
+        },
+        {
+          id:       'prefs.route',
+          prompt:   'Are there certain administration routes you\'re less comfortable with? For example, do you find it hard to swallow pills? Do you find patches uncomfortable? Are you comfortable with devices being inserted in your uterus or under your skin?',
+          required: false,
+        },
+        {
+          id:          'prefs.periods',
+          prompt:      'Do you have any strong feelings about your periods — whether they stop, become lighter or heavier, or stay roughly the same?',
+          required:    true,
+          validation:  'Critical question: this is the most common unspoken discontinuation trigger. Surface it explicitly at this stage.',
+        },
+        {
+          id:       'prefs.ruled_out',
+          prompt:   'Are there any methods you\'ve already ruled out — or any you\'re curious about?',
+          required: false,
+        },
+        {
+          id:       'prefs.others_involved',
+          prompt:   'Is there anyone else involved in this decision, like a partner — whose perspective matters to you?',
+          required: false,
+        },
+      ],
     },
     {
       number:  4,
