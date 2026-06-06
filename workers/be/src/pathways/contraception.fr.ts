@@ -191,6 +191,12 @@ export const contraceptionFr: PathwayModule = {
       title:   'Présentation des méthodes',
       purpose: 'présenter, 2 à 3 à la fois, les méthodes non exclues par les filtres UKMEC de la phase 2',
       questions: [],
+      enrichmentHooks: [
+        {
+          id:          'phase4.presentation_rules',
+          description: "Ne présenter que les méthodes non exclues par les filtres UKMEC de la phase 2. Présenter 2 à 3 options à la fois, en langage simple, sans submerger. Pour chaque méthode : fonctionnement (une phrase), durée, profil de saignement attendu, effets secondaires les plus fréquents et leurs délais, pour qui ça marche bien, mises en garde (dépistage IST, observance), rapidité du retour de fertilité. Si glp1_user = true : privilégier DIU/SIU, implant, patch, anneau (l'absorption orale est moins fiable). Si adherence_concern = true : privilégier les LARC puis anneau/patch avant les pilules quotidiennes.",
+        },
+      ],
     },
     {
       number:  5,
@@ -230,6 +236,20 @@ export const contraceptionFr: PathwayModule = {
     { condition: 'IMC > 35 avec facteur de risque cardiovasculaire',     categories: { chc: 3, pop: 1, implant: 1, lng_ius: 2, copper_iud: 1 }, action: 'CHC = UKMEC 3 — signaler au médecin prescripteur.' },
     { condition: 'Cancer du sein actuel',                                categories: { chc: 4, pop: 4, implant: 4, lng_ius: 4, copper_iud: 1 }, action: 'Bloquer toutes les méthodes hormonales (UKMEC 4). Ne pas aborder les méthodes hormonales avant avis médical.' },
     { condition: 'Maladie hépatique sévère',                             categories: { chc: 4, pop: 3, implant: 3, lng_ius: 3, copper_iud: 1 }, action: 'Bloquer les CHC (UKMEC 4) ; signaler les méthodes progestatives (UKMEC 3).' },
+  ],
+
+  // Method reference table (V2 §6.1 Phase 4). Brand names kept as-is.
+  methodTable: [
+    { name: 'SIU Mirena',          type: 'LARC hormonal',      duration: '5 à 8 ans',             keyPoints: 'LNG 52 mg — SIU le plus dosé. Arrête souvent les règles. Utile pour l\'endométriose et les règles abondantes.', clinicianNotes: 'À distinguer de Jaydess/Kyleena — ne pas regrouper. Dépistage IST avant pose.' },
+    { name: 'SIU Jaydess',         type: 'LARC hormonal',      duration: '3 ans',                 keyPoints: 'LNG 13,5 mg — SIU le moins dosé. Effet plus léger sur les règles.', clinicianNotes: 'Quasi identique à Kyleena hormis la durée. Dépistage IST avant pose. Informer du risque d\'expulsion.' },
+    { name: 'SIU Kyleena',         type: 'LARC hormonal',      duration: '5 ans',                 keyPoints: 'LNG 19,5 mg — dose intermédiaire. Légèrement plus grand que Jaydess.', clinicianNotes: 'Quasi identique à Jaydess hormis la durée et la taille. Dépistage IST avant pose.' },
+    { name: 'DIU au cuivre',       type: 'LARC non hormonal',  duration: "Jusqu'à 10 ans",        keyPoints: 'Aucun effet secondaire hormonal. Peut aggraver les douleurs de règles et les douleurs pelviennes chroniques. Aussi utilisable en contraception d\'urgence.', clinicianNotes: 'Prévenir activement du risque de douleurs. Dépistage IST avant pose.' },
+    { name: 'Implant Nexplanon',   type: 'LARC hormonal',      duration: '3 ans',                 keyPoints: 'Méthode la plus efficace. Saignements imprévisibles très fréquents. 20 % d\'aménorrhée à 12 mois.', clinicianNotes: 'Idéal pour les fumeuses et en cas d\'obésité. Peut provoquer une sécheresse vaginale et une baisse de moral.' },
+    { name: 'Pilule combinée (CHC)', type: 'Hormonal quotidien', duration: 'En continu',           keyPoints: 'Toutes les CHC peuvent améliorer l\'acné. Possible en prise continue (4 règles/an). Risque de MTEV — vérifier UKMEC et IMC.', clinicianNotes: 'La fertilité revient 4 à 7 jours après l\'arrêt — certaines données suggèrent qu\'elle est optimale juste après l\'arrêt.' },
+    { name: 'Pilule progestative (POP)', type: 'Hormonal quotidien', duration: 'En continu',        keyPoints: 'Adaptée quand les œstrogènes sont contre-indiqués. 50 % d\'aménorrhée à 12 mois. Désogestrel : fenêtre de 12 h.' },
+    { name: 'Patch Evra',          type: 'Hormonal hebdomadaire', duration: 'En continu',          keyPoints: 'CHC par voie transdermique. Effet de premier passage hépatique plus faible que la pilule.', clinicianNotes: 'Utile en cas de difficulté d\'observance. Même UKMEC que la pilule combinée.' },
+    { name: 'Anneau Nuvaring',     type: 'Hormonal mensuel',   duration: 'En continu',            keyPoints: 'CHC par anneau vaginal. Pose et retrait une fois par mois.', clinicianNotes: 'Utile en cas de difficulté d\'observance. Même UKMEC que la pilule combinée.' },
+    { name: 'Injection DMPA',      type: 'Toutes les 12 à 13 semaines', duration: 'En continu',    keyPoints: 'Aucune action quotidienne. Retour de fertilité retardé (jusqu\'à 12 mois). Densité osseuse : prudence au long cours.', clinicianNotes: 'Sécheresse vaginale et baisse de moral rapportées. Peut diminuer la densité osseuse en usage prolongé.' },
   ],
 
   // Populated by the Phase 6 PR (V2 §6.1 myth-busting table).
