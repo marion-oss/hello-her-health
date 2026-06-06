@@ -19,6 +19,8 @@ import { getServiceClient } from '../lib/supabase'
 import { getUserIdFromRequest } from '../auth'
 import { classifyInput, checkPolicy } from '../policy/policyChecker'
 import { chat as geminiChat, chatStream as geminiChatStream } from '../lib/gemini'
+import { runPathwayTurn, recordPhaseTokens } from '../pathways/session'
+import type { PathwayKey } from '../pathways/types'
 import { retrieve, renderSnippetsForPrompt, type Snippet } from '../lib/retrieval'
 import { parseCitations, type MessageSource } from '../lib/citationParser'
 
@@ -153,6 +155,12 @@ type ChatPrep = {
   snippets: Snippet[]
   systemAddendum: string | undefined
   userDocsBlock: string | undefined
+  // Pathway runtime (PATHWAYS.md). Undefined/null when the flag is off or
+  // routing landed on open chat. pathwayPhase is carried so the finishers can
+  // attribute token usage to the active phase.
+  pathwayBlock: string | undefined
+  pathwayKey: PathwayKey | null
+  pathwayPhase: number | null
 }
 
 async function prepareChat(
@@ -357,6 +365,32 @@ async function prepareChat(
   const systemAddendum = renderSnippetsForPrompt(snippets, language) ?? undefined
   const userDocsBlock = renderUserDocsBlock(documents, language)
 
+  // Pathway runtime (Layer 1-3). Gated by PATHWAY_RUNTIME_ENABLED — off by
+  // default, so this whole block is skipped in production until PR I. The
+  // runtime is best-effort: runPathwayTurn returns null on any failure and we
+  // fall straight back to open chat, so enabling the flag can't break /chat.
+  let pathwayBlock: string | undefined
+  let pathwayKey: PathwayKey | null = null
+  let pathwayPhase: number | null = null
+  if ((c.env.PATHWAY_RUNTIME_ENABLED ?? '').toLowerCase() === 'true') {
+    const firstUserMessage =
+      (existingMessages ?? []).find((m) => m.role === 'user')?.content as string | undefined
+    const turn = await runPathwayTurn({
+      supabase,
+      env: c.env,
+      conversationId: activeConversationId,
+      firstUserMessage: firstUserMessage ?? trimmedMessage,
+      currentUserMessage: trimmedMessage,
+      journeyType,
+      language,
+    })
+    if (turn) {
+      pathwayBlock = turn.block
+      pathwayKey = turn.pathwayKey
+      pathwayPhase = turn.phase
+    }
+  }
+
   return {
     kind: 'proceed',
     supabase,
@@ -370,6 +404,9 @@ async function prepareChat(
     snippets,
     systemAddendum,
     userDocsBlock,
+    pathwayBlock,
+    pathwayKey,
+    pathwayPhase,
   }
 }
 
@@ -392,7 +429,7 @@ async function chatJsonHandler(c: Context<{ Bindings: Env }>): Promise<Response>
   const {
     supabase, userId, activeConversationId, isNewConversation,
     message, language, journeyType, messageHistory, snippets, systemAddendum,
-    userDocsBlock,
+    userDocsBlock, pathwayBlock, pathwayPhase,
   } = prep
 
   // Call Gemini (policy check runs inside)
@@ -403,6 +440,7 @@ async function chatJsonHandler(c: Context<{ Bindings: Env }>): Promise<Response>
     c.env,
     language,
     userDocsBlock,
+    pathwayBlock,
   )
 
   if (aiResponse.error === 'api_error') {
@@ -413,6 +451,15 @@ async function chatJsonHandler(c: Context<{ Bindings: Env }>): Promise<Response>
       },
       503,
     )
+  }
+
+  // Attribute token usage to the active pathway phase (Decision 6 / Roadmap 2).
+  // Best-effort, off the response path.
+  if (pathwayPhase != null) {
+    const recordP = recordPhaseTokens(supabase, activeConversationId, pathwayPhase, aiResponse.tokensUsed)
+    const waitUntil = c.executionCtx?.waitUntil?.bind(c.executionCtx)
+    if (waitUntil) waitUntil(recordP)
+    else await recordP
   }
 
   const { cleanContent, citedSources, hallucinatedLabels } = parseCitations(
@@ -526,7 +573,7 @@ async function chatStreamHandler(c: Context<{ Bindings: Env }>): Promise<Respons
   const {
     supabase, userId, activeConversationId, isNewConversation,
     message, language, journeyType, messageHistory, snippets, systemAddendum,
-    userDocsBlock,
+    userDocsBlock, pathwayBlock, pathwayPhase,
   } = prep
 
   const encoder = new TextEncoder()
@@ -541,10 +588,11 @@ async function chatStreamHandler(c: Context<{ Bindings: Env }>): Promise<Respons
       let accumulated = ''
       let redactedContent: string | null = null
       let geminiErrored = false
+      let streamTokens: number | null = null
 
       try {
         for await (const evt of geminiChatStream(
-          messageHistory, journeyType, systemAddendum, c.env, language, userDocsBlock,
+          messageHistory, journeyType, systemAddendum, c.env, language, userDocsBlock, pathwayBlock,
         )) {
           if (evt.kind === 'error') {
             geminiErrored = true
@@ -556,6 +604,7 @@ async function chatStreamHandler(c: Context<{ Bindings: Env }>): Promise<Respons
             return
           }
           if (evt.kind === 'done') {
+            streamTokens = evt.tokensUsed
             break
           }
           // evt.kind === 'delta'
@@ -618,6 +667,9 @@ async function chatStreamHandler(c: Context<{ Bindings: Env }>): Promise<Respons
               .from('conversations')
               .update({ title })
               .eq('id', activeConversationId)
+          }
+          if (pathwayPhase != null) {
+            await recordPhaseTokens(supabase, activeConversationId, pathwayPhase, streamTokens)
           }
         })().catch((e) => console.error('[chat-stream] persist error:', e))
 
