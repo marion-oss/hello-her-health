@@ -15,6 +15,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { GeminiEnv } from '../lib/gemini'
 import type { Language, PathwayKey } from './types'
 import { classifyPathway } from './classifier'
+import { evaluatePhaseProgress } from './progress'
 import { getPathway, getSymptomRegistry, loadedPathwayKeys } from './registry'
 import {
   detectSymptoms, emptySession, renderPathwayPromptBlock, runPhase, type SessionState,
@@ -149,6 +150,51 @@ export async function runPathwayTurn(opts: {
   } catch (e) {
     console.error('[pathways] runPathwayTurn failed (non-fatal, open chat):', e)
     return null
+  }
+}
+
+/**
+ * Between-turn phase advancement (run in the BACKGROUND — the result only
+ * affects the next turn, so it adds no user-visible latency). Evaluates the
+ * exchange against the phase just played, marks answered questions, and
+ * advances currentPhase when the phase is complete (model says so, or all
+ * required questions are answered). Best-effort; never throws into the
+ * response path.
+ */
+export async function advancePhase(opts: {
+  supabase:         SupabaseClient
+  env:              GeminiEnv
+  conversationId:   string
+  language:         Language
+  userMessage:      string
+  assistantMessage: string
+}): Promise<void> {
+  const { supabase, env, conversationId, language, userMessage, assistantMessage } = opts
+  try {
+    const session = await loadSession(supabase, conversationId)
+    if (!session.pathwayKey) return
+
+    const pathway = getPathway(session.pathwayKey, language)
+    if (!pathway) return
+
+    const idx = Math.min(Math.max(session.currentPhase, 1), pathway.phases.length) - 1
+    const phase = pathway.phases[idx]
+    if (!phase) return
+
+    const progress = await evaluatePhaseProgress(pathway, phase, userMessage, assistantMessage, env)
+    for (const id of progress.answered) session.phaseAnswers[id] = true
+
+    const requiredIds = phase.questions.filter(q => q.required).map(q => q.id)
+    const allRequiredAnswered =
+      requiredIds.length > 0 && requiredIds.every(id => session.phaseAnswers[id])
+
+    if ((progress.phaseComplete || allRequiredAnswered) && session.currentPhase < pathway.phases.length) {
+      session.currentPhase += 1
+    }
+
+    await saveSession(supabase, conversationId, session)
+  } catch (e) {
+    console.error('[pathways] advancePhase failed (non-fatal):', e)
   }
 }
 
