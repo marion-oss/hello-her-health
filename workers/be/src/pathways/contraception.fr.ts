@@ -151,7 +151,40 @@ export const contraceptionFr: PathwayModule = {
       number:  3,
       title:   'Mode de vie et préférences',
       purpose: "cerner les préférences (réversibilité, fréquence, voie d'administration, attentes sur les règles)",
-      questions: [],
+      questions: [
+        {
+          id:       'prefs.reversibility',
+          prompt:   "À quel point est-ce important pour toi que ta contraception soit rapidement réversible si tu souhaites essayer d'avoir un enfant dans un avenir proche ?",
+          required: true,
+        },
+        {
+          id:          'prefs.frequency',
+          prompt:      "Préférerais-tu quelque chose à laquelle tu ne penses jamais, quelque chose à changer une fois par semaine ou par mois, ou une fois par jour — ou est-ce que ça t'est égal ?",
+          required:    true,
+          branchLogic: "Pondérer la réponse avec le drapeau adherence_concern posé en phase 1.",
+        },
+        {
+          id:       'prefs.route',
+          prompt:   "Y a-t-il des voies d'administration avec lesquelles tu es moins à l'aise ? Par exemple, as-tu du mal à avaler des comprimés ? Trouves-tu les patchs inconfortables ? Es-tu à l'aise avec un dispositif inséré dans l'utérus ou sous la peau ?",
+          required: false,
+        },
+        {
+          id:          'prefs.periods',
+          prompt:      "As-tu des préférences fortes concernant tes règles — qu'elles s'arrêtent, deviennent plus légères ou plus abondantes, ou restent à peu près identiques ?",
+          required:    true,
+          validation:  "Question critique : c'est le déclencheur d'arrêt le plus fréquent et le plus souvent passé sous silence. La soulever explicitement à ce stade.",
+        },
+        {
+          id:       'prefs.ruled_out',
+          prompt:   "Y a-t-il des méthodes que tu as déjà écartées — ou d'autres qui t'intriguent ?",
+          required: false,
+        },
+        {
+          id:       'prefs.others_involved',
+          prompt:   "Est-ce qu'il y a quelqu'un d'autre impliqué dans cette décision, comme un partenaire, dont le point de vue compte pour toi ?",
+          required: false,
+        },
+      ],
     },
     {
       number:  4,
