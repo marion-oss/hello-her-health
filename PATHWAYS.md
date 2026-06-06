@@ -1,6 +1,6 @@
 # Anoqi — Pathway Architecture
 
-**Status:** Design v1 (2026-06-05) — approved for MVP implementation
+**Status:** Design v1.1 (2026-06-06) — approved for MVP implementation; Marion's PR #50 review feedback folded into Decisions + Roadmap
 **Source of truth for clinical content:** `Anoqi_LLM_Product_Guidelines_V2.md` (Dr Giada Frontino, May 2026)
 **Implements:** Parts 1, 2, 3, 6 of the LLM Guidelines V2
 
@@ -53,6 +53,7 @@ Translation:
 | **3. Content** | Pathways are declarative data files. Clinical team owns the strings; engineering owns the structure. | Lets clinical edits ship without code review. Each pathway file is reviewable in isolation by the SAB. |
 | **4. Multi-pathway** | **Differential-aware single-pathway runtime.** At any moment, one primary pathway is active. The runtime detects when symptoms the user has mentioned are shared with other pathways' declarations, and weaves in awareness behaviour from the primary pathway's `differentialAwareness` block — without switching. | Reflects clinical reality: a woman asking for contraception due to period pain doesn't have "two separate problems queued"; she has one presenting complaint with a differential. The V2 doc's "sequential" model is the trivial case where pathways don't share symptoms. |
 | **5. Open chat** | The default when no pathway routes is a **general health-companion mode**. No refusals. The AI provides evidence-based general info + signposts. Hard constraints (V2 §1.4) still apply. | Marion's principle, encoded. The contrast: pathway = recommendations grounded in clinical logic; no pathway = no clinical recommendations, just information + preparation. |
+| **6. Pathway switching** | The session pathway is locked by default (Decision 1). The runtime may **switch** the active pathway only when the user has clearly crossed into a second pathway's clinical territory — specifically once she is **undergoing tests for the second pathway** or has been **diagnosed**. Below that threshold, a second-pathway topic is handled as *differential awareness* (Decision 4), not a switch. | Marion, 2026-06-06. Avoids premature, disorienting context changes while honouring clinical reality: an active work-up or confirmed diagnosis in another area means that area is now the live clinical context. The trigger is an objective clinical event (test ordered / diagnosis recorded), not a fuzzy topic guess — which keeps the switch decision auditable. |
 
 ---
 
@@ -230,6 +231,7 @@ function runPhase(
                                 currentPhase: 1,
                                 symptomsMentioned: Set<SymptomKey>,
                                 phaseAnswers: Record<questionId, value>,
+                                phaseTokens: Record<phaseNumber, {prompt, completion}>,  // per-step usage, for optimisation (Decision 6 / Roadmap)
                               }
                                               │
                                               ▼
@@ -258,6 +260,8 @@ function runPhase(
                                               │
                                               ▼
                               7. Update session state from response + persist
+                                 — incl. per-phase token usage (messages.tokens_used
+                                   already records per-message; pathways add per-phase)
                                               │
                                               ▼
                               8. Stream response to FE
@@ -274,7 +278,7 @@ At the prompt level, the AI is told:
 > If the user mentions symptoms, watch for these signals: {pathway.declaredSymptoms}.
 > Additional context for this turn: {out.differentialMentions if any}."
 
-The model is **not** asked to "switch pathways" — that's a runtime decision the AI engine makes between turns, not within them. This keeps the model focused on the current phase.
+The model is **not** asked to "switch pathways" — that's a runtime decision the AI engine makes between turns, not within them. This keeps the model focused on the current phase. Per Decision 6, the engine triggers a switch only on an objective clinical event (the user is undergoing tests for, or has been diagnosed in, the second pathway); short of that, the model surfaces *differential awareness* text but stays in the current pathway.
 
 ---
 
@@ -288,6 +292,7 @@ The model is **not** asked to "switch pathways" — that's a runtime decision th
    - `workers/be/src/pathways/contraception.en.ts` — mirror
    - Hook into `handlers/chat.ts` — gated by a `PATHWAY_RUNTIME_ENABLED` env var so we can ship code without flipping the flag for all users until validated
    - Routing classifier (Layer 1) implemented as a tiny dedicated Gemini call on the first message, returns a `PathwayKey | null`
+   - **Per-phase token instrumentation** — the runtime records prompt + completion tokens per phase onto `session.phaseTokens` and persists them, so we can later see which phases are expensive and optimise (caching, prompt trimming). Cheap to add now, painful to backfill later. (Marion, 2026-06-06)
 
 2. **PR B-H: Phase 2-8 of contraception, one PR each**
    - Each PR fills one phase's `questions[]` from V2 §6.1, plus any pathway reference data the phase needs (UKMEC table comes with Phase 2, method table with Phase 4, side-effect literacy with Phase 5, etc.)
@@ -302,15 +307,20 @@ The model is **not** asked to "switch pathways" — that's a runtime decision th
 
 ---
 
-## Open questions to revisit later
+## Roadmap — confirmed post-MVP direction (Marion, 2026-06-06)
 
-These are deliberately out of scope for this design. Each is its own conversation when the time comes.
+These are **out of scope for the MVP PRs** but are now confirmed directions, not open questions. Each gets its own design + PR when the time comes; capturing them here so PR A doesn't paint us into a corner.
 
-1. **Cross-session pathway memory.** If a returning user was in contraception last week, should the next conversation default to that? V2 §2.3 doesn't address. Architecture allows it but state model needs extension (user-profile-level field).
-2. **Re-entry into a pathway mid-conversation.** If a user is in pathway X and types a question that's a strong entry signal for pathway Y, do we offer to switch or stay? V2 §2.3 implies "complete then offer", but UX may want a softer pivot.
-3. **Pathway versioning + migration.** When `contraception.fr.ts` ships v2, what happens to sessions started under v1? Probably: complete the session under v1, new sessions get v2. Detail TBD.
-4. **Physician interface (V2 §7) integration.** The portal should expose the same `PathwayModule` data — same source of truth for clinical review. Plumbing later.
-5. **Implicit caching threshold reached.** Once a full pathway's structured prompt exceeds 4096 tokens, Vertex AI explicit caching becomes viable. We deliberately skipped caching design until pathway content makes it worthwhile.
+1. **Cross-session pathway persistence (logged-in users).** A returning, signed-in user's pathway state should persist across conversations, so Anoqi can do **proactive symptom checks in later sessions** ("Last time we looked at contraception and you mentioned period pain — how has that been?"). For **anonymous users** this is the natural moment to surface an **account-creation prompt** ("Create an account so I can remember this for next time"). Infra note: `conversations` already carries both `user_id` (logged-in) and `session_id` (anonymous), so the boundary exists; what's missing is a per-user pathway-state record (last pathway, open symptoms, phase reached) plus the proactive-check trigger. Supersedes the old "cross-session memory" open question.
+2. **Per-step token tracking → optimisation.** Captured in this design (Decision 6, `session.phaseTokens`, PR A ship list). Recorded from day one; the *optimisation* work (caching, prompt trimming on expensive phases) is the deferred part. Relates to the Vertex explicit-caching threshold below.
+3. **Physician-interface pathway visualisation (V2 §7).** The physician portal should **visualise pathways** — render each `PathwayModule`'s phases, questions, red flags and myth corrections so the clinical team can review the live logic, not just the JSON. Same source of truth as the patient runtime. Infra note: the backend already exists — `clinical_pathways` (003_physician_backend.sql) holds pathway content, and `005_pathways_anon_read.sql` already grants the read-only portal access to non-archived pathways. The work is the **portal UI**, in the `anoqi-physician` repo.
+4. **Content-management backend (new pathways, content, myth-busters).** *Future feature — not now.* Largely already scaffolded in `003_physician_backend.sql`: `clinical_pathways` + `pathway_change_proposals` + `proposal_comments` + `clinical_audit_log` give a reviewed, versioned, audited authoring flow, and `source_validation_queue` + `source_library` cover clinical sources. **Gap to close when this is built:** there is no dedicated myth-buster content table — today myth corrections live inside each pathway's `mythCorrections` / the pathway `content` jsonb. If myth-busters need to be authored and reused independently of a pathway, that's a new table + admin UI.
+
+## Open questions still genuinely undecided
+
+1. **Pathway switching UX below the clinical threshold.** Decision 6 fixes *when* the engine switches (tests ordered / diagnosis). Still open: when a user in pathway X shows a strong entry signal for pathway Y but hasn't crossed that threshold, do we stay silent, weave a soft differential mention, or explicitly offer to switch? V2 §2.3 implies "complete then offer"; UX may want a softer pivot.
+2. **Pathway versioning + migration.** When `contraception.fr.ts` ships v2, what happens to sessions started under v1? Probably: complete the session under v1, new sessions get v2. Interacts with cross-session persistence (Roadmap 1) — a persisted pathway state may outlive the version it started under. Detail TBD.
+3. **Vertex implicit/explicit caching threshold.** Once a full pathway's structured prompt exceeds ~4096 tokens, Vertex AI explicit caching becomes viable. Deliberately skipped until pathway content makes it worthwhile; the per-step token data (Roadmap 2) tells us when we're there.
 
 ---
 
@@ -325,6 +335,10 @@ These are deliberately out of scope for this design. Each is its own conversatio
 | `workers/be/src/policy/policyChecker.ts` | Hard constraints (V2 §1.4). Universal — runs on every response, every pathway, no pathway. Untouched. |
 | `workers/be/src/lib/gemini.ts` | Where the system prompt is assembled. PR A modifies this to add the pathway-context block when a pathway is active. |
 | `workers/be/src/lib/retrieval.ts` | RAG. Eventually becomes pathway-aware (retrieve only chunks tagged for the current pathway), but not in PR A. |
+| `scripts/migrations/003_physician_backend.sql` | Physician backend (pathway authoring, change proposals, source validation, clinical audit). Already in the repo and the home of the content-management backend (Roadmap 4). The patient runtime reads `PathwayModule` data files; the portal reads/writes `clinical_pathways`. Keeping these in sync is a later plumbing task. |
+| `scripts/migrations/005_pathways_anon_read.sql` | Grants the read-only physician portal anon access to non-archived `clinical_pathways` — the data feed for pathway visualisation (Roadmap 3). |
+| `scripts/migrations/004_chat_tables.sql` | `messages.tokens_used` (per-message) + `conversations.user_id` / `session_id` (logged-in vs anonymous) — the existing basis for per-step token tracking (Roadmap 2) and cross-session persistence (Roadmap 1). |
+| `anoqi-physician` repo | Where pathway visualisation (Roadmap 3) is built. Production source for the portal; the in-repo `physician-portal/` folder is stale. |
 
 ---
 
@@ -333,3 +347,4 @@ These are deliberately out of scope for this design. Each is its own conversatio
 | Version | Date | Author | Notes |
 | --- | --- | --- | --- |
 | v1 | 2026-06-05 | Marion + Claude session | Initial design, MVP scope. Approved for PR A implementation. |
+| v1.1 | 2026-06-06 | Marion (PR #50 review) + Claude | Added Decision 6 (pathway switching on tests/diagnosis), per-step token tracking (session state + PR A), and a confirmed-roadmap section: cross-session persistence + proactive checks + account-creation prompt, physician-interface pathway visualisation, content-management backend. Noted the physician backend already exists as `003_physician_backend.sql`. |
