@@ -179,6 +179,12 @@ export const contraceptionEn: PathwayModule = {
       title:   'Method Overview',
       purpose: 'present, two to three at a time, the methods not excluded by the Phase 2 UKMEC gates',
       questions: [],
+      enrichmentHooks: [
+        {
+          id:          'phase4.presentation_rules',
+          description: 'Present only methods not excluded by the Phase 2 UKMEC gates. Present two to three options at a time, in plain language, without overwhelming. For each method cover: how it works (one sentence), duration, expected bleeding pattern, most common side effects and their timelines, who it works well for, caveats (STI screen, adherence), how quickly fertility returns. If glp1_user = true: lead with IUD/IUS, implant, patch, ring (oral absorption is less reliable). If adherence_concern = true: lead with LARC methods, then ring/patch, before daily pills.',
+        },
+      ],
     },
     {
       number:  5,
@@ -218,6 +224,20 @@ export const contraceptionEn: PathwayModule = {
     { condition: 'BMI > 35 with CV risk factor',           categories: { chc: 3, pop: 1, implant: 1, lng_ius: 2, copper_iud: 1 }, action: 'CHC = UKMEC 3 — flag for prescribing physician.' },
     { condition: 'Current breast cancer',                  categories: { chc: 4, pop: 4, implant: 4, lng_ius: 4, copper_iud: 1 }, action: 'Block all hormonal methods (UKMEC 4). Do not discuss hormonal methods until seen.' },
     { condition: 'Severe liver disease',                   categories: { chc: 4, pop: 3, implant: 3, lng_ius: 3, copper_iud: 1 }, action: 'Block CHC (UKMEC 4); flag progestogen-only methods (UKMEC 3).' },
+  ],
+
+  // Method reference table (V2 §6.1 Phase 4). Brand names kept as-is.
+  methodTable: [
+    { name: 'Mirena IUS',        type: 'LARC hormonal',     duration: '5–8 years',        keyPoints: 'LNG 52mg — highest-dose IUS. Often stops periods. Good for endometriosis and heavy bleeding.', clinicianNotes: 'Distinct from Jaydess/Kyleena — do not group. STI screen before insertion.' },
+    { name: 'Jaydess IUS',       type: 'LARC hormonal',     duration: '3 years',          keyPoints: 'LNG 13.5mg — lowest-dose IUS. Lighter effect on periods.', clinicianNotes: 'Near-identical to Kyleena except duration. STI screen before insertion. Counsel re: expulsion.' },
+    { name: 'Kyleena IUS',       type: 'LARC hormonal',     duration: '5 years',          keyPoints: 'LNG 19.5mg — mid dose. Slightly larger than Jaydess.', clinicianNotes: 'Near-identical to Jaydess except duration and size. STI screen before insertion.' },
+    { name: 'Copper IUD',        type: 'LARC non-hormonal', duration: 'Up to 10 years',   keyPoints: 'No hormonal side effects. Can worsen period pain and chronic pelvic pain. Also used as emergency contraception.', clinicianNotes: 'Counsel proactively about pain risk. STI screen before insertion.' },
+    { name: 'Nexplanon implant', type: 'LARC hormonal',     duration: '3 years',          keyPoints: 'Most effective method. Unpredictable bleeding very common. 20% amenorrhoea at 12 months.', clinicianNotes: 'Ideal for smokers and people with obesity. Can cause vaginal dryness and low mood.' },
+    { name: 'Combined pill (CHC)', type: 'Daily hormonal',  duration: 'Ongoing',          keyPoints: 'All CHCs can improve acne. Can be taken continuously (4 periods/year). VTE risk — check UKMEC and BMI.', clinicianNotes: 'Fertility returns 4–7 days after stopping — some evidence it is best immediately after stopping CHC.' },
+    { name: 'Progestogen-only pill (POP)', type: 'Daily hormonal', duration: 'Ongoing',    keyPoints: 'Suitable where oestrogen is contraindicated. 50% amenorrhoea at 12 months. Desogestrel: 12-hour window.' },
+    { name: 'Evra patch',        type: 'Weekly hormonal',   duration: 'Ongoing',          keyPoints: 'CHC via transdermal route. Lower first-pass hepatic effect than the pill.', clinicianNotes: 'Good for adherence-challenged users. Same UKMEC as the CHC pill.' },
+    { name: 'Nuvaring',          type: 'Monthly hormonal',  duration: 'Ongoing',          keyPoints: 'CHC via vaginal ring. Monthly insertion and removal.', clinicianNotes: 'Good for adherence-challenged users. Same UKMEC as the CHC pill.' },
+    { name: 'DMPA injection',    type: 'Every 12–13 weeks', duration: 'Ongoing',          keyPoints: 'No daily action. Delayed fertility return (up to 12 months). Bone density: caution long-term.', clinicianNotes: 'Vaginal dryness and low mood reported. Can decrease bone density with prolonged use.' },
   ],
 
   mythCorrections: [],
