@@ -105,6 +105,85 @@ export function runPhase(
 }
 
 /**
+ * Per-phase guidance + reference data, in the pathway's language. This is where
+ * the phase content (UKMEC gates, method table, side-effect literacy, myth
+ * corrections, consultation-prep template) actually reaches the model. Phase 4
+ * carries the UKMEC filters so the model presents only methods appropriate to
+ * what the user disclosed in Phase 2 (UKMEC 4 → exclude, UKMEC 3 → flag).
+ *
+ * Phase 8 (check-in protocol) is intentionally NOT injected: those check-ins
+ * fire in later sessions, not in the live consultation conversation.
+ */
+function buildPhaseExtras(pathway: PathwayModule, phase: PhaseDefinition, lang: Language): string {
+  const blocks: string[] = []
+
+  if (phase.enrichmentHooks && phase.enrichmentHooks.length) {
+    const header = lang === 'fr' ? 'Consignes pour cette phase :' : 'Guidance for this phase:'
+    blocks.push(`${header}\n${phase.enrichmentHooks.map(h => `- ${h.description}`).join('\n')}`)
+  }
+
+  const esc = lang === 'fr' ? 'alerte' : 'escalate'
+  const ifLabel = lang === 'fr' ? 'Si' : 'If'
+
+  switch (phase.number) {
+    case 2:
+      if (pathway.ukmecGates?.length) {
+        const h = lang === 'fr'
+          ? 'Règles de sécurité UKMEC à garder en tête (résumé ; le document complet fait foi) :'
+          : 'UKMEC safety rules to keep in mind (summary; the full document is authoritative):'
+        blocks.push(`${h}\n${pathway.ukmecGates.map(g => `- ${g.condition} : ${g.action ?? ''}`).join('\n')}`)
+      }
+      break
+    case 4: {
+      if (pathway.methodTable?.length) {
+        const h = lang === 'fr'
+          ? "Méthodes (n'en présenter que 2 à 3 à la fois, et seulement celles adaptées à son profil) :"
+          : 'Methods (present only 2-3 at a time, and only those appropriate to her profile):'
+        blocks.push(`${h}\n${pathway.methodTable.map(m => `- ${m.name} (${m.type}, ${m.duration}) : ${m.keyPoints}`).join('\n')}`)
+      }
+      if (pathway.ukmecGates?.length) {
+        const h = lang === 'fr'
+          ? 'Filtres UKMEC — exclure toute méthode UKMEC 4 pour une condition signalée par l\'utilisatrice ; signaler les UKMEC 3 :'
+          : 'UKMEC filters — exclude any method that is UKMEC 4 for a condition the user disclosed; flag UKMEC 3:'
+        blocks.push(`${h}\n${pathway.ukmecGates.map(g => `- ${g.condition} : ${g.action ?? ''}`).join('\n')}`)
+      }
+      break
+    }
+    case 5:
+      if (pathway.sideEffectLiteracy?.length) {
+        const h = lang === 'fr'
+          ? "Effets secondaires — expliquer en amont, avec délais et signal d'alerte :"
+          : 'Side effects — explain proactively, with timelines and the escalation signal:'
+        blocks.push(`${h}\n${pathway.sideEffectLiteracy.map(e => `- ${e.effect} : ${e.whatToSay}${e.whenToEscalate ? ` (${esc} : ${e.whenToEscalate})` : ''}`).join('\n')}`)
+      }
+      break
+    case 6:
+      if (pathway.mythCorrections?.length) {
+        const h = lang === 'fr'
+          ? "Corrections de mythes — si l'utilisatrice exprime une de ces croyances, corriger avec chaleur et avec la source :"
+          : 'Myth corrections — if she expresses one of these beliefs, correct it warmly and with the source:'
+        blocks.push(`${h}\n${pathway.mythCorrections.map(m => {
+          const src = m.sources?.length ? ` [${m.sources.join('; ')}]` : ''
+          return `- ${ifLabel} « ${m.trigger} » → ${m.correction}${src}`
+        }).join('\n')}`)
+      }
+      break
+    case 7: {
+      const t = pathway.consultationPrepTemplate
+      if (t) {
+        const h = lang === 'fr' ? 'Préparer le résumé de consultation ainsi :' : 'Prepare the consultation summary as follows:'
+        blocks.push(`${h}\n${t.voice}\n${t.sections.map(s => `- ${s}`).join('\n')}`)
+      }
+      break
+    }
+    default:
+      break
+  }
+
+  return blocks.join('\n\n')
+}
+
+/**
  * Render the [PATHWAY CONTEXT] system-prompt block injected for this turn.
  * Authored in the pathway's language so it reads naturally to the model. The
  * base persona + hard constraints (gemini.ts / policyChecker.ts) are unchanged
@@ -119,6 +198,7 @@ export function renderPathwayPromptBlock(
   const pathwayName = PATHWAY_DISPLAY_NAME[pathway.key][lang]
   const watch = pathway.declaredSymptoms.map(s => symptomLabel(s, lang)).join(', ')
   const questionLines = out.questionsToAsk.map(q => `- ${q.prompt}`).join('\n')
+  const extras = buildPhaseExtras(pathway, phase, lang)
 
   if (lang === 'fr') {
     const parts = [
@@ -129,9 +209,10 @@ export function renderPathwayPromptBlock(
         ? `Aborde les points suivants, un seul à la fois, de façon naturelle et chaleureuse (n'enchaîne pas les questions) :\n${questionLines}`
         : `Poursuis naturellement la conversation pour cette phase.`,
       `Reste attentive si l'utilisatrice évoque : ${watch}.`,
+      extras || null,
       out.differentialMentions.length ? out.differentialMentions.join('\n') : null,
     ].filter(Boolean)
-    return parts.join('\n')
+    return parts.join('\n\n')
   }
 
   const parts = [
@@ -142,9 +223,10 @@ export function renderPathwayPromptBlock(
       ? `Cover the following, ONE at a time, naturally and warmly (don't fire questions in a row):\n${questionLines}`
       : `Continue the conversation naturally for this phase.`,
     `Stay attentive if the user mentions: ${watch}.`,
+    extras || null,
     out.differentialMentions.length ? out.differentialMentions.join('\n') : null,
   ].filter(Boolean)
-  return parts.join('\n')
+  return parts.join('\n\n')
 }
 
 /** A fresh, unrouted session. */
