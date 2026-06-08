@@ -36,15 +36,50 @@ export type PolicyResult = {
 // If any of these appear in AI output, the response is blocked
 // and replaced with a safe fallback
 // ─────────────────────────────────────────────────────────────
+// Benign continuations after a second-person "have" verb. When one of these
+// follows as a COMPLETE word, the phrase is ordinary dialogue — present perfect
+// ("you have described / experienced"), a negation ("you have not"), or
+// possession of a non-clinical noun ("you have options / an appointment") —
+// NOT a diagnostic claim. Listing exceptions only ever makes the block fire
+// LESS on conversational text; "you have <condition>" and anything ambiguous
+// still blocks. Dangerous perfect-tense forms (e.g. "...been diagnosed with")
+// are recovered by explicit patterns below.
+// (v1.2 — fixes false positives where "you have"/"vous avez"/"tu as" matched
+//  ordinary replies and wiped them with the diagnosis fallback.)
+const EN_HAVE_BENIGN =
+  'had|been|not|never|yet|always|already|described|experienced|mentioned|told|' +
+  'tried|noticed|reported|shared|listed|raised|asked|used|felt|seen|started|' +
+  'stopped|come|gone|options|option|several|some|any|more|other|access|to|' +
+  'a question|a concern|a choice|an appointment|your appointment|the option|' +
+  'the choice|the opportunity'
+
+const FR_AVOIR_BENIGN =
+  'mentionné|décrit|décrite|essayé|parlé|indiqué|signalé|noté|ressenti|dit|' +
+  'posé|partagé|demandé|remarqué|eu|déjà|jamais|encore|toujours|raison|besoin|' +
+  'plusieurs|accès|le choix|des options|la possibilité|du temps|rendez-vous|' +
+  'votre rendez-vous'
+
+// "...complete word" guard: the benign term must not be a prefix of a longer
+// word (so "to" excludes "to discuss" but NOT "total ovarian failure").
+const EN_WORD_END = '(?![A-Za-z0-9])'
+const FR_WORD_END = '(?![A-Za-zÀ-ÿ0-9])'
+
 const DIAGNOSIS_PATTERNS = [
-  /vous (avez|souffrez de|êtes atteinte de)/i,
-  /tu (as|souffres de|es atteinte d[e'])/i,                  // FIX v1.1: was "es atteinte de", misses "atteinte d'" form
+  /vous (souffrez de|êtes atteinte de)/i,
+  /tu (souffres de|es atteinte d[e'])/i,                      // FIX v1.1: was "es atteinte de", misses "atteinte d'" form
+  // Possessive "you have <…>" attributes a condition UNLESS the continuation is
+  // ordinary dialogue (see *_BENIGN). v1.2: bare "vous avez"/"tu as" no longer
+  // match every "you have …" sentence.
+  new RegExp(`vous avez (?!(?:${FR_AVOIR_BENIGN})${FR_WORD_END})`, 'i'),
+  new RegExp(`tu as (?!(?:${FR_AVOIR_BENIGN})${FR_WORD_END})`, 'i'),
   /il s'agit (d'|de )/i,
   /c'est (probablement |certainement |clairement )/i,
   /diagnostic\s*(de |:)/i,                                    // FIX v1.1: was "diagnostic (de |:)", missed "Diagnostic:" without space
   /vous (souffrez|êtes) (atteinte )?(d'endométriose|de SOPK|de PMDD)/i,  // FIX v1.1: added optional "atteinte" before condition
   /I (diagnose|confirm|identify)/i,
-  /you (have|are suffering from|are diagnosed with)/i,
+  /you are (suffering from|diagnosed with)/i,
+  /you have been diagnosed/i,                                 // recovery: "been" is benign-listed, so catch this explicitly
+  new RegExp(`you have (?!(?:${EN_HAVE_BENIGN})${EN_WORD_END})`, 'i'),
 ]
 
 // ─────────────────────────────────────────────────────────────
