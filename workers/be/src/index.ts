@@ -58,6 +58,7 @@ const app = new Hono<{ Bindings: Env }>()
 //
 // localhost is included so `expo start --web` can call this API in dev.
 const STATIC_ALLOWED_ORIGINS = [
+  'https://ask.anoqi.health',
   'https://anoqi-app-staging.marion-8c0.workers.dev',
   'https://app.anoqi.com',
   'https://anoqi.com',
