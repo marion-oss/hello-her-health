@@ -321,11 +321,11 @@ async function tryUploadInBackground(docId: string) {
     const doc = await loadDocument(docId)
     if (!doc) return
 
-    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? ''
-    if (!supabaseUrl) return
+    const apiUrl = (process.env.EXPO_PUBLIC_ANOQI_API_URL ?? '').replace(/\/+$/, '')
+    if (!apiUrl) return
 
     await uploadDocument(doc, {
-      supabaseUrl,
+      apiUrl,
       accessToken: session.access_token,
       birthYear:   null,
       country:     null,

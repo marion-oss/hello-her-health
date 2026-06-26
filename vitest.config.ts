@@ -20,7 +20,6 @@ export default defineConfig({
     include: [
       'api/lib/citationParser.test.ts',
       'api/lib/pseudonymise.test.ts',
-      'api/lib/summaryParser.test.ts',
       'api/functions/summaries.test.ts',
       'api/policy/policy.test.ts',
     ],

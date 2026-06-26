@@ -274,14 +274,15 @@ export async function deleteAllDocuments(): Promise<void> {
 
 // ─────────────────────────────────────────────────────────────
 // UPLOAD
-// Sends the clean payload to the Supabase Edge Function.
+// Sends the clean payload to the Anoqi Worker (POST /documents), which
+// authenticates the same Supabase Bearer token via JWKS and writes the row.
 // Call only after the user is authenticated (token required).
 // Updates the local doc record with serverId + uploadedAt on success.
 // ─────────────────────────────────────────────────────────────
 export async function uploadDocument(
   doc: LocalDocument,
   options: {
-    supabaseUrl: string
+    apiUrl: string
     accessToken: string
     birthYear: number | null
     country: string | null
@@ -299,7 +300,7 @@ export async function uploadDocument(
   }
 
   const response = await fetch(
-    `${options.supabaseUrl}/functions/v1/documents`,
+    `${options.apiUrl}/documents`,
     {
       method: 'POST',
       headers: {
@@ -336,7 +337,7 @@ export async function uploadDocument(
 // ─────────────────────────────────────────────────────────────
 export async function uploadPendingDocuments(
   options: {
-    supabaseUrl: string
+    apiUrl: string
     accessToken: string
     birthYear: number | null
     country: string | null

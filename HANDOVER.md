@@ -3,6 +3,33 @@
 Last updated: 2026-05-18 (Option C posture + privacy/safety PRs + brand v2.0)
 Supersedes (does not delete): [`PHASE_1_RAG.md`](./PHASE_1_RAG.md), which covers Phase 1 RAG only.
 
+> ## ⚠️ Architecture update — 2026-06-26 (read this first)
+>
+> The sections below describe **two parallel backends** (a Supabase Edge Function
+> and a Cloudflare Worker) and say both authenticate to Gemini with an
+> **AI Studio API key** (`GEMINI_API_KEY`). **That is no longer true.** Current
+> state:
+>
+> - **One backend: the Cloudflare Worker `anoqi-api-staging`.** It serves
+>   `POST /chat`, `POST /documents`, and `POST /summaries`. The app talks only
+>   to this Worker, via `EXPO_PUBLIC_ANOQI_API_URL`
+>   (`https://anoqi-api-staging.marion-8c0.workers.dev`).
+> - **Gemini is reached through Vertex AI, not AI Studio.** The Worker mints a
+>   Google service-account OAuth token (`workers/be/src/lib/vertexAuth.ts`) from
+>   the **`VERTEX_SA_JSON`** secret and calls `aiplatform.googleapis.com`. There
+>   is **no `GEMINI_API_KEY`** anymore. Vertex AI only accepts OAuth, never API
+>   keys — this is why a leftover AI-Studio key returned **403**.
+> - **Models:** `gemini-3.5-flash` (chat), `gemini-3.5-pro` (summaries).
+> - **The Supabase Edge Functions are removed.** `supabase/functions/{chat,
+>   documents,summaries}` and their AI-Studio source (`api/functions/chat.ts`,
+>   `api/functions/documents.ts`, `api/lib/gemini.ts`) are gone. `api/lib/gemini.ts`
+>   may briefly survive only as a test dependency of `summaries.test.ts`.
+> - Still on Supabase (unchanged): the **Postgres database + Auth (JWT)**. The
+>   Worker verifies those same JWTs.
+>
+> Everything from here down is kept for history. Where it conflicts with this
+> box, this box wins.
+
 **Looking for *how* to do something?**
 - [`RUNBOOK.md`](./RUNBOOK.md) — deploy, rotate keys, flip flags, fix common errors
 - [`BRAND.md`](./BRAND.md) — visual identity: palette, type, the form, component anchors
@@ -47,10 +74,10 @@ RAG is **off by default** on both backends for public traffic. Named pilot users
 
 | Surface | URL | What it does |
 |---|---|---|
-| **Web chat** | <https://anoqi-app-staging.marion-8c0.workers.dev> | Expo web build of `app/` — talks to Supabase Edge `/chat` |
-| **Mobile** | `cd <repo> && npx expo start` | Same React Native code as web — talks to Supabase Edge `/chat` |
-| **Supabase Edge `/chat`** | `https://xulemxvfufwvewvtwwcv.supabase.co/functions/v1/chat` | Original deploy of the chat function. Public traffic: RAG off; pilot list: RAG on. |
-| **CF Worker `/chat`** | `https://anoqi-api-staging.marion-8c0.workers.dev/chat` | Parallel deploy. Same posture. Identical response shape. |
+| **Web chat** | <https://anoqi-app-staging.marion-8c0.workers.dev> | Expo web build of `app/` — talks to the CF Worker (`/chat`, `/documents`, `/summaries`) |
+| **Mobile** | `cd <repo> && npx expo start` | Same React Native code as web — talks to the CF Worker |
+| **CF Worker (live backend)** | `https://anoqi-api-staging.marion-8c0.workers.dev/chat` | The single backend. Gemini via Vertex OAuth. Public traffic: RAG off; pilot list: RAG on. |
+| ~~Supabase Edge `/chat`~~ | _(removed 2026-06-26)_ | Retired AI-Studio path. Was the source of the 403. |
 | **CF Worker `/health`** | `https://anoqi-api-staging.marion-8c0.workers.dev/health` | Liveness probe |
 
 To redeploy the FE Worker after a UI change in `app/`:
@@ -181,7 +208,7 @@ HANDOVER.md                     # This file
 
 - **Worker `anoqi-api-staging`** at <https://anoqi-api-staging.marion-8c0.workers.dev>
   - Routes: `GET /health`, `POST /chat`, `POST /documents`, `POST /summaries`
-  - Secrets set: `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. Add `ANOQI_RAG_PILOT_USERS` to put a user in the pilot.
+  - Secrets set: `VERTEX_SA_JSON` (service-account JSON for Vertex OAuth — replaced the old `GEMINI_API_KEY`), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_JWKS_URL`. Vars: `GCP_PROJECT_ID`, `GCP_REGION`. Add `ANOQI_RAG_PILOT_USERS` to put a user in the pilot.
   - Vars set: `ANOQI_RAG_ENABLED = "false"` (in `wrangler.toml`)
 - **Worker `anoqi-app-staging`** at <https://anoqi-app-staging.marion-8c0.workers.dev>
   - Static Assets serving the Expo web build (~1.1 MB JS bundle)
