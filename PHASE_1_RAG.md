@@ -1,5 +1,10 @@
 # Phase 1 — Retrieval-Augmented Chat (RAG)
 
+> **⚠️ Historical (pre-Vertex).** This doc references Supabase Edge Functions and
+> the AI-Studio `GEMINI_API_KEY`. Both are gone: the live backend is the
+> Cloudflare Worker, and Gemini is reached via Vertex AI OAuth. See the
+> "Architecture update" box at the top of [`HANDOVER.md`](./HANDOVER.md).
+
 Status: **code-complete, schema deployed, corpus populated. Not enabled in any environment.** Flipping the flag requires (a) deploying the new edge function code, (b) setting one secret, and (c) regulatory sign-off (see ROADMAP).
 
 This document captures what shipped on `marcelo_update`, what is still needed to reach end-to-end behaviour in the mobile app, and exactly how to close each gap.

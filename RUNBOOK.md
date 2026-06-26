@@ -4,6 +4,13 @@ Operational companion to [`HANDOVER.md`](./HANDOVER.md). HANDOVER explains *what
 
 If you're new here, read HANDOVER first, then keep this open in a tab.
 
+> **⚠️ 2026-06-26:** This runbook still shows two backends and `GEMINI_API_KEY`
+> steps. The Supabase Edge Functions were **removed**; the **Cloudflare Worker is
+> the only backend**, and Gemini is now reached via **Vertex AI OAuth**
+> (`VERTEX_SA_JSON`), not an AI-Studio key. Any `supabase functions deploy` or
+> `curl …supabase.co/functions/v1/…` step below is obsolete. See the
+> "Architecture update" box at the top of [`HANDOVER.md`](./HANDOVER.md).
+
 ---
 
 ## The moving parts
